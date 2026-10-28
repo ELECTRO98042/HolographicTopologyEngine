@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holographic HUD - CH-05: HOLOGRAPHIC TOPOLOGY ENGINE</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background: #050808;
+            overflow: hidden;
+            box-sizing: border-box;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        *,
+        *:before,
+        *:after {
+            box-sizing: inherit;
+        }
+    </style>
+    <script type="module" src="/js/controlDeck.js"></script>
+    <script type="module" src="/js/TopologyEngineViewer.js"></script>
+</head>
+
+<body style="display: flex; flex-direction: column; height: 100vh;"></bodystyle>
+    <!-- Left Sidebar: v2.7.8 Scenario Preset Creator -->
+    <div id="view-ch-05" class="channel-view"
+        style="display: none; width: 100%; height: 100%; position: absolute; top: 0px; left: 0px;">
+        <!-- Left Sidebar: v2.7.8 Scenario Preset Creator -->
+        <div id="preset-creator-panel"
+            style="position: absolute; top: 10px; left: 10px; z-index: 10; background: rgba(0,255,204,0.05); border: 1px solid rgba(0,255,204,0.3); padding: 12px; width: 280px;">
+            <div style="font-size: 10px; font-weight: bold; margin-bottom: 6px; color: #00ffcc;">// v2.7.8 PRESET ENGINE
+            </div>
+            <input type="text" id="preset-id-input" value="custom_operator_01"
+                style="width: 100%; background: #000; border: 1px solid #00ff33; color: #00ffcc; padding: 4px; margin-bottom: 6px;">
+            <select id="operator-type-select"
+                style="width: 100%; background: #000; border: 1px solid #00ff33; color: #00ffcc; padding: 4px; margin-bottom: 6px;">
+                <option value="Berry Curvature">Berry Curvature Tensor</option>
+                <option value="Topological Gauge">Topological Gauge Field</option>
+                <option value="Non-Hermitian Hamiltonian">Non-Hermitian Hamiltonian</option>
+            </select>
+            <button id="compile-preset-btn"
+                style="width: 100%; background: #00ffcc; color: #000; font-weight: bold; border: none; padding: 6px; cursor: pointer;">COMPILE
+                & STREAM</button>
+            <div id="compiler-status" style="font-size: 9px; margin-top: 6px; color: #ff00ff; min-height: 12px;"></div>
+        </div>
+    
+        <!-- Right Viewport: Topology Mesh Canvas Container -->
+        <div id="topologyContainer" style="width: 100vw; height: 100vh; position: relative;">
+            <canvas id="phaseSpaceCanvas" style="width: 100%; height: 100%; display: block;"></canvas>
+        </div>
+    </div>
+    <script type="module">
+        import { TopologyEngineViewer } from '/js/TopologyEngineViewer.js';
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const container = document.getElementById('topologyContainer');
+            if (!container) return;
+
+            // Initialize CH-05 Dedicated Topology Engine Viewer
+            const viewer = new TopologyEngineViewer(container);
+            window.topologyEngineViewer = viewer;
+            window.topologyViewer = viewer;
+
+            // Initialize Zero-Copy Ingestion Engine
+            const ingestionEngine = new PresetMeshIngestionEngine(viewer);
+            window.meshIngestionEngine = ingestionEngine;
+            ingestionEngine.connect('/ws/topology');
+
+            // Compile & Stream Button Event Listener
+            const compileBtn = document.getElementById('compile-preset-btn');
+            if (compileBtn) {
+                compileBtn.addEventListener('click', async () => {
+                    const presetId = document.getElementById('preset-id-input').value;
+                    const operatorType = document.getElementById('operator-type-select').value;
+                    const statusDiv = document.getElementById('compiler-status');
+
+                    const payload = {
+                        preset_id: presetId,
+                        metadata: { title: "Dynamic Custom Operator" },
+                        nodes: [{
+                            node_id: "node_custom_1",
+                            operator_type: operatorType,
+                            position_3d: [50.0, 50.0, 0.0],
+                            inputs: [{ socket_id: "in_1", rank: 2, variance: "covariant", shape_marker: "square" }],
+                            outputs: [{ socket_id: "out_1", rank: 2, variance: "contravariant", shape_marker: "square" }],
+                            parameters: { flux: 1.5 }
+                        }],
+                        connections: [],
+                        slider_bindings: { coupling_strength: "0.80", entropy_perturbation: "0.20", stream_velocity: "1.50", scalar_distortion: "0.10" }
+                    };
+
+                    statusDiv.innerText = "Compiling...";
+                    try {
+                        const res = await fetch('/api/v2.7.8/presets/compile', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const result = await res.json();
+                        if (res.ok && (result.is_valid || result.status === 'success')) {
+                            statusDiv.style.color = "#00ffcc";
+                            statusDiv.innerText = "Connected!";
+                            ingestionEngine.connect(`/ws/telemetry/${presetId}`);
+                        } else {
+                            statusDiv.style.color = "#ff3333";
+                            statusDiv.innerText = "Compilation failed";
+                        }
+                    } catch (err) {
+                        statusDiv.style.color = "#ff3333";
+                        statusDiv.innerText = "Network error";
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+
+</html>

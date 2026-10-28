@@ -17,6 +17,8 @@ from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 from typing import Dict, List, Any
 from backend.routes.test_suite_routes import router as test_suite_router
+from backend.routers import presets, websocket_telemetry
+from backend.compute_engine import serialize_coords_to_binary
 
 # Configure logger
 logger = logging.getLogger("uvicorn.error")
@@ -24,8 +26,8 @@ logger = logging.getLogger("uvicorn.error")
 # ==========================================
 # IMPORT MODULARIZED ENGINES & HELPERS
 # ==========================================
-from oscilloscope_engine import oscilloscope_websocket_endpoint, OscilloscopeEngine
-from compute_engine import serialize_coords_to_binary
+from backend.oscilloscope_engine import oscilloscope_websocket_endpoint, OscilloscopeEngine
+from backend.compute_engine import serialize_coords_to_binary
 
 # Mock or local stub for curvature metrics if not imported directly
 def compute_curvature_metrics(x, node_positions):
@@ -51,8 +53,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.mount("/js", StaticFiles(directory=JS_DIR), name="js")
 app.include_router(test_suite_router)
+app.include_router(presets.router)
+app.include_router(websocket_telemetry.router)
 # ==========================================
 # PIPELINE & CONNECTION MANAGERS
 # ==========================================
@@ -175,18 +178,12 @@ app.websocket("/ws/oscilloscope")(oscilloscope_websocket_endpoint)
 async def websocket_telemetry_endpoint(websocket: WebSocket):
     global current_active_node_positions
     await manager.connect(websocket)
-    
     try:
         if pipeline is None:
             await websocket.close(code=1011, reason="Pipeline not initialized")
             return
-    except Exception as e:
-        logger.error(f"Telemetry initialization failed: {e}")
-        await websocket.close(code=1011)
-        raise
 
-    try:
-        phase = 0.0  # Initialize phase accumulator to prevent NameError
+        phase = 0.0
         while True:
             start_time = time.time()
             phase += 0.05
@@ -256,15 +253,15 @@ async def websocket_telemetry_endpoint(websocket: WebSocket):
         manager.disconnect(websocket)
 
 # CH-03: Raw Matrix / Tensor Inspector Stream
-@app.websocket("/ws/telemetry")
+@app.websocket("/ws/matrix") #edited to match ws/matrix websocket instead of ws/telemetry
 async def websocket_matrix_endpoint(websocket: WebSocket):
     await websocket.accept()
     try:
         while True:
-            if os.path.exists("data/stream_buffer.bin"):
-                with open("data/stream_buffer.bin", "rb") as f:
-                    payload = f.read()
-                await websocket.send_bytes(payload)
+            start_time = time.time()
+            tensor_frame = np.random.uniform(-2.0, 2.0, size=(32, 32)).astype(np.float32)
+            payload = serialize_coords_to_binary(tensor_frame)
+            await manager.send_binary(payload, websocket)
             
             elapsed = time.time() - start_time
             await asyncio.sleep(max(0.0, (1.0 / 60.0) - elapsed))
@@ -290,6 +287,32 @@ async def websocket_phasespace_endpoint(websocket: WebSocket):
         pass
     except Exception as e:
         print(f"Phase-space WebSocket error: {e}")
+# CH-05: Holographic Topology Engine Stream
+@app.websocket("/ws/topology")
+async def websocket_topology_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    logger.log(logging.INFO, "[CH-05] Topology mesh stream connected.")
+    try:
+        while True:
+            start_time = time.time()
+            # Generate or stream 6-layer mesh Float32 coordinate/topology data
+            mesh_frame = np.random.uniform(-1.0, 1.0, size=(6, 256, 3)).astype(np.float32)
+            payload = mesh_frame.tobytes()
+            await websocket.send_bytes(payload)
+            
+            elapsed = time.time() - start_time
+            await asyncio.sleep(max(0.0, (1.0 / 60.0) - elapsed))
+    except WebSocketDisconnect:
+        logger.log(logging.INFO, "[CH-05] Topology mesh stream disconnected.")
+    except Exception as e:
+        logger.error(f"[CH-05] Topology WebSocket error: {e}")
+@app.get("/health")
+def health_check():
+    return {
+        "status": "healthy",
+        "version": "2.7.8",
+        "engine": "JAX-accelerated 6-Layer Holographic Topology Engine"
+    }
 
 # CH-04 Placeholder (Ready for future expansion)
 # @app.websocket("/ws/ch04")

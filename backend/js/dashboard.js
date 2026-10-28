@@ -6,6 +6,7 @@
  * 3. Mounting, initializing, and resizing individual channel viewers (`OscilloscopeViewer`, 
  *    `TopologyMeshViewer`, `RawMatrixViewer`) without breaking scoping or state.
  */
+import { TopologyEngineViewer } from './TopologyEngineViewer.js';
 
 export class TelemetryStreamApp {
     constructor(containerElement) {
@@ -16,6 +17,8 @@ export class TelemetryStreamApp {
         this.oscViewer = null;    // CH-01: Oscilloscope Viewer
         this.meshViewer = null;   // CH-02: Topology Mesh Viewer (3D Lattice)
         this.matrixViewer = null; // CH-03: Raw Matrix / Tensor Inspector Viewer
+        this.phaseSpaceViewer = null; // CH-04 Phase Space Constructor
+        this.topologyEngineViewer = null; // CH-05 Holographic Topology Engine
 
         this.init();
     }
@@ -70,6 +73,11 @@ export class TelemetryStreamApp {
                             <div id="phaseSpaceContainer" style="width: 100%; height: 100%; position: relative;"></div>
                         </div>
 
+                        <!-- CH-05 Topology Engine View Container -->
+                        <div id="view-CH-05" class="channel-view" style="display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0;">
+                            <div id="topologyContainer" style="width: 100%; height: 100%; position: relative;"></div>
+                        </div>
+
                     </div>
                 </div>
 
@@ -79,6 +87,7 @@ export class TelemetryStreamApp {
                     <button class="channel-btn" data-channel="CH-02" style="background: transparent; border: 1px solid #00ffcc; color: #00ffcc; padding: 6px 16px; font-family: monospace; cursor: pointer;">CH-02</button>
                     <button class="channel-btn" data-channel="CH-03" style="background: transparent; border: 1px solid #00ffcc; color: #00ffcc; padding: 6px 16px; font-family: monospace; cursor: pointer;">CH-03</button>
                     <button class="channel-btn" data-channel="CH-04" style="background: transparent; border: 1px solid #00ffcc; color: #00ffcc; padding: 6px 16px; font-family: monospace; cursor: pointer;">CH-04</button>
+                    <button class="channel-btn" data-channel="CH-05" style="background: transparent; border: 1px solid #00ffcc; color: #00ffcc; padding: 6px 16px; font-family: monospace; cursor: pointer;">CH-05</button>
                     <!-- FUTURE CHANNELS: Add new button elements here following data-channel="CH-XX" -->
                 </div>
 
@@ -143,6 +152,10 @@ export class TelemetryStreamApp {
                     if (titleEl) titleEl.textContent = "CH-04: PHASE SPACE CONSTRUCTOR";
                     this.initChannel04(activeView);
                     break;
+                case 'CH-05':
+                    if (titleEl) titleEl.textContent = "CH-05: HOLOGRAPHIC TOPOLOGY ENGINE";
+                    this.initChannel05(activeView);
+                    break;
                 default:
                     if (titleEl) titleEl.textContent = `UNKNOWN CHANNEL: ${channelId}`;
             }
@@ -191,7 +204,7 @@ export class TelemetryStreamApp {
         if (container && typeof RawMatrixViewer !== 'undefined') {
             if (!this.matrixViewer) {
                 this.matrixViewer = new RawMatrixViewer(container);
-                this.matrixViewer.connect('/ws/telemetry');
+                this.matrixViewer.connect('/ws/matrix');
             }
         } else if (typeof this.matrixViewer.renderGrid === 'function' && this.matrixViewer.currentData) {
             this.matrixViewer.renderGrid(this.matrixViewer.currentData);
@@ -211,5 +224,19 @@ export class TelemetryStreamApp {
             }
         }
         this.activeViewer = this.phaseViewer;
+    }
+    /*** CH-05 Initialization Logic (Holographic Topology Engine View) ***/
+    initChannel05(activeView) {
+        const container = activeView.querySelector('#topologyContainer');
+        if (container && typeof TopologyEngineViewer !== 'undefined') {
+            if (!this.topologyEngineViewer) {
+                this.topologyEngineViewer = new TopologyEngineViewer(container);
+                this.topologyEngineViewer.connect('/ws/topology');
+                window.topologyEngineViewer = this.topologyEngineViewer;
+            } else {
+                this.topologyEngineViewer.resize();
+            }
+        }
+        this.activeViewer = this.topologyEngineViewer;
     }
 }

@@ -57,6 +57,15 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (channelId === 'CH-02') {
             url = '/topologylattice.html';
             windowName = 'TopologyLatticeStream';
+        } else if (channelId === 'CH-03') {
+            url = '/rawmatrix.html'; 
+            windowName = 'RawMatrixStream';
+        } else if (channelId === 'CH-04') {
+            url = '/phasespace.html';
+            windowName = 'PhaseSpaceStream';
+        } else if (channelId === 'CH-05') {
+            url = '/topology.html';
+            windowName = 'TopologyEngineStream';
         } else if (channelId === 'DASHBOARD') {
             url = '/dashboard.html';
             windowName = 'TelemetryDashboard';

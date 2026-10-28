@@ -44,7 +44,7 @@
 
             const viewer = new RawMatrixViewer(container);
             window.matrixViewer = viewer;
-            viewer.connect('/ws/telemetry');
+            viewer.connect('/ws/matrix'); //edited to correct ws/matrix instead of ws/telemetry to isolate the channel
         });
     </script>
 </body>

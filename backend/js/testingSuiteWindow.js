@@ -34,7 +34,6 @@ class TestingSuiteWindow {
         };
 
         this.initUI();
-        this.fetchConfigs();
     }
 
     initUI() {
@@ -44,7 +43,7 @@ class TestingSuiteWindow {
         drawer.innerHTML = `
             <div class="drawer-header" id="suite-drag-handle" style="cursor: move;">
                 <h3>🧪 Scientific Testing Suite</h3>
-                <button class="close-btn" id="close-drawer-btn">&times;</button>
+                <button class="close-btn" id="close-drawer-btn">×</button>
             </div>
             <div class="drawer-content">
                 <!-- Step 1: Scenario Selection -->
@@ -52,6 +51,11 @@ class TestingSuiteWindow {
                     <h4>Step 1: Scenario Selection</h4>
                     <select id="suite-preset-select" class="form-select">
                         <option value="">-- Select Physics Preset --</option>
+                        <optgroup label="Standard Presets" id="preset-options-group">
+                        </optgroup>
+                        <optgroup label="Custom Scenario Builder">
+                            <option value="FREESTYLE_HOLOGRAPHIC_ENGINE">❖ Launch Holographic Topology Engine (Freestyle)...</option>
+                        </optgroup>
                     </select>
                 </div>
 
@@ -124,7 +128,22 @@ class TestingSuiteWindow {
 
         // Bind events safely
         document.getElementById("close-drawer-btn").addEventListener("click", () => this.toggleDrawer(false));
-        document.getElementById("suite-preset-select").addEventListener("change", (e) => this.loadConfig(e.target.value));
+        document.getElementById("suite-preset-select").addEventListener("change", (e) => {
+            const val = e.target.value;
+            if (val === "FREESTYLE_HOLOGRAPHIC_ENGINE") {
+                const windowFeatures = "width=1920,height=1080,resizable=yes,scrollbars=no,status=no";
+                const engineWindow = window.open("deck.html", "HolographicTopologyEngine", windowFeatures);
+                if (engineWindow) {
+                    engineWindow.focus();
+                } else {
+                    alert("Popup blocked! Please allow popups for this site to open the Holographic Topology Engine.");
+                }
+                e.target.value = "";
+                this.loadConfig("");
+                return;
+            }
+            this.loadConfig(val);
+        });
         document.getElementById("btn-toggle-capture").addEventListener("click", () => this.toggleCapture());
         document.getElementById("btn-abort-capture").addEventListener("click", () => this.abandonTest());
         document.getElementById("btn-export-ai-report").addEventListener("click", () => this.exportReport());
@@ -134,8 +153,57 @@ class TestingSuiteWindow {
         ["chk-mesh", "chk-singularity", "chk-snr"].forEach(id => {
             document.getElementById(id).addEventListener("change", () => this.evaluateStatus());
         });
+        this.fetchConfigs();        
     }
 
+    async fetchConfigs() {
+        const defaultConfigs = [
+            "preset_maldacena_conformal",
+            "preset_er_bridge_collapse",
+            "preset_ricci_soliton_decay"
+        ];
+
+        const group = document.getElementById("preset-options-group");
+
+        const render = (items) => {
+            if (!group) return;
+            group.innerHTML = "";
+            items.forEach(cfg => {
+                const opt = document.createElement("option");
+                opt.value = cfg;
+                opt.textContent = cfg;
+                group.appendChild(opt);
+            });
+        };
+
+        // Render defaults immediately so options appear right away
+        render(defaultConfigs);
+
+        // Fetch live configs from the backend in the background with a 2-second timeout
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+            const res = await fetch("/api/v1/test-suite/configs", { signal: controller.signal });
+            clearTimeout(timeoutId);
+
+            if (res.ok) {
+                const data = await res.json();
+                let configs = [];
+                if (Array.isArray(data)) {
+                    configs = data;
+                } else if (data && Array.isArray(data.configs)) {
+                    configs = data.configs;
+                }
+                if (configs.length > 0) {
+                    render(configs);
+                }
+            }
+        } catch (err) {
+            console.warn("Using default physics presets (server route offline or timed out).", err);
+        }
+    }
+    
     initDraggable(drawer) {
         const header = document.getElementById("suite-drag-handle");
         let isDragging = false;
@@ -169,23 +237,6 @@ class TestingSuiteWindow {
         document.addEventListener("mouseup", () => {
             isDragging = false;
         });
-    }
-
-    async fetchConfigs() {
-        try {
-            const res = await fetch("/api/v1/test-suite/configs");
-            const data = await res.json();
-            const select = document.getElementById("suite-preset-select");
-            select.innerHTML = '<option value="">-- Select Physics Preset --</option>';
-            data.configs.forEach(cfg => {
-                const opt = document.createElement("option");
-                opt.value = cfg;
-                opt.textContent = cfg;
-                select.appendChild(opt);
-            });
-        } catch (err) {
-            console.warn("Test suite server routes offline. Using local mode fallback.", err);
-        }
     }
 
     async loadConfig(filename) {
@@ -536,7 +587,7 @@ class TestingSuiteWindow {
                     outputs: [],
                     source: [
                         "# 2. Ingest Captured Telemetry Dataset\n",
-                        'telemetry_data = {JSON.stringify(this.metricsLog, null, 2)}\n\n',
+                        `telemetry_data = ${JSON.stringify(this.metricsLog, null, 2)}\n\n`,
                         "steps = jnp.array([d['step'] for d in telemetry_data])\n",
                         "time_elapsed = jnp.array([d['timeElapsed'] for d in telemetry_data])\n",
                         "num_points = jnp.array([d['numPoints'] for d in telemetry_data])\n",

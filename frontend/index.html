@@ -422,8 +422,18 @@
             rotZ: 0.0,
             distance: 800
         };
+
+        window.hudConfig = window.hudConfig || {
+                worldScale: parseFloat(document.getElementById('slider-world-scale')?.value || 3.0),
+                gridDensity: 10,
+                motionSpeed: 1.0,
+                noiseThresh: 0.05,
+                overlays: {}
+            };
         // Inside your main setup or init routine
         function initControlDeck() {
+            window.hudConfig = window.hudConfig || {};
+            window.hudConfig.worldScale = parseFloat(document.getElementById('slider-world-scale')?.value || 3.0);
             //////////////////////////////////////////////////////////////
             // ... existing event listeners for overlays and sliders ...//
             //////////////////////////////////////////////////////////////
@@ -435,13 +445,31 @@
             }
         }
 
-        // Global Nodes Data[cite: 1]
-        let nodes = [
-            { id: "N-001", x: 0, y: 0, z: 0, isCore: true },
-            { id: "N-002", x: 120, y: -40, z: 30, isCore: false },
-            { id: "N-003", x: -120, y: 60, z: -30, isCore: false }
-        ];
-        window.nodes = nodes; // Keep global reference synchronized
+        // Expose a robust getter/setter on window with a local fallback
+        let _fallbackNodes = [
+                { id: 'N-001', x: 0, y: 0, z: 0, isCore: true },
+                { id: 'N-002', x: -100, y: 0, z: 86.6, isCore: false },
+                { id: 'N-003', x: 100, y: 0, z: 86.6, isCore: false }
+            ];
+
+            Object.defineProperty(window, 'nodes', {
+                get() {
+                    const activeNodes = (window.deckViewport && window.deckViewport.nodes && window.deckViewport.nodes.length > 0)
+                        ? window.deckViewport.nodes
+                        : _fallbackNodes;
+                    console.log("Getter activeNodes:", activeNodes);
+                    return activeNodes;
+                },
+                set(newNodes) {
+                    console.warn("Nodes setter called with:", newNodes);
+                    if (window.deckViewport) {
+                        window.deckViewport.nodes = newNodes;
+                    } else {
+                        _fallbackNodes = newNodes;
+                    }
+                },
+                configurable: true
+            });
 
         // 3D Projection Pipeline[cite: 1]
         function project3D(x, y, z, width, height) {
@@ -612,6 +640,7 @@
         ws.onmessage = function (event) {
             if (event.data instanceof ArrayBuffer) {
                 const floatArray = new Float32Array(event.data);
+                const scaleMultiplier = window.hudConfig ? window.hudConfig.worldScale : 1.0;
                 for (let i = 0; i < nodes.length && (i * 4 + 1) < floatArray.length; i++) {
                     if (!nodes[i].isPinned && nodes[i] !== selectedNode) {
                         nodes[i].x = floatArray[i * 4];
@@ -647,62 +676,23 @@
             );
         }
 
-        // 3D Motion & Drift Calibration Loop[cite: 1]
-        nodes.forEach(node => {
-                if (!node.drift) node.drift = { x: 0, z: 0, vx: 0, vz: 0 };
-            });
-
-            function updateNodesMotion() {
-                const motionMultiplier = window.hudConfig ? window.hudConfig.motionSpeed : 1.0;
-                const scaleMultiplier = window.hudConfig ? window.hudConfig.worldScale : 1.0;
-                const noiseThresh = window.hudConfig ? window.hudConfig.noiseThreshold : 0.0;
-                const animTime = performance.now() * 0.0003 * motionMultiplier;
-
-                nodes.forEach((node, index) => {
-                    if (!node.isCore && node !== selectedNode && !node.isPinned) {
-                        const baseAngle = animTime * (index === 1 ? 1 : -1) + (index * Math.PI);
-                        const radius = 120 * scaleMultiplier;
-
-                        // Base orbital path
-                        node.x = Math.cos(baseAngle) * radius;
-                        node.z = Math.sin(baseAngle) * radius;
-
-                        // Persistent random walk / drift
-                        if (noiseThresh > 0) {
-                            if (!node.drift) node.drift = { x: 0, z: 0, vx: 0, vz: 0 };
-
-                            node.drift.vx += (Math.random() - 0.5) * noiseThresh * 2.0;
-                            node.drift.vz += (Math.random() - 0.5) * noiseThresh * 2.0;
-                            node.drift.vx *= 0.90; // Damping/friction
-                            node.drift.vz *= 0.90;
-
-                            node.drift.x += node.drift.vx;
-                            node.drift.z += node.drift.vz;
-
-                            const maxDrift = 40 * noiseThresh * scaleMultiplier;
-                            node.drift.x = Math.max(-maxDrift, Math.min(maxDrift, node.drift.x));
-                            node.drift.z = Math.max(-maxDrift, Math.min(maxDrift, node.drift.z));
-
-                            node.x += node.drift.x;
-                            node.z += node.drift.z;
-                        } else if (node.drift) {
-                            node.drift.x = 0; node.drift.z = 0;
-                            node.drift.vx = 0; node.drift.vz = 0;
-                        }
-                        node.y = 0;
-                    }
-                });
-            }
-
         // Main Render Loop[cite: 1]
         function draw() {
             ctx.fillStyle = '#05050a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            updateNodesMotion();
+            // REMOVE THIS: updateNodesMotion();
 
             let projectedNodes = nodes.map(node => {
-                const p = project3D(node.x, node.y, node.z, canvas.width, canvas.height);
+                const pos = node.position || node;
+                const scaleMultiplier = window.hudConfig ? window.hudConfig.worldScale : 1.0;
+
+                // Keep base spread proportional to the grid span without over-stretching
+                const baseSpread = 60;
+                const effectiveScale = baseSpread * scaleMultiplier;
+
+                // Scale X and Z for spread, but leave Y grounded/flat relative to the floor
+                const p = project3D(pos.x * effectiveScale, pos.y, pos.z * effectiveScale, canvas.width, canvas.height);
                 return { ...node, px: p.px, py: p.py, scale: p.scale, depth: p.depth };
             });
 
@@ -783,16 +773,20 @@
                 }
             }
 
-            // 3D Nodes[cite: 1]
+            // 3D Nodes projection mapping
             projectedNodes.forEach(node => {
-                ctx.fillStyle = node.isCore ? '#ff0055' : '#00ffcc';
+                const pos = node.position || node;
+                const identifier = (node.data && node.data.name) ? node.data.name : (node.id || 'N-001');
+                const isCore = (node.color === 0xff0055 || node.isCore);
+
+                ctx.fillStyle = isCore ? '#ff0055' : '#00ffcc';
                 ctx.beginPath();
-                ctx.arc(node.px, node.py, (node.isCore ? 6 : 4) * node.scale, 0, Math.PI * 2);
+                ctx.arc(node.px, node.py, (isCore ? 6 : 4) * node.scale, 0, Math.PI * 2);
                 ctx.fill();
 
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
                 ctx.font = '10px Courier New';
-                ctx.fillText(node.id, node.px + 10, node.py + 4);
+                ctx.fillText(identifier, node.px + 10, node.py + 4);
             });
 
             drawGizmo();
@@ -885,7 +879,15 @@
             const valDisplay = document.getElementById(valId);
             if (slider && valDisplay) {
                 slider.addEventListener('input', (e) => {
+                    const val = parseFloat(e.target.value);
                     valDisplay.textContent = e.target.value + unit;
+
+                    if (window.hudConfig) {
+                        if (id === 'slider-world-scale') window.hudConfig.worldScale = val;
+                        if (id === 'slider-grid-density') window.hudConfig.gridDensity = val;
+                        if (id === 'slider-motion-speed') window.hudConfig.motionSpeed = val;
+                        if (id === 'slider-noise-thresh') window.hudConfig.noiseThresh = val;
+                    }
                 });
             }
         };
@@ -903,8 +905,8 @@
 <!-- Snapshot bundle package with telemetry if pop-out window is present (v2.7.0) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!-- Telemetry call to telemetryStream.js call (v2.7.0) -->
-<script src="/js/telemetryStream.js"></script>
-<script src="js/testingSuiteWindow.js"></script>
+<!--<script src="/js/telemetryStream.js"></script> -->
+<script src="/js/testingSuiteWindow.js"></script>
 <script>
     document.addEventListener("DOMContentLoaded", () => {
         // Instantiate testing suite drawer window

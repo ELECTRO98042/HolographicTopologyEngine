@@ -1,6 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Three dependency -->
+    <script type="importmap">
+              {
+                "imports": {
+                  "three": "/js/vendor/graphics/three.js"
+                }
+              }
+        </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Holographic HUD - Telemetry Stream</title>
@@ -72,7 +80,8 @@
     <script type="module" src="./js/RawMatrixViewer.js"></script>
     <!-- CH-04: Phase Space Constructor Viewer dependency -->
     <script type="module" src="/js/PhaseSpaceViewer.js"></script>
-</head>
+    <!-- CH-05: Holographic Topology Engine Viewer dependency -->
+    <script type="module" src="./js/preset_mesh_ingestion.js"></script>
 
 <body>
 

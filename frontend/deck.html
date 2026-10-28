@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <!-- Local Stylesheet -->
+  <link rel="stylesheet" href="css/deck.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Holographic Topology Engine v2.5</title>
+
+  <!-- Local Scripts -->
+  <script src="js/lucide.js"></script>
+  
+  <!-- Local Application Script -->
+  <script type="module" src="/js/deck_render.js"></script>
+  <style>
+    /* Custom Scrollbars */
+    ::-webkit-scrollbar {
+      width: 4px;
+      height: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(12, 16, 23, 0.6);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #1a2436;
+      border-radius: 2px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #00f0ff;
+    }
+
+    /* Glassmorphic Panel HUD */
+    .glass-hud {
+      background: rgba(12, 16, 23, 0.82);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 240, 255, 0.15);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Deck perspective background grid */
+    .deck-grid {
+      background-image:
+        linear-gradient(to right, rgba(0, 240, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(0, 240, 255, 0.04) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    /* Directional Cascading Layers */
+    .layer-cascade-right {
+      animation: slideRight 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .layer-cascade-left {
+      animation: slideLeft 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes slideRight {
+      from {
+        opacity: 0;
+        transform: translateX(-12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes slideLeft {
+      from {
+        opacity: 0;
+        transform: translateX(12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* Floating Nodes Animation */
+    @keyframes nodePulse {
+
+      0%,
+      100% {
+        transform: translateY(0px) scale(1);
+      }
+
+      50% {
+        transform: translateY(-6px) scale(1.02);
+      }
+    }
+
+    .animate-node {
+      animation: nodePulse 4s ease-in-out infinite;
+    }
+
+    /* Rotating Pad Ring */
+    @keyframes spinRing {
+      from {
+        transform: rotate(0deg);
+      }
+
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .animate-spin-ring {
+      animation: spinRing 25s linear infinite;
+    }
+  </style>
+</head>
+
+<body
+  class="bg-engine-bg text-slate-200 font-sans h-screen w-screen overflow-hidden select-none flex flex-col relative">
+
+  <!-- UNIFIED TOP HUD STATUS BAR -->
+  <header
+    class="h-10 bg-engine-panel border-b border-engine-border px-4 flex items-center justify-between z-50 shrink-0 glass-hud">
+    <div class="flex items-center space-x-3">
+      <div class="flex items-center space-x-2">
+        <i data-lucide="cpu" class="w-4 h-4 text-engine-cyan"></i>
+        <span class="font-mono text-xs font-bold tracking-wider text-slate-100">HOLOGRAPHIC TOPOLOGY ENGINE</span>
+        <span
+          class="text-[10px] bg-engine-cyan/20 text-engine-cyan border border-engine-cyan/30 px-1.5 py-0.5 rounded font-mono">v2.5
+          UNIFIED</span>
+      </div>
+    </div>
+
+    <!-- Operating System / Canvas Status -->
+    <div class="flex items-center space-x-6 text-xs font-mono hidden md:flex">
+      <div class="flex items-center space-x-2">
+        <span class="text-slate-500">SPAN MODE:</span>
+        <span class="text-engine-cyan">SINGLE / MULTI-MONITOR STRETCH</span>
+      </div>
+      <span class="text-slate-700">|</span>
+      <div class="flex items-center space-x-2">
+        <span class="text-slate-500">DECK STATUS:</span>
+        <span id="top-deck-status" class="text-engine-green font-semibold">ACTIVE (EUREKA)</span>
+      </div>
+      <span class="text-slate-700">|</span>
+      <div class="flex items-center space-x-2">
+        <span class="text-slate-500">NODES ON PAD:</span>
+        <span id="node-count-badge" class="text-engine-amber font-mono">0</span>
+      </div>
+    </div>
+
+    <!-- Clock & State Indicator -->
+    <div class="flex items-center space-x-4 text-xs font-mono">
+      <div id="sys-time" class="text-slate-400">12:00:00 UTC</div>
+      <button onclick="runDeckTests()"
+        class="px-2.5 py-1 bg-slate-900/90 border border-engine-amber/40 hover:border-engine-amber text-engine-amber text-[10px] rounded transition-all shadow-sm">
+        RUN TESTS
+      </button>
+      <button onclick="exportDeckState()"
+        class="px-2 py-0.5 bg-engine-cyan/10 border border-engine-cyan/30 hover:bg-engine-cyan/20 text-engine-cyan text-[10px] rounded transition-all">
+        EXPORT JSON
+      </button>
+      <button onclick="resetWholeDeck()"
+        class="px-2 py-0.5 bg-engine-red/10 border border-engine-red/30 hover:bg-engine-red/20 text-engine-red text-[10px] rounded transition-all">
+        CLEAR DECK
+      </button>
+    </div>
+  </header>
+
+  <!-- UNIFIED SINGLE VIEWPORT CANVAS CONTAINER -->
+  <main class="flex-1 relative overflow-hidden flex items-stretch">
+
+    <!-- 3D WebGL Canvas Layer -->
+    <div id="deck-viewport" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
+      <div id="deck-canvas-container" ondragover="event.preventDefault()"
+        ondrop="if(window.deckViewport) window.deckViewport.handleDrop(event)"
+        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+    </div>
+    <!-- SYS.TELEMETRY HUD Overlay (Anchored to Viewport) -->
+    <div id="hud-telemetry" style="position: fixed; bottom: 24px; right: 24px; z-index: 9999;" class="bg-[#090d16]/80 backdrop-blur-md border border-[#00f0ff]/30 rounded-lg p-4 font-mono text-xs text-[#00f0ff] shadow-[0_0_15px_rgba(0,240,255,0.1)] pointer-events-none">
+      <div class="flex justify-between items-center border-b border-[#1a2436] pb-2 mb-2 space-x-6">
+        <span class="tracking-widest text-slate-400">SYS.TELEMETRY</span>
+        <span id="telemetry-status" class="flex items-center text-emerald-400">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse mr-1.5"></span>SYNCED
+        </span>
+      </div>
+      <div class="grid grid-cols-2 gap-x-6 gap-y-1.5">
+        <span class="text-slate-400">FRAMERATE:</span> <span id="tele-fps" class="text-right">60 FPS</span>
+        <span class="text-slate-400">DRAW CALLS:</span> <span id="tele-draws" class="text-right">0</span>
+        <span class="text-slate-400">GEOMETRIES:</span> <span id="tele-geoms" class="text-right">0</span>
+        <span class="text-slate-400">ACTIVE NODES:</span> <span id="tele-nodes" class="text-right">0</span>
+      </div>
+    </div>
+
+    <!-- 2D UI Pantry Overlay Container (Left-Justified) -->
+    <aside id="left-container-wrapper"
+      class="absolute left-3 top-3 bottom-3 z-40 flex flex-col gap-3 w-80 max-w-[320px] pointer-events-auto">
+
+      <!-- PRIMARY WINDOW 1: THE PANTRY -->
+      <div id="win-pantry"
+        class="glass-hud rounded-lg flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-200">
+        <div
+          class="bg-slate-900/90 border-b border-engine-border/80 px-3 py-2 flex justify-between items-center cursor-pointer shrink-0"
+          onclick="toggleWindowCollapse('pantry-body')">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="database" class="w-4 h-4 text-engine-cyan"></i>
+            <span class="font-mono text-xs font-semibold text-slate-100">1. THE PANTRY</span>
+          </div>
+          <span
+            class="text-[9px] font-mono text-engine-cyan/70 bg-engine-cyan/10 px-1.5 py-0.5 rounded border border-engine-cyan/20">RAW
+            METRICS</span>
+        </div>
+      
+        <div id="pantry-body" class="flex-1 overflow-y-auto p-2 space-y-2 text-xs font-mono min-h-0">
+          <!-- Accordion 1.1 -->
+          <div class="border border-engine-border rounded bg-slate-950/40">
+            <button onclick="toggleAccordion('acc-1-1')"
+              class="w-full flex items-center justify-between p-2.5 bg-slate-900/80 hover:bg-slate-900 border border-engine-border hover:border-engine-cyan/50 text-slate-300 rounded transition-all">
+              <span class="flex items-center space-x-2">
+                <i data-lucide="chevron-right" id="acc-1-1-icon"
+                  class="w-3.5 h-3.5 text-engine-cyan transition-transform"></i>
+                <span class="text-[11px]">1.1 SPACETIME METRICS</span>
+              </span>
+              <span class="text-[9px] text-slate-500">3 ITEMS</span>
+            </button>
+            <div id="acc-1-1" class="hidden p-2 pt-0 space-y-1 text-[11px]">
+              <div draggable="true" ondragstart="handleDragStart(event, 'Minkowski Space', 'METRIC', 'η_μν = diag(-1,1,1,1)')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
+                <span>Minkowski Flat Metric</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Schwarzschild Metric', 'METRIC', 'g_00 = -(1-2GM/r)')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
+                <span>Schwarzschild Geometry</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'AdS Boundary Shell', 'TOPOLOGY', 'dS^d / CFT_d-1 Boundary')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
+                <span>AdS/CFT Boundary Shell</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <div draggable="true" ondragstart="handleDragStart(event, 'Kerr Rotating Metric', 'METRIC', 'ds² = -(1-2Mr/ρ²)dt² ...')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
+                <span>Kerr Rotating Black Hole</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'FLRW Cosmological', 'METRIC', 'ds² = -dt² + a(t)²[dr²/(1-kr²) ...]') "
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
+                <span>FLRW Cosmological Metric</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+            </div>
+          </div>
+      
+          <!-- Accordion 1.2 GUAGE & POTENTIOALS -->
+          <div class="border border-engine-border rounded bg-slate-950/40">
+            <button onclick="toggleAccordion('acc-1-2')"
+              class="w-full flex items-center justify-between p-2.5 bg-slate-900/80 hover:bg-slate-900 border border-engine-border hover:border-engine-cyan/50 text-slate-300 rounded transition-all">
+              <span class="flex items-center space-x-2">
+                <i data-lucide="chevron-right" id="acc-1-2-icon"
+                  class="w-3.5 h-3.5 text-engine-cyan transition-transform"></i>
+                <span class="text-[11px]">1.2 GAUGE & POTENTIALS</span>
+              </span>
+              <span class="text-[9px] text-slate-500">2 ITEMS</span>
+            </button>
+            <div id="acc-1-2" class="hidden p-2 pt-0 space-y-1 text-[11px]">
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Abelian U(1) EM', 'FIELD', 'F_μν = ∂_μ A_ν - ∂_ν A_μ')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab flex justify-between items-center">
+                <span>Abelian U(1) Potential</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <div draggable="true" ondragstart="handleDragStart(event, 'Non-Abelian SU(2)', 'FIELD', 'F^a_μν = ∂_μ A^a_ν')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab flex justify-between items-center">
+                <span>Non-Abelian SU(2)</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Yang-Mills SU(3)', 'FIELD', 'F^a_μν = ∂_μ A^a_ν - ∂_ν A^a_μ + g f^abc A^b_μ A^c_ν')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab flex justify-between items-center">
+                <span>Yang-Mills SU(3) Gauge</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <div draggable="true" ondragstart="handleDragStart(event, 'Higgs Scalar Field', 'POTENTIAL', 'V(Φ) = μ²|Φ|² + λ|Φ|⁴')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab flex justify-between items-center">
+                <span>Higgs Scalar Field V(Φ)</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- PRIMARY WINDOW 2: NODE INSPECTOR -->
+      <div id="win-inspector"
+        class="glass-hud rounded-lg flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-200">
+        <div class="bg-slate-900/90 border-b border-engine-border/80 px-3 py-2 flex justify-between items-center shrink-0">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="sliders" class="w-4 h-4 text-engine-cyan"></i>
+            <span class="font-mono text-xs font-semibold text-slate-100">2. TOPOLOGY INSPECTOR</span>
+          </div>
+          <span id="inspector-status"
+            class="text-[9px] font-mono text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700">NO
+            SELECTION</span>
+        </div>
+        <div id="inspector-body" class="flex-1 overflow-y-auto p-3 space-y-3 text-xs font-mono text-slate-300 min-h-0">
+          <div class="text-slate-500 italic text-center pt-8">Select a node on the deck to inspect its field equations and
+            metric parameters.</div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <script>
+    // Initialize Lucide Icons after DOM load
+    document.addEventListener("DOMContentLoaded", function () {
+      if (typeof lucide !== 'undefined') {
+        lucide.createIcons();
+      }
+    });
+
+    function toggleAccordion(id) {
+      const el = document.getElementById(id);
+      const icon = document.getElementById(id + '-icon');
+      if (el) {
+        el.classList.toggle('hidden');
+        if (icon) icon.classList.toggle('rotate-90');
+      }
+    }
+
+    function toggleWindowCollapse(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('hidden');
+    }
+
+    function handleDragStart(e, name, type, formula) {
+      e.dataTransfer.setData('application/json', JSON.stringify({ name, type, formula }));
+    }
+
+    function resetWholeDeck() {
+      if (window.deckViewport) {
+        window.deckViewport.clearDeck();
+      }
+    }
+
+    function exportDeckState() {
+      if (window.deckViewport) {
+        window.deckViewport.exportState();
+      }
+    }
+
+    function runDeckTests() {
+      if (window.deckViewport) {
+        window.deckViewport.runAutomatedTests();
+      }
+    }
+    
+  </script>
+</body>
+
+</html>

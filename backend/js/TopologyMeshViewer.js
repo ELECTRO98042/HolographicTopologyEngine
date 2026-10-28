@@ -1,4 +1,4 @@
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import * as THREE from './vendor/graphics/three.js';
 import { WaveEquationSolver } from '/physics/dynamics/WaveEquationSolver.js';
 
 export class TopologyMeshViewer {

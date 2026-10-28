@@ -236,7 +236,7 @@ export class RawMatrixViewer {
         }
         table.innerHTML = html;
     }
-    connect(url = '/ws/telemetry') {
+    connect(url = '/ws/matrix') {//<--edited to separate telemetry and matrix websockets
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = url.startsWith('ws') ? url : `${protocol}//${window.location.host}${url}`;
 

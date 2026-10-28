@@ -13,6 +13,8 @@
         }
         /* Removed static .testing-suite-drawer override to restore floating pop-out behavior */
     </style>
+    <script src="backend/js/testingSuiteWindow.js?v=2.8.0" type="module"></script>
+    <script src="backend/js/telemetryStream.js" type="module"></script>
 </head>
 <body>
     <div class="testing-suite-drawer">
@@ -24,8 +26,18 @@
             <!-- Step 1: Scenario Selection -->
             <div class="workflow-step">
                 <h4>Step 1: Scenario Selection</h4>
-                <select id="suite-preset-select" class="form-select">
+                <select id="suite-preset-select" class="form-select" onchange="handlePresetSelectChange(this)">
                     <option value="">-- Select Physics Preset --</option>
+            
+                    <!-- Standard Presets (populated dynamically or hardcoded) -->
+                    <optgroup label="Standard Presets" id="preset-options-group">
+                        <!-- Existing dynamically populated options go here -->
+                    </optgroup>
+            
+                    <!-- Freestyle Studio Option -->
+                    <optgroup label="Custom Scenario Builder">
+                        <option value="FREESTYLE_HOLOGRAPHIC_ENGINE">❖ Launch Holographic Topology Engine (Freestyle)...</option>
+                    </optgroup>
                 </select>
             </div>
 
@@ -78,7 +90,6 @@
             </div>
         </div>
     </div>
-    <script type="module" src="/js/testingSuiteWindow.js"></script>
     <script>
         document.addEventListener("DOMContentLoaded", () => {
             // Instantiate testing suite drawer window
