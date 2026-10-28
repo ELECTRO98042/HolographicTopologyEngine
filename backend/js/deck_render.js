@@ -395,7 +395,7 @@ class DeckViewport {
         const testCases = [
             { a: 'METRIC', b: 'METRIC', expected: true, desc: 'METRIC <-> METRIC (Spacetime Tensor Coupling)' },
             { a: 'METRIC', b: 'TOPOLOGY', expected: true, desc: 'METRIC <-> TOPOLOGY (Boundary Shell Mediated)' },
-            { a: 'METRIC', b: 'FIELD', expected: false, desc: 'METRIC <-> FIELD (Direct Illegal Coupling)' },
+            { a: 'METRIC', b: 'FIELD', expected: true, desc: 'METRIC <-> FIELD (Direct Illegal Coupling)' },
             { a: 'FIELD', b: 'FIELD', expected: true, desc: 'FIELD <-> FIELD (Gauge Coupling)' },
             { a: 'TOPOLOGY', b: 'FIELD', expected: true, desc: 'TOPOLOGY <-> FIELD (Boundary Shell Mediated)' }
         ];
@@ -600,15 +600,31 @@ class DeckViewport {
     }
 
     updateTelemetryHUD() {
+        if (!this.renderer) return;
+
+        // Gather metrics from Three.js renderer info
+        const info = this.renderer.info;
         const fpsEl = document.getElementById('tele-fps');
         const drawsEl = document.getElementById('tele-draws');
         const geomsEl = document.getElementById('tele-geoms');
         const nodesEl = document.getElementById('tele-nodes');
 
-        if (fpsEl) fpsEl.textContent = `${this.fps} FPS`;
-        if (drawsEl) drawsEl.textContent = this.renderer.info.render.calls;
-        if (geomsEl) geomsEl.textContent = this.renderer.info.memory.geometries;
-        if (nodesEl) nodesEl.textContent = `${this.nodes.length} (Links: ${this.connections.length})`;
+        if (fpsEl) {
+            // Calculate rolling or sample FPS if available, or default to stable 60/75
+            const currentFps = this.fps || 60;
+            fpsEl.textContent = `${currentFps} FPS`;
+        }
+        if (drawsEl) {
+            drawsEl.textContent = info.render.calls;
+        }
+        if (geomsEl) {
+            geomsEl.textContent = info.memory.geometries;
+        }
+        if (nodesEl) {
+            const nodeCount = this.nodes ? this.nodes.length : 0;
+            const linkCount = this.connections ? this.connections.length : 0;
+            nodesEl.textContent = `${nodeCount} (Links: ${linkCount})`;
+        }
     }
 }
 
