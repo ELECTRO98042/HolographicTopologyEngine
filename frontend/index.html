@@ -445,11 +445,35 @@
             }
         }
 
-            // --- Centralized Workspace Node State Store ---
+            // --- Centralized Workspace Node State Store (Concentric Bulk-Boundary Tiers) ---
             let _fallbackNodes = [
-                { id: 'N-001', name: 'AdS Boundary Shell', type: 'TOPOLOGY', x: 0, y: 0, z: 0, isCore: false, color: '#8b5cf6' }, // Violet exception
-                { id: 'N-002', name: 'Minkowski Space', type: 'METRIC', x: -100, y: 0, z: 86.6, isCore: false, color: '#10b981' }, // Emerald Green pass
-                { id: 'N-003', name: 'Abelian U(1) EM', type: 'FIELD', x: 100, y: 0, z: 86.6, isCore: false, color: '#10b981' }   // Emerald Green pass
+                {
+                    id: 'N-001',
+                    name: 'AdS Boundary Shell',
+                    type: 'TOPOLOGY',
+                    tier: 'BOUNDARY',
+                    x: 0, y: 120, z: 0,
+                    color: '#8b5cf6',
+                    isCore: false
+                },
+                {
+                    id: 'N-002',
+                    name: 'Minkowski Space',
+                    type: 'METRIC',
+                    tier: 'BULK_CORE',
+                    x: 0, y: 0, z: 0,
+                    color: '#ffffff',
+                    isCore: true
+                },
+                {
+                    id: 'N-003',
+                    name: 'Abelian U(1) EM',
+                    type: 'FIELD',
+                    tier: 'INTERMEDIATE',
+                    x: -70, y: 30, z: 60,
+                    color: '#10b981',
+                    isCore: false
+                }
             ];
 
             // Standard global array reference
@@ -781,142 +805,272 @@
             }
         };*/
 
-        ws.onclose = () => {
-            console.warn("Holographic HUD WebSocket Disconnected. Reconnecting...");
-            //setTimeout(() => location.reload(), 3000);
-        };
+            ws.onclose = () => {
+                console.warn("Holographic HUD WebSocket Disconnected. Reconnecting...");
+                //setTimeout(() => location.reload(), 3000);
+            };
 
-        // Global Interaction State[cite: 1]
-        let selectedNode = null;
-        let isDraggingGimbal = false;
-        let lastMouseX = 0;
-        let lastMouseY = 0;
+            // Global Interaction State[cite: 1]
+            let selectedNode = null;
+            let isDraggingGimbal = false;
+            let lastMouseX = 0;
+            let lastMouseY = 0;
 
-        function isInGimbalArea(x, y) {
-            return (
-                x >= canvas.width - 220 &&
-                x <= canvas.width - 20 &&
-                y >= canvas.height - 220 &&
-                y <= canvas.height - 40
-            );
-        }
-
-        // Main Render Loop[cite: 1]
-        function draw() {
-            ctx.fillStyle = '#05050a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // REMOVE THIS: updateNodesMotion();
-
-            let projectedNodes = nodes.map(node => {
-                const pos = node.position || node;
-                const scaleMultiplier = window.hudConfig ? window.hudConfig.worldScale : 1.0;
-
-                // Keep base spread proportional to the grid span without over-stretching
-                const baseSpread = 60;
-                const effectiveScale = baseSpread * scaleMultiplier;
-
-                // Scale X and Z for spread, but leave Y grounded/flat relative to the floor
-                const p = project3D(pos.x * effectiveScale, pos.y, pos.z * effectiveScale, canvas.width, canvas.height);
-                return { ...node, px: p.px, py: p.py, scale: p.scale, depth: p.depth };
-            });
-
-            // World-Space Grid Floor[cite: 1]
-            ctx.strokeStyle = 'rgba(0, 255, 204, 0.15)';
-            ctx.lineWidth = 1;
-            // Dynamic Grid Resolution / Density scaling
-            const gridSteps = window.hudConfig ? parseInt(window.hudConfig.gridDensity) : 10;
-            const scaleMultiplier = window.hudConfig ? window.hudConfig.worldScale : 1.0;
-            const span = 250 * scaleMultiplier; // World-view background scales in tandem with nodes!
-            const floorY = 80;
-            const overlays = window.hudConfig ? window.hudConfig.overlays : {};
-
-            // 1. Thermal Interference Overlay (Faint crimson/infrared radial gradient tint)
-            if (overlays.thermal) {
-                ctx.save();
-                const gradient = ctx.createRadialGradient(
-                    canvas.width / 2, canvas.height / 2, 50,
-                    canvas.width / 2, canvas.height / 2, canvas.width * 0.7
+            function isInGimbalArea(x, y) {
+                return (
+                    x >= canvas.width - 220 &&
+                    x <= canvas.width - 20 &&
+                    y >= canvas.height - 220 &&
+                    y <= canvas.height - 40
                 );
-                gradient.addColorStop(0, 'rgba(255, 50, 50, 0.0)');
-                gradient.addColorStop(1, 'rgba(180, 20, 20, 0.12)');
-                ctx.fillStyle = gradient;
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.restore();
             }
 
-            // 2. Wave Interference Overlay (Sinusoidal scanline modulation)
-            if (overlays.wave) {
-                ctx.save();
-                ctx.strokeStyle = 'rgba(0, 255, 204, 0.08)';
-                ctx.lineWidth = 1;
-                const timeVal = performance.now() * 0.002;
-                for (let y = 0; y < canvas.height; y += 12) {
-                    ctx.beginPath();
-                    ctx.moveTo(0, y);
-                    for (let x = 0; x < canvas.width; x += 20) {
-                        const waveY = y + Math.sin(x * 0.02 + timeVal) * 4;
-                        ctx.lineTo(x, waveY);
+            // Multi-Tier Spectral EM Shells (High-Density Holographic Gradient with Proximity)
+                function drawSpectralOrbs(scaleMultiplier) {
+                    const spectralTiers = [
+                        { radius: 30, color: 'rgba(255, 255, 255, 0.22)', width: 1.0 }, // Core: Planck / White Hot Singularity
+                        { radius: 65, color: 'rgba(250, 204, 21, 0.25)', width: 0.9 }, // Tier 1: UV / Yellow High-Freq
+                        { radius: 105, color: 'rgba(249, 115, 22, 0.20)', width: 0.8 }, // Tier 2: Optical / Orange Field
+                        { radius: 145, color: 'rgba(239, 68, 68, 0.18)', width: 0.7 }, // Tier 3: IR / Red Thermal Band
+                        { radius: 190, color: 'rgba(139, 92, 246, 0.22)', width: 0.8 }, // Tier 4: Microwave / Violet Boundary
+                        { radius: 240, color: 'rgba(59, 130, 246, 0.15)', width: 0.6 }  // Tier 5: Radio / Asymptotic Blue Horizon
+                    ];
+
+                    spectralTiers.forEach(tier => {
+                        // FIXED: Call the proximity-enabled shell renderer here
+                        drawConcentricShellWithProximity(tier.radius * scaleMultiplier, tier.color, tier.width);
+                    });
+                }
+
+            // Localized Mesh Patch Illumination Helper
+                function drawConcentricShellWithProximity(radius, baseStroke, lineWidth) {
+                    const latSteps = 32;
+                    const lonSteps = 64;
+                    const interactionRadius = 55; // Proximity threshold in world units
+
+                    for (let i = 1; i < latSteps; i++) {
+                        const lat = (Math.PI / latSteps) * i - Math.PI / 2;
+                        const rCurrent = radius * Math.cos(lat);
+                        const yCurrent = radius * Math.sin(lat);
+
+                        let segmentPoints = [];
+                        for (let j = 0; j <= lonSteps; j++) {
+                            const lon = (Math.PI * 2 / lonSteps) * j;
+                            const x = rCurrent * Math.cos(lon);
+                            const z = rCurrent * Math.sin(lon);
+
+                            // Check distance to any active node to trigger localized illumination
+                            let isNearNode = false;
+                            if (window.nodes) {
+                                for (const node of window.nodes) {
+                                    const nx = node.x || 0;
+                                    const ny = node.y || 0;
+                                    const nz = node.z || 0;
+                                    const dist = Math.sqrt((x - nx) ** 2 + (yCurrent - ny) ** 2 + (z - nz) ** 2);
+                                    if (dist < interactionRadius) {
+                                        isNearNode = true;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            const p = project3D(x, yCurrent, z, canvas.width, canvas.height);
+                            segmentPoints.push({ ...p, isHighlighted: isNearNode });
+                        }
+
+                        // Render segments with local patch brightening
+                        for (let j = 0; j < segmentPoints.length - 1; j++) {
+                            const p1 = segmentPoints[j];
+                            const p2 = segmentPoints[j + 1];
+
+                            if (p1.scale > 0 && p2.scale > 0) {
+                                ctx.beginPath();
+                                ctx.moveTo(p1.px, p1.py);
+                                ctx.lineTo(p2.px, p2.py);
+
+                                if (p1.isHighlighted || p2.isHighlighted) {
+                                    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)'
+                                    ctx.lineWidth = (lineWidth || 0.6) * 1.3;
+                                } else {
+                                    ctx.strokeStyle = baseStroke;
+                                    ctx.lineWidth = lineWidth || 0.6;
+                                }
+                                ctx.stroke();
+                            }
+                        }
                     }
-                    ctx.stroke();
                 }
-                ctx.restore();
-            }
 
-            // 3. Atmospheric Distortion Overlay (Subtle scanline haze)
-            if (overlays.atmos) {
-                ctx.save();
-                ctx.fillStyle = 'rgba(0, 255, 150, 0.03)';
-                const scanlineY = (performance.now() * 0.1) % canvas.height;
-                ctx.fillRect(0, scanlineY, canvas.width, 3);
-                ctx.restore();
-            }
+                // Tensegrity Equilibrium Relaxation Step (Runs every frame)
+                    function updateTensegrityEquilibrium() {
+                            if (!window.nodes) return;
 
-            for (let i = -gridSteps; i <= gridSteps; i++) {
-                const coord = (i / gridSteps) * span;
-                const p1 = project3D(coord, floorY, -span, canvas.width, canvas.height);
-                const p2 = project3D(coord, floorY, span, canvas.width, canvas.height);
-                if (p1.scale > 0 && p2.scale > 0) {
-                    ctx.beginPath(); ctx.moveTo(p1.px, p1.py); ctx.lineTo(p2.px, p2.py); ctx.stroke();
+                            const damping = 0.05; // Smoother, heavier dampening
+
+                            window.nodes.forEach((node, idx) => {
+                                if (node.isPinned || node === selectedNode) return;
+
+                                let targetRadius = 105;
+                                if (node.tier === 'BULK_CORE' || node.isCore) targetRadius = 30;
+                                else if (node.tier === 'BOUNDARY') targetRadius = 190;
+
+                                const currentRadius = Math.sqrt(node.x ** 2 + node.y ** 2 + node.z ** 2) || 1;
+                                const radiusError = targetRadius - currentRadius;
+
+                                // Only apply force if error is above micro-jitter threshold (> 0.5 units)
+                                if (Math.abs(radiusError) > 0.5) {
+                                    node.x += (node.x / currentRadius) * radiusError * damping;
+                                    node.y += (node.y / currentRadius) * radiusError * damping;
+                                    node.z += (node.z / currentRadius) * radiusError * damping;
+                                }
+
+                                // Inter-node repulsion with deadzone
+                                for (let j = 0; j < window.nodes.length; j++) {
+                                    if (idx === j) continue;
+                                    const other = window.nodes[j];
+                                    const dx = node.x - other.x;
+                                    const dy = node.y - other.y;
+                                    const dz = node.z - other.z;
+                                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+                                    if (dist < 35 && dist > 1.0) {
+                                        const push = (35 - dist) * 0.02; // Reduced repulsion force
+                                        node.x += (dx / dist) * push;
+                                        node.y += (dy / dist) * push;
+                                        node.z += (dz / dist) * push;
+                                    }
+                                }
+                            });
+                        }
+
+            // Main Concentric Render Loop (Blueprint 1: Epistemic Topology Canvas)
+            function draw() {
+                // 1. Run the Tensegrity Equilibrium relaxation step per frame
+                updateTensegrityEquilibrium();
+                ctx.fillStyle = '#05050a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                const scaleMultiplier = window.hudConfig ? window.hudConfig.worldScale : 1.0;
+                const gridSteps = window.hudConfig ? parseInt(window.hudConfig.gridDensity) : 10;
+                const span = 250 * scaleMultiplier;
+                const floorY = 80;
+                const overlays = window.hudConfig ? window.hudConfig.overlays : {};
+
+                // 1. Interference Overlays (Preserved directly from original HUD deck)
+                if (overlays.thermal) {
+                    ctx.save();
+                    const gradient = ctx.createRadialGradient(
+                        canvas.width / 2, canvas.height / 2, 50,
+                        canvas.width / 2, canvas.height / 2, canvas.width * 0.7
+                    );
+                    gradient.addColorStop(0, 'rgba(255, 50, 50, 0.0)');
+                    gradient.addColorStop(1, 'rgba(180, 20, 20, 0.12)');
+                    ctx.fillStyle = gradient;
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.restore();
                 }
-                const p3 = project3D(-span, floorY, coord, canvas.width, canvas.height);
-                const p4 = project3D(span, floorY, coord, canvas.width, canvas.height);
-                if (p3.scale > 0 && p4.scale > 0) {
-                    ctx.beginPath(); ctx.moveTo(p3.px, p3.py); ctx.lineTo(p4.px, p4.py); ctx.stroke();
-                }
-            }
 
-            // 3D Connections[cite: 1]
-            ctx.strokeStyle = 'rgba(0, 255, 204, 0.3)';
-            ctx.lineWidth = 1.5;
-            for (let i = 0; i < projectedNodes.length; i++) {
-                for (let j = i + 1; j < projectedNodes.length; j++) {
+                if (overlays.wave) {
+                    ctx.save();
+                    ctx.strokeStyle = 'rgba(0, 255, 204, 0.08)';
+                    ctx.lineWidth = 1;
+                    const timeVal = performance.now() * 0.002;
+                    for (let y = 0; y < canvas.height; y += 12) {
+                        ctx.beginPath();
+                        ctx.moveTo(0, y);
+                        for (let x = 0; x < canvas.width; x += 20) {
+                            const waveY = y + Math.sin(x * 0.02 + timeVal) * 4;
+                            ctx.lineTo(x, waveY);
+                        }
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+
+                if (overlays.atmos) {
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(0, 255, 150, 0.03)';
+                    const scanlineY = (performance.now() * 0.1) % canvas.height;
+                    ctx.fillRect(0, scanlineY, canvas.width, 3);
+                    ctx.restore();
+                }
+
+                // 2. World-Space Floor Grid (Preserved)
+                ctx.strokeStyle = 'rgba(0, 255, 204, 0.15)';
+                ctx.lineWidth = 1;
+                for (let i = -gridSteps; i <= gridSteps; i++) {
+                    const coord = (i / gridSteps) * span;
+                    const p1 = project3D(coord, floorY, -span, canvas.width, canvas.height);
+                    const p2 = project3D(coord, floorY, span, canvas.width, canvas.height);
+                    if (p1.scale > 0 && p2.scale > 0) {
+                        ctx.beginPath(); ctx.moveTo(p1.px, p1.py); ctx.lineTo(p2.px, p2.py); ctx.stroke();
+                    }
+                    const p3 = project3D(-span, floorY, coord, canvas.width, canvas.height);
+                    const p4 = project3D(span, floorY, coord, canvas.width, canvas.height);
+                    if (p3.scale > 0 && p4.scale > 0) {
+                        ctx.beginPath(); ctx.moveTo(p3.px, p3.py); ctx.lineTo(p4.px, p4.py); ctx.stroke();
+                    }
+                }
+
+                // 3. Render Concentric Bulk-Boundary Shells (Blueprint 1 Master Geometric Framework) Invokes the full 6-tier spectral EM legend with longitude/latitude meshes):
+                drawSpectralOrbs(scaleMultiplier);
+
+                // 4. Project Nodes into 3D Space
+                let projectedNodes = nodes.map(node => {
+                    const pos = node.position || node;
+                    const baseSpread = 1.0;
+                    const effectiveScale = baseSpread * scaleMultiplier;
+
+                    const p = project3D(pos.x * effectiveScale, pos.y * effectiveScale, pos.z * effectiveScale, canvas.width, canvas.height);
+                    return { ...node, px: p.px, py: p.py, scale: p.scale, depth: p.depth };
+                });
+
+                // 5. Multi-Tone Gradient Tethers Connecting Nodes
+                for (let i = 0; i < projectedNodes.length; i++) {
+                    for (let j = i + 1; j < projectedNodes.length; j++) {
+                        const n1 = projectedNodes[i];
+                        const n2 = projectedNodes[j];
+
+                        if (n1.scale > 0 && n2.scale > 0) {
+                            const gradient = ctx.createLinearGradient(n1.px, n1.py, n2.px, n2.py);
+                            gradient.addColorStop(0, n1.color || '#10b981');
+                            gradient.addColorStop(1, n2.color || '#8b5cf6');
+
+                            ctx.strokeStyle = gradient;
+                            ctx.lineWidth = 1.8 * Math.min(n1.scale, n2.scale);
+                            ctx.beginPath();
+                            ctx.moveTo(n1.px, n1.py);
+                            ctx.lineTo(n2.px, n2.py);
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                // 6. Node Spheres & High-Glow Core Anchors
+                projectedNodes.forEach(node => {
+                    if (node.scale <= 0) return;
+                    const identifier = (node.data && node.data.name) ? node.data.name : (node.id || 'N-001');
+                    const isCore = node.tier === 'BULK_CORE' || node.isCore;
+                    const nodeColor = node.color || (isCore ? '#ffffff' : '#10b981');
+
+                    ctx.save();
+                    ctx.fillStyle = nodeColor;
+                    ctx.shadowColor = nodeColor;
+                    ctx.shadowBlur = isCore ? 18 : 8;
+
                     ctx.beginPath();
-                    ctx.moveTo(projectedNodes[i].px, projectedNodes[i].py);
-                    ctx.lineTo(projectedNodes[j].px, projectedNodes[j].py);
-                    ctx.stroke();
-                }
+                    ctx.arc(node.px, node.py, (isCore ? 7 : 4.5) * node.scale, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+                    ctx.font = '10px Courier New';
+                    ctx.fillText(identifier, node.px + 10, node.py + 4);
+                });
+
+                // 7. Interactive 3D Gimbal Panel Render (Preserved)
+                drawGizmo();
             }
-
-            // 3D Nodes projection mapping
-            projectedNodes.forEach(node => {
-                const pos = node.position || node;
-                const identifier = (node.data && node.data.name) ? node.data.name : (node.id || 'N-001');
-                const isCore = (node.color === 0xff0055 || node.isCore);
-
-                // Use synchronized node color if present, otherwise fallback to core/default styling
-                ctx.fillStyle = node.color ? node.color : (isCore ? '#ff0055' : '#00ffcc');
-                ctx.beginPath();
-                ctx.arc(node.px, node.py, (isCore ? 6 : 4) * node.scale, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-                ctx.font = '10px Courier New';
-                ctx.fillText(identifier, node.px + 10, node.py + 4);
-            });
-
-            drawGizmo();
-        }
 
         function animationLoop() {
             draw();

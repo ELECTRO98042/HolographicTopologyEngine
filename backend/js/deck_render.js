@@ -329,38 +329,39 @@ class DeckViewport {
             return;
         }
 
+        // Inside deck_render.js syncToMainHUD()
         const payload = {
             type: 'SYNC_TOPOLOGY',
             timestamp: Date.now(),
             nodes: this.nodes.map((n, index) => {
-                // Handle both mesh wrapped nodes and direct data objects
                 const nodeData = n.data || n;
-                const position = n.mesh ? n.mesh.position : (n.position || { x: n.x || 0, y: n.y || 0, z: n.z || 0 });
+
+                // Auto-assign Concentric Tier based on theory type
+                let tier = 'INTERMEDIATE';
+                let nodeColor = '#10b981';
+
+                if (nodeData.type === 'TOPOLOGY' || nodeData.name.includes('Boundary')) {
+                    tier = 'BOUNDARY';
+                    nodeColor = '#8b5cf6'; // Violet
+                } else if (nodeData.type === 'METRIC' || nodeData.name.includes('Black Hole') || nodeData.name.includes('Kerr')) {
+                    tier = 'BULK_CORE';
+                    nodeColor = '#ffffff'; // White core
+                }
 
                 return {
                     id: nodeData.id || `N-00${index + 1}`,
                     name: nodeData.name || `Node-${index + 1}`,
                     type: nodeData.type || 'Standard',
-                    formula: nodeData.formula || 'Linear',
-                    position: {
-                        x: position.x,
-                        y: position.y,
-                        z: position.z
-                    }
-                }
-            }),
-            connections: (this.connections || []).map(c => ({
-                source: c.nodeA ? (c.nodeA.data ? c.nodeA.data.id : c.nodeA.id) : null,
-                target: c.nodeB ? (c.nodeB.data ? c.nodeB.data.id : c.nodeB.id) : null
-            }))
+                    tier: tier,
+                    color: nodeColor,
+                    position: n.mesh ? n.mesh.position : (n.position || { x: 0, y: 0, z: 0 })
+                };
+            })
         };
 
-        // Broadcast across the cross-tab channel
         const syncChannel = new BroadcastChannel('holographic_sync_channel');
         syncChannel.postMessage(payload);
-
-        console.log("[Sync Bridge] Custom topology broadcasted to Main HUD workspace:", payload);
-        //alert("Topology successfully synced to Main HUD workspace!");
+        console.log("[Sync Bridge] Custom topology & colors broadcasted to Main HUD workspace:", payload);
     }
 
     checkBondValidity(typeA, typeB) {
