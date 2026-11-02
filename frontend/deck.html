@@ -10,9 +10,16 @@
 
   <!-- Local Scripts -->
   <script src="js/lucide.js"></script>
+
+  <!-- Core Physics Engines & Arbiter Middleware (Load before app scripts) -->
+  <script src="/backend/physics/holographic/SpacetimeMetricEngine.js"></script>
+  <script src="/backend/physics/dynamics/PhaseSpaceHamiltonianEngine.js"></script>
+  <script src="/js/physicsArbiter.js"></script>
   
   <!-- Local Application Script -->
+  <script src="/js/rightConsoleManager.js"></script>
   <script type="module" src="/js/deck_render.js"></script>
+  <script type="module" src="/js/tests_remedy.js"></script>
   <style>
     /* Custom Scrollbars */
     ::-webkit-scrollbar {
@@ -109,6 +116,7 @@
         transform: rotate(360deg);
       }
     }
+    
 
     .animate-spin-ring {
       animation: spinRing 25s linear infinite;
@@ -168,17 +176,18 @@
     </div>
   </header>
 
-  <!-- UNIFIED SINGLE VIEWPORT CANVAS CONTAINER -->
-  <main class="flex-1 relative overflow-hidden flex items-stretch">
+  <!-- UNIFIED SINGLE VIEWPORT CONTAINER (FULL SPAN) -->
+  <main class="flex-1 w-full h-full relative overflow-hidden">
 
-    <!-- 3D WebGL Canvas Layer -->
-    <div id="deck-viewport" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;">
+    <!-- 3D WebGL Canvas Layer (Background Canvas Spanning Entire Deck Space) -->
+    <div id="deck-viewport" class="absolute inset-0 z-0">
       <div id="deck-canvas-container" ondragover="event.preventDefault()"
-        ondrop="if(window.deckViewport) window.deckViewport.handleDrop(event)"
-        style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"></div>
+        ondrop="if(window.deckViewport) window.deckViewport.handleDrop(event)" class="absolute inset-0"></div>
     </div>
-    <!-- SYS.TELEMETRY HUD Overlay (Anchored to Viewport) -->
-    <div id="hud-telemetry" style="position: fixed; bottom: 24px; right: 24px; z-index: 9999;" class="bg-[#090d16]/80 backdrop-blur-md border border-[#00f0ff]/30 rounded-lg p-4 font-mono text-xs text-[#00f0ff] shadow-[0_0_15px_rgba(0,240,255,0.1)] pointer-events-none">
+
+    <!-- SYS.TELEMETRY HUD Overlay (Anchored Bottom Right) -->
+    <div id="hud-telemetry" style="position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 9999;"
+      class="bg-[#090d16]/80 backdrop-blur-md border border-[#00f0ff]/30 rounded-lg p-4 font-mono text-xs text-[#00f0ff] shadow-[0_0_15px_rgba(0,240,255,0.1)] pointer-events-none">
       <div class="flex justify-between items-center border-b border-[#1a2436] pb-2 mb-2 space-x-6">
         <span class="tracking-widest text-slate-400">SYS.TELEMETRY</span>
         <span id="telemetry-status" class="flex items-center text-emerald-400">
@@ -193,11 +202,11 @@
       </div>
     </div>
 
-    <!-- 2D UI Pantry Overlay Container (Left-Justified) -->
+    <!-- 2D UI Pantry Overlay Container (Pinned Top to Bottom) -->
     <aside id="left-container-wrapper"
       class="absolute left-3 top-3 bottom-3 z-40 flex flex-col gap-3 w-80 max-w-[320px] pointer-events-auto">
-
-      <!-- PRIMARY WINDOW 1: THE PANTRY -->
+    
+      <!-- PRIMARY WINDOW 1: THE PANTRY (Dynamically stretches to fill all remaining space above inspector) -->
       <div id="win-pantry"
         class="glass-hud rounded-lg flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-200">
         <div
@@ -211,7 +220,7 @@
             class="text-[9px] font-mono text-engine-cyan/70 bg-engine-cyan/10 px-1.5 py-0.5 rounded border border-engine-cyan/20">RAW
             METRICS</span>
         </div>
-      
+    
         <div id="pantry-body" class="flex-1 overflow-y-auto p-2 space-y-2 text-xs font-mono min-h-0">
           <!-- Accordion 1.1 -->
           <div class="border border-engine-border rounded bg-slate-950/40">
@@ -222,41 +231,69 @@
                   class="w-3.5 h-3.5 text-engine-cyan transition-transform"></i>
                 <span class="text-[11px]">1.1 SPACETIME METRICS</span>
               </span>
-              <span class="text-[9px] text-slate-500">3 ITEMS</span>
+              <span class="text-[9px] text-slate-500">8 ITEMS</span>
             </button>
             <div id="acc-1-1" class="hidden p-2 pt-0 space-y-1 text-[11px]">
-              <div draggable="true" ondragstart="handleDragStart(event, 'Minkowski Space', 'METRIC', 'η_μν = diag(-1,1,1,1)')"
+              <!-- Minkowski Flat Metric -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Minkowski Space', 'METRIC', 'η_μν = diag(-1,1,1,1)')"
                 class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
                 <span>Minkowski Flat Metric</span>
                 <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
               </div>
+              <!-- Schwarzschild Geometry -->
               <div draggable="true"
                 ondragstart="handleDragStart(event, 'Schwarzschild Metric', 'METRIC', 'g_00 = -(1-2GM/r)')"
                 class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
                 <span>Schwarzschild Geometry</span>
                 <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
               </div>
+              <!-- Kerr Rotating Black Hole -->
               <div draggable="true"
-                ondragstart="handleDragStart(event, 'AdS Boundary Shell', 'TOPOLOGY', 'dS^d / CFT_d-1 Boundary')"
-                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
-                <span>AdS/CFT Boundary Shell</span>
-                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
-              </div>
-              <div draggable="true" ondragstart="handleDragStart(event, 'Kerr Rotating Metric', 'METRIC', 'ds² = -(1-2Mr/ρ²)dt² ...')"
+                ondragstart="handleDragStart(event, 'Kerr Rotating Metric', 'METRIC', 'ds² = -(1-2Mr/ρ²)dt² ...')"
                 class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
                 <span>Kerr Rotating Black Hole</span>
                 <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
               </div>
+              <!-- FLRW Cosmological Metric (Theoretical) -->
               <div draggable="true"
                 ondragstart="handleDragStart(event, 'FLRW Cosmological', 'METRIC', 'ds² = -dt² + a(t)²[dr²/(1-kr²) ...]') "
                 class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab active:cursor-grabbing flex justify-between items-center transition-all">
-                <span>FLRW Cosmological Metric</span>
+                <span style="color: #fbbf24;" class="font-medium">FLRW Cosmological Metric</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- BTZ Rotating Black Hole (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'BTZ Rotating Black Hole', 'METRIC', 'ds^2 = -N^2 dt^2 + N^{-2} dr^2 + r^2(d\phi + N^\phi dt)^2')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center">
+                <span style="color: #fbbf24;" class="font-medium">BTZ Rotating Black Hole</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Anti-de Sitter (AdS) Bulk (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Anti-de Sitter (AdS) Bulk', 'METRIC', 'ds^2 = \\frac{l^2}{z^2}(-dt^2 + dz^2 + d\\vec{x}^2)')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Anti-de Sitter (AdS) Bulk</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- de Sitter (dS) Space (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'de Sitter (dS) Space', 'METRIC', 'ds^2 = -dt^2 + \\alpha^2 \\cosh^2(t/\\alpha) d\\Omega_3^2')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">de Sitter (dS) Space</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Non-Abelian SU(2) (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Reissner-Nordström Charged BH', 'METRIC', 'ds^2 = -f(r)dt^2 + f(r)^{-1}dr^2 + r^2 d\\Omega^2')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Reissner-Nordström Charged BH</span>
                 <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
               </div>
             </div>
           </div>
-      
-          <!-- Accordion 1.2 GUAGE & POTENTIOALS -->
+    
+          <!-- Accordion 1.2 GUAGE & POTENTIALS -->
           <div class="border border-engine-border rounded bg-slate-950/40">
             <button onclick="toggleAccordion('acc-1-2')"
               class="w-full flex items-center justify-between p-2.5 bg-slate-900/80 hover:bg-slate-900 border border-engine-border hover:border-engine-cyan/50 text-slate-300 rounded transition-all">
@@ -265,39 +302,140 @@
                   class="w-3.5 h-3.5 text-engine-cyan transition-transform"></i>
                 <span class="text-[11px]">1.2 GAUGE & POTENTIALS</span>
               </span>
-              <span class="text-[9px] text-slate-500">2 ITEMS</span>
+              <span class="text-[9px] text-slate-500">9 ITEMS</span>
             </button>
             <div id="acc-1-2" class="hidden p-2 pt-0 space-y-1 text-[11px]">
+    
               <div draggable="true"
                 ondragstart="handleDragStart(event, 'Abelian U(1) EM', 'FIELD', 'F_μν = ∂_μ A_ν - ∂_ν A_μ')"
                 class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab flex justify-between items-center">
                 <span>Abelian U(1) Potential</span>
                 <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
               </div>
+              <!-- Non-Abelian SU(2) -->
               <div draggable="true" ondragstart="handleDragStart(event, 'Non-Abelian SU(2)', 'FIELD', 'F^a_μν = ∂_μ A^a_ν')"
                 class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab flex justify-between items-center">
                 <span>Non-Abelian SU(2)</span>
                 <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
               </div>
+              <!-- Yang-Mills SU(3) Gauge -->
               <div draggable="true"
                 ondragstart="handleDragStart(event, 'Yang-Mills SU(3)', 'FIELD', 'F^a_μν = ∂_μ A^a_ν - ∂_ν A^a_μ + g f^abc A^b_μ A^c_ν')"
                 class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab flex justify-between items-center">
                 <span>Yang-Mills SU(3) Gauge</span>
                 <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
               </div>
-              <div draggable="true" ondragstart="handleDragStart(event, 'Higgs Scalar Field', 'POTENTIAL', 'V(Φ) = μ²|Φ|² + λ|Φ|⁴')"
+              <!-- Higgs Scalar Field V(Φ) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Higgs Scalar Field', 'POTENTIAL', 'V(Φ) = μ²|Φ|² + λ|Φ|⁴')"
                 class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 cursor-grab flex justify-between items-center">
                 <span>Higgs Scalar Field V(Φ)</span>
                 <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
               </div>
+              <!-- Bulk-Boundary Correlator -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Bulk-Boundary Correlator', 'FIELD', '\\langle \\mathcal{O}(x)\\mathcal{O}(y) \\rangle = \\frac{C}{|x-y|^{2\\Delta}}')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center">
+                <span>Bulk-Boundary Correlator</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Chern-Simons Topological Term (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Chern-Simons Topological Term', 'TOPOLOGY', 'S_CS = (k/4\\pi) \\int Tr(A \\wedge dA + \\frac{2}{3}A^3)')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Chern-Simons Topological Term</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Yang-Mills Instanton (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Yang-Mills Instanton', 'FIELD', 'F_{\\mu\\nu} = \\frac{1}{2}\\epsilon_{\\mu\\nu\\rho\\sigma}F^{\\rho\\sigma}')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Yang-Mills Instanton</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Maxwell-Chern-Simons Field (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Maxwell-Chern-Simons Field', 'FIELD', '\\mathcal{L} = -\\frac{1}{4}F_{\\mu\\nu}F^{\\mu\\nu}')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Maxwell-Chern-Simons Field</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Scalar Higgs Potential (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Scalar Higgs Potential', 'POTENTIAL', 'V(\\phi) = -\\mu^2 |\\phi|^2 + \\lambda |\\phi|^4')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Scalar Higgs Potential</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+    
             </div>
+          </div>
+    
+          <!-- Accordion 1.3 TOPOLOGY & BOUNDARIES -->
+          <div class="border border-engine-border rounded bg-slate-950/40">
+            <button onclick="toggleAccordion('acc-1-3')"
+              class="w-full flex items-center justify-between p-2.5 bg-slate-900/80 hover:bg-slate-900 border border-engine-border hover:border-engine-cyan/50 text-slate-300 rounded transition-all">
+              <span class="flex items-center space-x-2">
+                <i data-lucide="chevron-right" id="acc-1-3-icon"
+                  class="w-3.5 h-3.5 text-engine-cyan transition-transform"></i>
+                <span class="text-[11px]">1.3 SPAN & BOUNDARIES</span>
+              </span>
+              <span class="text-[9px] text-slate-500">6 ITEMS</span>
+            </button>
+            <div id="acc-1-3" class="hidden p-2 pt-0 space-y-1 text-[11px]">
+              <!-- Ads Boundary Topological Term -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'AdS Boundary Shell', 'TOPOLOGY', 'dS^d / CFT_d-1 Boundary')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center">
+                <span>AdS/CFT Boundary Shell</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Chern-Simons Topological Term -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Chern-Simons Topological Term', 'TOPOLOGY', 'S_CS = (k/4\\pi) \\int Tr(A \\wedge dA + \\frac{2}{3}A^3)')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center">
+                <span>Chern-Simons Term</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Bulk-Boundary Correlator (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Bulk-Boundary Correlator', 'FIELD', '\\langle \\mathcal{O}(x)\\mathcal{O}(y) \\rangle = \\frac{C}{|x-y|^{2\\Delta}}')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Bulk-Boundary Correlator</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Ryu-Takayanagi Minimal Surface (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Ryu-Takayanagi Minimal Surface', 'TOPOLOGY', 'S_A = \\frac{\\text{Area}(\\gamma_A)}{4G_N}')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Ryu-Takayanagi Minimal Surface</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Entanglement Wedge Cross-Section (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Entanglement Wedge Cross-Section', 'TOPOLOGY', 'E_W = \\min \\text{Area}(\\Sigma_{E_W}) / 4G_N')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Entanglement Wedge Cross-Section</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+              <!-- Modular Hamiltonian Shell (Theoretical) -->
+              <div draggable="true"
+                ondragstart="handleDragStart(event, 'Modular Hamiltonian Shell', 'POTENTIAL', 'K = -\\log \\rho_A = \\int_A \\beta(x) T_{00}(x) dx')"
+                class="p-2 rounded bg-slate-900/80 border border-slate-800 hover:border-engine-cyan/60 hover:bg-engine-cyan/10 active:cursor-grabbing flex justify-between items-center cursor-grab">
+                <span style="color: #fbbf24;" class="font-medium">Modular Hamiltonian Shell</span>
+                <i data-lucide="grip-vertical" class="w-3.5 h-3.5 text-slate-500"></i>
+              </div>
+    
+            </div>
+    
           </div>
         </div>
       </div>
-      
-      <!-- PRIMARY WINDOW 2: NODE INSPECTOR -->
+    
+      <!-- PRIMARY WINDOW 2: NODE INSPECTOR (Fixed dimensions, locked to bottom) -->
       <div id="win-inspector"
-        class="glass-hud rounded-lg flex-1 flex flex-col min-h-0 overflow-hidden transition-all duration-200">
+        class="glass-hud rounded-lg flex-shrink-0 flex flex-col overflow-hidden transition-all duration-200"
+        style="height: 310px;">
         <div class="bg-slate-900/90 border-b border-engine-border/80 px-3 py-2 flex justify-between items-center shrink-0">
           <div class="flex items-center space-x-2">
             <i data-lucide="sliders" class="w-4 h-4 text-engine-cyan"></i>
@@ -313,15 +451,85 @@
         </div>
       </div>
     </aside>
+    <!-- 2D UI Right-Side Justified Master Container (4-in-1 Instrument Console) -->
+    <aside id="right-container-wrapper"
+      style="position: absolute; top: 12px; right: 12px; bottom: 12px; width: 320px; z-index: 40;"
+      class="flex flex-col gap-3 pointer-events-auto">
+    
+      <!-- UPPER MASTER CONSOLE (Drawers 3 & 4) -->
+      <div id="win-right-master"
+        class="glass-hud rounded-lg flex-[2] flex flex-col min-h-0 overflow-hidden transition-all duration-200">
+    
+        <!-- Top-Bar Dropdown & Preset Actions -->
+        <div class="bg-slate-900/90 border-b border-engine-border/80 px-3 py-2 flex justify-between items-center shrink-0">
+          <div class="flex items-center space-x-2 relative">
+            <i data-lucide="cpu" class="w-4 h-4 text-engine-cyan shrink-0"></i>
+            <div class="relative flex items-center">
+              <select id="right-view-selector" onchange="switchRightView(this.value)"
+                style="background-color: #0b0f19 !important; color: #e2e8f0 !important;"
+                class="bg-slate-950 text-engine-cyan font-mono text-xs border border-engine-border/10 hover:border-engine-cyan/60 rounded px-2.5 py-1 pr-7 outline-none cursor-pointer appearance-none transition-all shadow-sm">
+                <option value="ads-cft" style="background-color: #0b0f19; color: #e2e8f0;">3.1 AdS/CFT Entanglement</option>
+                <option value="constraints" style="background-color: #0b0f19; color: #e2e8f0;">3.2 Einstein Constraints
+                </option>
+                <option value="telemetry" style="background-color: #0b0f19; color: #e2e8f0;">4.1 Telemetry & Streams
+                </option>
+                <option value="simulation" style="background-color: #0b0f19; color: #e2e8f0;">4.2 Simulation Controls
+                </option>
+              </select>
+              <i class="w-3.5 h-3.5 text-engine-cyan absolute right-2 pointer-events-none"></i>
+            </div>
+          </div>
+          <button onclick="exportWorkingPreset()" title="Export Preset"
+            class="text-[9px] font-mono text-engine-cyan bg-engine-cyan/10 hover:bg-engine-cyan/20 px-2 py-1 rounded border border-engine-cyan/30 transition-all cursor-pointer">
+            EXPORT
+          </button>
+        </div>
+    
+        <!-- Active Viewport Body (Swapped Dynamically via rightConsoleManager.js) -->
+        <div id="right-console-body" class="flex-1 overflow-y-auto p-3 space-y-3 text-xs font-mono text-slate-300 min-h-0">
+        </div>
+      </div>
+    
+      <!-- LOWER AUXILIARY SUBSYSTEM WINDOW (Compact Render Viewport & Misc Controls) -->
+      <div id="win-right-auxiliary"
+        class="glass-hud rounded-lg flex-[1] flex flex-col min-h-0 overflow-hidden transition-all duration-200 p-3 space-y-2">
+        <div
+          class="text-[10px] font-mono text-engine-cyan tracking-wider border-b border-engine-border/40 pb-1 flex justify-between shrink-0">
+          <span>AUXILIARY SUBSYSTEMS</span>
+          <span class="text-slate-500">RENDER/CTRL</span>
+        </div>
+        <!-- Compact Render Window Slot -->
+        <div id="aux-render-viewport"
+          class="w-full flex-1 bg-slate-900/60 rounded border border-engine-border/40 flex items-center justify-center text-xs font-mono text-slate-400">
+          [Auxiliary Render Viewport]
+        </div>
+      </div>
+    
+    </aside>
   </main>
-
   <script>
-    // Initialize Lucide Icons after DOM load
-    document.addEventListener("DOMContentLoaded", function () {
-      if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
+    // --- LIVE UTC TIMESTAMP CLOCK ---
+      function initUTCClock() {
+        const clockEl = document.getElementById('utc-clock') || document.querySelector('.utc-timestamp');
+
+        function updateClock() {
+          const now = new Date();
+          const utcString = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+          if (clockEl) {
+            clockEl.textContent = utcString;
+          }
+        }
+
+        updateClock();
+        setInterval(updateClock, 1000);
       }
-    });
+
+      // Execute immediately if DOM is ready, otherwise wait for load
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initUTCClock);
+      } else {
+        initUTCClock();
+      }
 
     function toggleAccordion(id) {
       const el = document.getElementById(id);
@@ -342,8 +550,8 @@
     }
 
     function resetWholeDeck() {
-      if (window.deckViewport) {
-        window.deckViewport.clearDeck();
+      if (window.deckViewPort) {
+        window.deckViewPort.clearDeck();
       }
     }
 
@@ -354,10 +562,15 @@
     }
 
     function runDeckTests() {
-      if (window.deckViewport) {
-        window.deckViewport.runAutomatedTests();
+        if (typeof window.runAutomatedTests === 'function') {
+          window.runAutomatedTests();
+        } else if (window.deckViewPort) {
+          window.remedyEngine = window.remedyEngine || new TopologyRemedyEngine(window.deckViewPort);
+          window.remedyEngine.runDiagnosticAudit();
+        } else {
+          console.warn("[Remedy Engine] Viewport not ready.");
+        }
       }
-    }
     
   </script>
 </body>

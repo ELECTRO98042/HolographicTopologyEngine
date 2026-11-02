@@ -37,6 +37,12 @@ class TestingSuiteWindow {
     }
 
     initUI() {
+        // Destroy any existing drawer instance to prevent ghost duplicates and stacked listeners
+        const existingDrawer = document.getElementById("testing-suite-drawer");
+        if (existingDrawer) {
+            existingDrawer.remove();
+        }
+
         const drawer = document.createElement("div");
         drawer.id = "testing-suite-drawer";
         drawer.className = "testing-suite-drawer hidden";
@@ -46,30 +52,46 @@ class TestingSuiteWindow {
                 <button class="close-btn" id="close-drawer-btn">×</button>
             </div>
             <div class="drawer-content">
-                <!-- Step 1: Scenario Selection -->
-                <div class="workflow-step">
-                    <h4>Step 1: Scenario Selection</h4>
-                    <select id="suite-preset-select" class="form-select">
+                <!-- Step 1: Custom Scenario Builder Wizard -->
+                <div class="workflow-step" style="background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 6px; padding: 10px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                        <h4 style="margin: 0; color: #38bdf8; font-size: 12px;">Step 1: Custom Scenario Builder</h4>
+                        <span id="step1-status-badge" class="status-badge pending" style="font-size: 10px; background: #eab30822; color: #eab308; padding: 2px 6px; border-radius: 4px;">PENDING</span>
+                    </div>
+                    <p style="font-size: 11px; color: #94a3b8; margin: 0 0 8px 0;">
+                        Construct a model in the freestyle deck, commit it, or bypass to standard presets.
+                    </p>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;">
+                        <button id="btn-launch-builder" class="btn-primary" style="font-size: 10px; padding: 5px; background: #0284c722; border: 1px solid #38bdf8; color: #38bdf8;">🚀 BUILDER</button>
+                        <button id="btn-commit-model" class="btn-primary" style="font-size: 10px; padding: 5px; background: #10b98122; border: 1px solid #10b981; color: #34d399;">✔ COMMIT</button>
+                        <button id="btn-bypass-model" class="btn-primary" style="font-size: 10px; padding: 5px; background: #33415522; border: 1px solid #64748b; color: #94a3b8;">⏭ BYPASS</button>
+                    </div>
+                </div>
+
+                <!-- Step 2: Scenario Selection (Locked until Step 1 action taken) -->
+                <div class="workflow-step" id="step-2-workflow" style="opacity: 0.5; pointer-events: none; transition: opacity 0.2s ease;">
+                    <h4>Step 2: Scenario Selection</h4>
+                    <select id="suite-preset-select" class="form-select" disabled>
                         <option value="">-- Select Physics Preset --</option>
                         <optgroup label="Standard Presets" id="preset-options-group">
                         </optgroup>
-                        <optgroup label="Custom Scenario Builder">
-                            <option value="FREESTYLE_HOLOGRAPHIC_ENGINE">❖ Launch Holographic Topology Engine (Freestyle)...</option>
+                        <optgroup label="Custom Workflow">
+                            <option value="FREESTYLE_HOLOGRAPHIC_ENGINE" id="opt-custom-committed" class="hidden">★ Custom Committed Model (Active)</option>
                         </optgroup>
                     </select>
                 </div>
 
-                <!-- Step 2: Target & Metrics -->
+                <!-- Step 3: Target & Metrics -->
                 <div class="workflow-step">
-                    <h4>Step 2: Experiment Specifications</h4>
+                    <h4>Step 3: Experiment Specifications</h4>
                     <div id="experiment-spec-display" style="font-size: 12px; color: #38bdf8;">
                         Select a scenario to view specs.
                     </div>
                 </div>
 
-                <!-- Step 3: Scientist Checkpoints -->
+                <!-- Step 4: Scientist Checkpoints -->
                 <div class="workflow-step">
-                    <h4>Step 3: Verification Checkpoints</h4>
+                    <h4>Step 4: Verification Checkpoints</h4>
                     <div class="checkbox-group">
                         <label><input type="checkbox" id="chk-mesh"> Mesh / Trajectory Coherent</label>
                         <label><input type="checkbox" id="chk-singularity"> No Matrix Singularities / NaNs</label>
@@ -77,9 +99,9 @@ class TestingSuiteWindow {
                     </div>
                 </div>
 
-                <!-- Step 4: Run Data Acquisition -->
+                <!-- Step 5: Run Data Acquisition -->
                 <div class="workflow-step">
-                    <h4>Step 4: Telemetry Acquisition</h4>
+                    <h4>Step 5: Telemetry Acquisition</h4>
                     <div id="status-descriptor" style="font-size: 12px; color: #94a3b8; margin-bottom: 8px;">
                         Open Telemetry Stream
                     </div>
@@ -103,9 +125,9 @@ class TestingSuiteWindow {
                     </div>
                 </div>
 
-                <!-- Step 5: Export & Publishing Assistant -->
+                <!-- Step 6: Export & Publishing Assistant -->
                 <div class="workflow-step">
-                    <h4>Step 5: Validation & Publishing Assistant</h4>
+                    <h4>Step 6: Validation & Publishing Assistant</h4>
                     <div style="margin-bottom: 8px;">
                         Status: <span id="experiment-status-badge" class="status-badge pending">PENDING / INCOMPLETE</span>
                     </div>
@@ -128,22 +150,21 @@ class TestingSuiteWindow {
 
         // Bind events safely
         document.getElementById("close-drawer-btn").addEventListener("click", () => this.toggleDrawer(false));
+
+        // Step 1 Wizard Button Bindings
+        // Replace line 149 with a clean assignment to guarantee only one listener ever exists:
+        const launchBtn = document.getElementById("btn-launch-builder");
+        if (launchBtn) {
+            launchBtn.onclick = () => this.launchFreestyleDeck();
+        }
+        document.getElementById("btn-commit-model").addEventListener("click", () => this.commitCustomScenario());
+        document.getElementById("btn-bypass-model").addEventListener("click", () => this.bypassCustomScenario());
+
         document.getElementById("suite-preset-select").addEventListener("change", (e) => {
             const val = e.target.value;
-            if (val === "FREESTYLE_HOLOGRAPHIC_ENGINE") {
-                const windowFeatures = "width=1920,height=1080,resizable=yes,scrollbars=no,status=no";
-                const engineWindow = window.open("deck.html", "HolographicTopologyEngine", windowFeatures);
-                if (engineWindow) {
-                    engineWindow.focus();
-                } else {
-                    alert("Popup blocked! Please allow popups for this site to open the Holographic Topology Engine.");
-                }
-                e.target.value = "";
-                this.loadConfig("");
-                return;
-            }
             this.loadConfig(val);
         });
+
         document.getElementById("btn-toggle-capture").addEventListener("click", () => this.toggleCapture());
         document.getElementById("btn-abort-capture").addEventListener("click", () => this.abandonTest());
         document.getElementById("btn-export-ai-report").addEventListener("click", () => this.exportReport());
@@ -153,7 +174,76 @@ class TestingSuiteWindow {
         ["chk-mesh", "chk-singularity", "chk-snr"].forEach(id => {
             document.getElementById(id).addEventListener("change", () => this.evaluateStatus());
         });
-        this.fetchConfigs();        
+        this.fetchConfigs();
+    }
+
+    launchFreestyleDeck() {
+        const perfStart = performance.now();
+        console.log(`[Diagnostic] launchFreestyleDeck invoked at t=${perfStart.toFixed(2)}ms`);
+
+        // If an existing window reference is active and open, focus it instead of spawning a duplicate
+        if (window._engineWindow && !window._engineWindow.closed) {
+            window._engineWindow.focus();
+            console.log("[Testing Suite] Focused existing deck viewport.");
+            return;
+        }
+
+        // Define explicit window dimensions and features for an independent pop-out window
+        const windowFeatures = "width=1920,height=1080,resizable=yes,scrollbars=yes,status=no,location=yes";
+
+        // Opening with an empty string name forces Firefox to create an independent popup window
+        window._engineWindow = window.open("deck.html", "", windowFeatures);
+
+        if (window._engineWindow) {
+            window._engineWindow.focus();
+            console.log("[Testing Suite] Freestyle deck opened as a separate standalone window.");
+        } else {
+            alert("Popup blocked! Please allow popups for this site to open the Holographic Topology Engine.");
+        }
+    }
+
+    commitCustomScenario() {
+        const step2 = document.getElementById('step-2-workflow');
+        const step1Badge = document.getElementById('step1-status-badge');
+        const presetSelect = document.getElementById('suite-preset-select');
+        const customOpt = document.getElementById('opt-custom-committed');
+
+        if (step2) {
+            step2.style.opacity = '1';
+            step2.style.pointerEvents = 'auto';
+        }
+        if (step1Badge) {
+            step1Badge.textContent = "COMMITTED";
+            step1Badge.style.background = "#10b98122";
+            step1Badge.style.color = "#34d399";
+        }
+        if (customOpt && presetSelect) {
+            customOpt.classList.remove('hidden');
+            presetSelect.value = "FREESTYLE_HOLOGRAPHIC_ENGINE";
+            presetSelect.removeAttribute('disabled');
+            this.loadConfig("FREESTYLE_HOLOGRAPHIC_ENGINE");
+        }
+        console.log("[Testing Suite] Custom scenario committed. Proceeding to Step 2.");
+    }
+
+    bypassCustomScenario() {
+        const step2 = document.getElementById('step-2-workflow');
+        const step1Badge = document.getElementById('step1-status-badge');
+        const presetSelect = document.getElementById('suite-preset-select');
+
+        if (step2) {
+            step2.style.opacity = '1';
+            step2.style.pointerEvents = 'auto';
+        }
+        if (step1Badge) {
+            step1Badge.textContent = "BYPASSED";
+            step1Badge.style.background = "#33415522";
+            step1Badge.style.color = "#94a3b8";
+        }
+        if (presetSelect) {
+            presetSelect.removeAttribute('disabled');
+        }
+        console.log("[Testing Suite] Custom build bypassed. Standard presets unlocked.");
     }
 
     async fetchConfigs() {
@@ -176,10 +266,8 @@ class TestingSuiteWindow {
             });
         };
 
-        // Render defaults immediately so options appear right away
         render(defaultConfigs);
 
-        // Fetch live configs from the backend in the background with a 2-second timeout
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 2000);
@@ -203,7 +291,7 @@ class TestingSuiteWindow {
             console.warn("Using default physics presets (server route offline or timed out).", err);
         }
     }
-    
+
     initDraggable(drawer) {
         const header = document.getElementById("suite-drag-handle");
         let isDragging = false;
@@ -246,6 +334,22 @@ class TestingSuiteWindow {
             document.getElementById("btn-toggle-capture").disabled = true;
             return;
         }
+
+        if (filename === "FREESTYLE_HOLOGRAPHIC_ENGINE") {
+            this.activeConfig = {
+                suite_id: "Custom_Freestyle_Model",
+                target_view: "Freestyle Topology Deck",
+                engine_module: "HolographicTopologyEngine v2.7.8"
+            };
+            document.getElementById("experiment-spec-display").innerHTML = `
+                <strong>ID:</strong> Custom_Freestyle_Model<br/>
+                <strong>Target View:</strong> Freestyle Topology Deck<br/>
+                <strong>Module:</strong> HolographicTopologyEngine v2.7.8
+            `;
+            document.getElementById("btn-toggle-capture").disabled = false;
+            return;
+        }
+
         try {
             const res = await fetch(`/api/v1/test-suite/configs/${filename}`);
             this.activeConfig = await res.json();
@@ -318,7 +422,6 @@ class TestingSuiteWindow {
             }
         }, safetyTimeoutMs);
 
-        // High-frequency tick for smooth sub-second elapsed time & frame logging
         this.captureTimer = setInterval(() => {
             if (!this.isCapturing) return;
 
@@ -328,7 +431,6 @@ class TestingSuiteWindow {
             const remaining = Math.max(0, totalDuration - Math.floor(elapsedSec));
             const percent = Math.min(100, Math.floor((elapsedSec / totalDuration) * 100));
 
-            // Log telemetry frame dynamically if external stream isn't pushing frames
             this.logTelemetryFrame({
                 step: this.frameCount + 1,
                 timeElapsed: elapsedSec,
@@ -349,7 +451,7 @@ class TestingSuiteWindow {
             if (elapsedSec >= totalDuration) {
                 this.completeTestSequence();
             }
-        }, 200); // 5Hz high-precision sampling
+        }, 200);
     }
 
     completeTestSequence() {
@@ -411,7 +513,6 @@ class TestingSuiteWindow {
             descriptor.style.color = "#94a3b8";
         }
 
-        // Reset Step 1 preset selection dropdown and specs
         const select = document.getElementById("suite-preset-select");
         if (select) select.value = "";
         this.activeConfig = null;
@@ -432,7 +533,6 @@ class TestingSuiteWindow {
             abortBtn.style.display = "none";
         }
 
-        // Reset checkboxes
         ["chk-mesh", "chk-singularity", "chk-snr"].forEach(id => {
             const chk = document.getElementById(id);
             if (chk) chk.checked = false;
@@ -483,13 +583,13 @@ class TestingSuiteWindow {
         if (badge) {
             if (isReadyForExport) {
                 badge.textContent = "COMPLETED!";
-                badge.style.background = "#15803d"; // Green
+                badge.style.background = "#15803d";
                 badge.style.color = "#ffffff";
                 if (exportBtn) exportBtn.disabled = false;
                 if (publishBtn) publishBtn.disabled = false;
             } else {
                 badge.textContent = "PENDING / INCOMPLETE";
-                badge.style.background = "#d97706"; // Amber
+                badge.style.background = "#d97706";
                 badge.style.color = "#ffffff";
                 if (exportBtn) exportBtn.disabled = true;
                 if (publishBtn) publishBtn.disabled = true;
@@ -547,7 +647,7 @@ class TestingSuiteWindow {
                     metadata: {},
                     source: [
                         `# Publishing Assistant: ${title}\n`,
-                        `**Generated by Holographic Topology Engine v2.7.7**  \n`,
+                        `**Generated by Holographic Topology Engine v2.7.8**  \n`,
                         `**Engine Module:** \`${module}\` | **Date:** \`${new Date().toISOString()}\`  \n\n`,
                         `---  \n`,
                         `This notebook contains embedded telemetry audit data captured directly during the experimental run, along with JAX-accelerated analysis routines and publication-grade figure generation formatted for *Physical Review* / *APS* journals.`
@@ -565,7 +665,6 @@ class TestingSuiteWindow {
                         "import matplotlib.pyplot as plt\n",
                         "import jax.numpy as jnp\n",
                         "\n",
-                        "# Apply APS / Physical Review publication aesthetic styling\n",
                         "plt.rcParams.update({\n",
                         "    'font.family': 'serif',\n",
                         "    'font.size': 10,\n",
@@ -603,13 +702,11 @@ class TestingSuiteWindow {
                     source: [
                         "# 3. Publication-Grade Visualization (APS Style Figure)\n",
                         "fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.5, 3.5), constrained_layout=True)\n\n",
-                        "# Subplot A: Topological Mesh Point Count vs. Time\n",
                         "ax1.plot(time_elapsed, num_points, color='#0284c7', lw=1.5, label='Point Density N(t)')\n",
                         "ax1.set_xlabel('Time Elapsed $t$ (s)')\n",
                         "ax1.set_ylabel('Mesh Point Density $N$')\n",
                         "ax1.set_title('(a) Mesh Scale Trajectory', loc='left', fontsize=10)\n",
                         "ax1.legend()\n\n",
-                        "# Subplot B: Frame Inter-Arrival Delta (Sampling Stability)\n",
                         "deltas = jnp.diff(logged_at)\n",
                         "ax2.plot(steps[1:], deltas, color='#0d9488', lw=1.2, alpha=0.85, label='$\\\\Delta t$ (ms)')\n",
                         "ax2.axhline(y=jnp.mean(deltas), color='#e11d48', linestyle='--', lw=1.0, label='Mean Jitter')\n",

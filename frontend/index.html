@@ -445,19 +445,22 @@
             }
         }
 
-        // Expose a robust getter/setter on window with a local fallback
-        let _fallbackNodes = [
-                { id: 'N-001', x: 0, y: 0, z: 0, isCore: true },
-                { id: 'N-002', x: -100, y: 0, z: 86.6, isCore: false },
-                { id: 'N-003', x: 100, y: 0, z: 86.6, isCore: false }
+            // --- Centralized Workspace Node State Store ---
+            let _fallbackNodes = [
+                { id: 'N-001', name: 'AdS Boundary Shell', type: 'TOPOLOGY', x: 0, y: 0, z: 0, isCore: false, color: '#8b5cf6' }, // Violet exception
+                { id: 'N-002', name: 'Minkowski Space', type: 'METRIC', x: -100, y: 0, z: 86.6, isCore: false, color: '#10b981' }, // Emerald Green pass
+                { id: 'N-003', name: 'Abelian U(1) EM', type: 'FIELD', x: 100, y: 0, z: 86.6, isCore: false, color: '#10b981' }   // Emerald Green pass
             ];
 
-            Object.defineProperty(window, 'nodes', {
+            // Standard global array reference
+            window.nodes = _fallbackNodes;
+
+            /*Object.defineProperty(window, 'nodes', {
                 get() {
                     const activeNodes = (window.deckViewport && window.deckViewport.nodes && window.deckViewport.nodes.length > 0)
                         ? window.deckViewport.nodes
                         : _fallbackNodes;
-                    console.log("Getter activeNodes:", activeNodes);
+                    //console.log("Getter activeNodes:", activeNodes);
                     return activeNodes;
                 },
                 set(newNodes) {
@@ -469,7 +472,54 @@
                     }
                 },
                 configurable: true
+            }); */
+
+            // Bridge listener & periodic sync for testing suite / deck nodes
+            window.addEventListener('addTopologyNode', (e) => {
+                const newNode = e.detail;
+
+                if (rawNode) {
+                    // Pass through Physics Arbiter validation gate
+                    const verdict = window.physicsArbiter.validateDrop(rawNode);
+                    // Log arbitration telemetry to console / update inspector status
+                    console.log(`[ARBITER VERDICT]: ${verdict.status} (${verdict.code}) - ${verdict.message}`);
+                    // If denied, block injection entirely to protect THREE render loop
+                    if (verdict.status === 'DENIED') {
+                        console.warn("Node drop blocked by physics arbiter:", rawNode.id);
+                        return;
+                    }
+                    // Use sanitized/validated node data
+                    const validatedNode = verdict.node;
+                
+
+                    if (validatedNode && !nodes.some(n => n.id === validatedNode.id)) {
+                        validatedNode.x = validatedNode.x || (Math.random() - 0.5) * 200;
+                        validatedNode.y = validatedNode.y || 0;
+                        validatedNode.z = validatedNode.z || (Math.random() - 0.5) * 200;
+
+                        nodes.push(validatedNode);
+                        console.log("Arbiter Approved & Injected node into Main HUD workspace:", validatedNode);
+                    }
+                }
             });
+
+            // Ensure deck viewport nodes sync seamlessly into the main render loop
+            /*setInterval(() => {
+                if (window.deckViewport && window.deckViewport.nodes) {
+                    window.deckViewport.nodes.forEach(viewportNode => {
+                        if (!nodes.some(n => n.id === viewportNode.id)) {
+                            nodes.push({
+                                id: viewportNode.id || `N-00${nodes.length + 1}`,
+                                x: viewportNode.x || (Math.random() - 0.5) * 200,
+                                y: viewportNode.y || 0,
+                                z: viewportNode.z || (Math.random() - 0.5) * 200,
+                                isCore: false,
+                                data: viewportNode.data
+                            });
+                        }
+                    });
+                }
+            }, 1000);  */  
 
         // 3D Projection Pipeline[cite: 1]
         function project3D(x, y, z, width, height) {
@@ -502,42 +552,44 @@
 
         // Topology Preset Generator[cite: 1]
         window.setTopologyMode = function (mode) {
-            const count = nodes.length > 0 ? nodes.length : 8;
-            nodes = [];
+                const count = window.nodes.length > 0 ? window.nodes.length : 8;
+                const newNodes = []; // Use a local array first
 
-            for (let i = 0; i < count; i++) {
-                let x = 0, y = 0, z = 0;
-                const id = `N-00${i + 1}`;
-                const isCore = (i === 0);
+                for (let i = 0; i < count; i++) {
+                    let x = 0, y = 0, z = 0;
+                    const id = `N-00${i + 1}`;
+                    const isCore = (i === 0);
 
-                if (mode === 'spheroid') {
-                    const phi = Math.acos(-1 + (2 * i) / count);
-                    const theta = Math.sqrt(count * Math.PI) * phi;
-                    const r = 120;
-                    x = r * Math.cos(theta) * Math.sin(phi);
-                    y = r * Math.sin(theta) * Math.sin(phi);
-                    z = r * Math.cos(phi);
-                } else if (mode === 'cubed') {
-                    const spacing = 100;
-                    x = (i % 2 === 0 ? -1 : 1) * spacing;
-                    y = (Math.floor(i / 2) % 2 === 0 ? -1 : 1) * spacing;
-                    z = (Math.floor(i / 4) === 0 ? -1 : 1) * spacing;
-                } else if (mode === 'toroidal') {
-                    const R = 120, r = 40;
-                    const u = (i / count) * Math.PI * 2;
-                    const v = (i * 3) * Math.PI * 2 / count;
-                    x = (R + r * Math.cos(v)) * Math.cos(u);
-                    y = (R + r * Math.cos(v)) * Math.sin(u);
-                    z = r * Math.sin(v);
-                } else {
-                    x = (Math.random() - 0.5) * 300;
-                    y = (Math.random() - 0.5) * 300;
-                    z = (Math.random() - 0.5) * 150;
+                    if (mode === 'spheroid') {
+                        const phi = Math.acos(-1 + (2 * i) / count);
+                        const theta = Math.sqrt(count * Math.PI) * phi;
+                        const r = 120;
+                        x = r * Math.cos(theta) * Math.sin(phi);
+                        y = r * Math.sin(theta) * Math.sin(phi);
+                        z = r * Math.cos(phi);
+                    } else if (mode === 'cubed') {
+                        const spacing = 100;
+                        x = (i % 2 === 0 ? -1 : 1) * spacing;
+                        y = (Math.floor(i / 2) % 2 === 0 ? -1 : 1) * spacing;
+                        z = (Math.floor(i / 4) === 0 ? -1 : 1) * spacing;
+                    } else if (mode === 'toroidal') {
+                        const R = 120, r = 40;
+                        const u = (i / count) * Math.PI * 2;
+                        const v = (i * 3) * Math.PI * 2 / count;
+                        x = (R + r * Math.cos(v)) * Math.cos(u);
+                        y = (R + r * Math.cos(v)) * Math.sin(u);
+                        z = r * Math.sin(v);
+                    } else {
+                        x = (Math.random() - 0.5) * 300;
+                        y = (Math.random() - 0.5) * 300;
+                        z = (Math.random() - 0.5) * 150;
+                    }
+
+                    newNodes.push({ id, x, y, z, isCore });
                 }
-
-                nodes.push({ id, x, y, z, isCore });
-            }
-        };
+                window.nodes = newNodes;
+                _fallbackNodes = newNodes;
+            };
 
         // Reset Camera Handler[cite: 1]
         window.resetCamera = function () {
@@ -624,20 +676,93 @@
             if (phiEl) phiEl.textContent = `Integrated Info (Phi): ${packet.phi}`;
         }
 
-        // WebSocket Connection[cite: 1]
-        const wsUrl = "ws://127.0.0.1:8000/ws/telemetry";
-        const ws = new WebSocket(wsUrl);
-        ws.binaryType = "arraybuffer";
+        // WebSocket Connection & Bridge Expose
+            const wsUrl = "ws://127.0.0.1:8000/ws/telemetry";
+            const ws = new WebSocket(wsUrl);
+            window.ws = ws; // Expose globally for console diagnostics and bridge tracking
+            window.bridge = {
+                sendAction: (action, payload) => {
+                    if (ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ action, ...payload }));
+                    } else {
+                        console.warn("Bridge not connected. State queue pending.");
+                    }
+                }
+            };
+            ws.binaryType = "arraybuffer";
 
-        ws.onopen = () => {
-            console.log("Holographic HUD WebSocket Connected.");
-            ws.send(JSON.stringify({
-                action: "update_nodes",
-                nodes: nodes
-            }));
-        };
+            ws.onopen = () => {
+                console.log("Holographic HUD WebSocket Connected.");
+                window.bridge.sendAction("update_nodes", { nodes: nodes });
+            };
 
-        ws.onmessage = function (event) {
+            ws.onmessage = function (event) {
+                if (event.data instanceof ArrayBuffer) {
+                    const floatArray = new Float32Array(event.data);
+                    const scaleMultiplier = window.hudConfig ? window.hudConfig.worldScale : 1.0;
+                    for (let i = 0; i < nodes.length && (i * 4 + 1) < floatArray.length; i++) {
+                        if (!nodes[i].isPinned && nodes[i] !== selectedNode) {
+                            nodes[i].x = floatArray[i * 4];
+                            nodes[i].y = floatArray[i * 4 + 1];
+                            nodes[i].z = floatArray[i * 4 + 2];
+                        }
+                    }
+                } else {
+                    const packet = JSON.parse(event.data);
+                    if (packet.type === "hud_update") {
+                        updateHUD(packet);
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                console.warn("Holographic HUD WebSocket Disconnected. Reconnecting...");
+            };
+            // --- Cross-Window Topology Sync Bridge Listener ---
+            const mainHUDChannel = new BroadcastChannel('holographic_sync_channel');
+
+                mainHUDChannel.onmessage = (event) => {
+                    const message = event.data;
+                    if (message && message.type === 'SYNC_TOPOLOGY') {
+                        console.log("[Main HUD Sync] Received topology payload from deck:", message.nodes);
+
+                        if (Array.isArray(message.nodes)) {
+                            const synchronizedNodes = message.nodes.map((n, index) => {
+                                const posX = (n.position && typeof n.position.x === 'number') ? n.position.x : (n.x || 0);
+                                const posY = (n.position && typeof n.position.y === 'number') ? n.position.y : (n.y || 0);
+                                const posZ = (n.position && typeof n.position.z === 'number') ? n.position.z : (n.z || 0);
+
+                                // Convert incoming hex color integer or string into a CSS-friendly hex string for the canvas
+                                let nodeColor = '#00ffcc'; // Default cyan fallback
+                                if (typeof n.color === 'number') {
+                                    nodeColor = '#' + n.color.toString(16).padStart(6, '0');
+                                } else if (typeof n.color === 'string') {
+                                    nodeColor = n.color;
+                                }
+
+                                return {
+                                    id: n.id || `N-00${index + 1}`,
+                                    name: n.name || `Node-${index + 1}`,
+                                    type: n.type || 'Standard',
+                                    color: nodeColor, // <--- Capture semantic color here!
+                                    x: posX,
+                                    y: posY,
+                                    z: posZ,
+                                    isCore: index === 0,
+                                    data: n
+                                };
+                            });
+
+                            // Update global nodes array so the render loop draws them instantly with correct colors
+                            window.nodes = synchronizedNodes;
+                            _fallbackNodes = synchronizedNodes;
+
+                            console.log(`[Main HUD Sync SUCCESS] Synchronized ${synchronizedNodes.length} nodes to Main HUD canvas with live theme colors.`);
+                        }
+                    }
+                };
+
+        /*ws.onmessage = function (event) {
             if (event.data instanceof ArrayBuffer) {
                 const floatArray = new Float32Array(event.data);
                 const scaleMultiplier = window.hudConfig ? window.hudConfig.worldScale : 1.0;
@@ -654,7 +779,7 @@
                     updateHUD(packet);
                 }
             }
-        };
+        };*/
 
         ws.onclose = () => {
             console.warn("Holographic HUD WebSocket Disconnected. Reconnecting...");
@@ -779,7 +904,8 @@
                 const identifier = (node.data && node.data.name) ? node.data.name : (node.id || 'N-001');
                 const isCore = (node.color === 0xff0055 || node.isCore);
 
-                ctx.fillStyle = isCore ? '#ff0055' : '#00ffcc';
+                // Use synchronized node color if present, otherwise fallback to core/default styling
+                ctx.fillStyle = node.color ? node.color : (isCore ? '#ff0055' : '#00ffcc');
                 ctx.beginPath();
                 ctx.arc(node.px, node.py, (isCore ? 6 : 4) * node.scale, 0, Math.PI * 2);
                 ctx.fill();
