@@ -21,6 +21,7 @@ Designed for real-time theoretical physics simulation, field topology analysis, 
   4. **Atmosphere Pass**: Volumetric mist, spatial density gradients, and turbulent eddy shear.
   5. **Doppler Pass**: Relativistic frequency-shifted emission cones for moving spatial emitters.
   6. **Multipath Pass**: Gravitational lensing caustics and multipath wave convergence.
+     
 - **Additive Diagnostic Pipeline**: Centralized `drawAdditiveDiagnosticOverlays()` utilizing `screen` compositing to prevent brightness blowouts across overlapping high-energy passes.
 - **Expanded Bulk Geometry Volume**: Native $900 \times 900$ world space featuring 72 grid rows and Z-axis spatial bounds spanning $[-140, +140]$ without spatial clipping or moiré artifacts.
 
@@ -77,8 +78,8 @@ Running Locally
 
 Bash
 
-git clone [https://github.com/ELECTRO98042/HolographicTopologyEngine-v2.5.git](https://github.com/ELECTRO98042/HolographicTopologyEngine-v2.5.git)
-cd HolographicTopologyEngine-v2.5
+git clone https://github.com/ELECTRO98042/HolographicTopologyEngine.git
+cd HolographicTopologyEngine
 
 2.  Start the FastAPI backend server:
 
