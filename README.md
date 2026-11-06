@@ -183,7 +183,9 @@ Pass Compositing        Screen / Additive    Screen          Overlay blending mo
 Doppler Shift $\beta$   $0.0 - 0.99c$        $0.15c$         Relativistic velocity factor for emission cones
 Color Charge $g$        $0.1 - 5.0$          $1.2$           Yang-Mills $SU(3)$ coupling constant
 
+License
 
+Distributed under the MIT License. See LICENSE for more information.
 
 
 
