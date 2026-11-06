@@ -1,3 +1,10 @@
+## 📜 License & Commercial Rights
+
+This repository is licensed under the **PolyForm Noncommercial License 1.0.0**. 
+
+- **Academic, personal, and research use:** Free to use, modify, and distribute under non-commercial terms.
+- **Commercial use:** Commercial use, integration into proprietary software, or monetized deployments require an explicit commercial license. Please contact the maintainer to acquire a commercial licensing agreement.
+
 # Holographic Topology Engine v2.8.2
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
