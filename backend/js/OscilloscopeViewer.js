@@ -54,6 +54,14 @@ class OscilloscopeViewer {
         requestAnimationFrame(this.animate);
 
         console.log("[CH-01] Mixed-Signal Real-Time Oscilloscope Engine v2.7.3 Online.");
+        // Ingest live physics nodes from Main HUD broadcast channel
+        const telemetryChannel = new BroadcastChannel('holographic_telemetry_channel');
+        telemetryChannel.onmessage = (event) => {
+            const data = event.data;
+            if (data && data.type === 'hud_update' && data.nodes) {
+                this.updateWaveform(data.nodes);
+            }
+        };
     }
 
     initDOM() {
@@ -87,6 +95,7 @@ class OscilloscopeViewer {
                 </div>
                 <div style="color: #94a3b8; font-size: 11px;">BW: <span id="hdr-bw" style="color:#06b6d4">100 GHz</span></div>
                 <div style="color: #94a3b8; font-size: 11px;">SR: <span id="hdr-sr" style="color:#06b6d4">200 GS/s</span></div>
+                <div style="color: #94a3b8; font-size: 11px;">TDIV: <span id="hdr-tdiv" style="color:#f59e0b">1.00 ns/div</span></div>
                 <div style="color: #94a3b8; font-size: 11px;">MEM: <span style="color:#a855f7">2 Gpts</span></div>
                 <div style="color: #10b981; font-size: 11px; font-weight: bold;">[TRIG READY]</div>
             </div>
@@ -269,7 +278,10 @@ class OscilloscopeViewer {
         const rngTDiv = this.controlPanel.querySelector('#rng-tdiv');
         if (rngTDiv) rngTDiv.addEventListener('input', (e) => {
             this.state.timePerDiv = parseFloat(e.target.value);
-            this.controlPanel.querySelector('#txt-tdiv').textContent = `${this.state.timePerDiv.toFixed(2)} ns/div`;
+            const valStr = `${this.state.timePerDiv.toFixed(2)} ns/div`;
+            this.controlPanel.querySelector('#txt-tdiv').textContent = valStr;
+            const hdrTdiv = this.viewport.querySelector('#hdr-tdiv');
+            if (hdrTdiv) hdrTdiv.textContent = valStr;
         });
 
         const rngTrig = this.controlPanel.querySelector('#rng-trig');
@@ -305,14 +317,26 @@ class OscilloscopeViewer {
         if (chkDigital) chkDigital.addEventListener('change', (e) => this.state.digitalEnabled = e.target.checked);
     }
 
-    updateWaveform(buffer) {
-        if (!buffer) return;
+    updateWaveform(input) {
+        if (!input) return;
+
+        // Handle broadcasted nodes array from Main HUD
+        if (Array.isArray(input)) {
+            const points = Math.min(this.numPoints, input.length);
+            for (let i = 0; i < points; i++) {
+                const node = input[i];
+                this.ch1Buffer[i] = (node.x || 0) * 0.05;
+                this.ch2Buffer[i] = (node.y || 0) * 0.05;
+                this.digitalBuffer[i] = (this.ch1Buffer[i] > this.state.triggerLevel) ? 1 : 0;
+            }
+            return;
+        }
 
         let floatData;
-        if (buffer instanceof ArrayBuffer) {
-            floatData = new Float32Array(buffer);
-        } else if (buffer instanceof Float32Array) {
-            floatData = buffer;
+        if (input instanceof ArrayBuffer) {
+            floatData = new Float32Array(input);
+        } else if (input instanceof Float32Array) {
+            floatData = input;
         } else {
             return;
         }
@@ -405,6 +429,10 @@ class OscilloscopeViewer {
         const stepY = this.height / divsY;
         const centerY = this.height / 2;
 
+        // Dynamic horizontal step scaling based on Time / Div slider
+        const timeScale = 1.0 / Math.max(0.1, this.state.timePerDiv);
+        const stepX = (this.width / this.numPoints) * timeScale;
+
         // 1. Draw CH1 Analog Trace (Cyan)
         if (this.state.ch1Enabled) {
             ctx.strokeStyle = '#06b6d4';
@@ -413,7 +441,6 @@ class OscilloscopeViewer {
             ctx.lineWidth = 2.0;
             ctx.beginPath();
 
-            const stepX = this.width / this.numPoints;
             for (let i = 0; i < this.numPoints; i++) {
                 const val = this.ch1Buffer[i] + this.state.ch1Offset;
                 const x = i * stepX;
@@ -434,7 +461,6 @@ class OscilloscopeViewer {
             ctx.lineWidth = 2.0;
             ctx.beginPath();
 
-            const stepX = this.width / this.numPoints;
             for (let i = 0; i < this.numPoints; i++) {
                 const val = this.ch2Buffer[i] + this.state.ch2Offset;
                 const x = i * stepX;
@@ -453,7 +479,6 @@ class OscilloscopeViewer {
             ctx.lineWidth = 1.2;
             const digYBase = this.height - 40;
             const digHeight = 16;
-            const stepX = this.width / this.numPoints;
 
             ctx.beginPath();
             for (let i = 0; i < this.numPoints; i++) {
@@ -484,12 +509,12 @@ class OscilloscopeViewer {
             ctx.fillStyle = 'rgba(168, 85, 247, 0.35)';
             const barWidth = this.width / 128;
             for (let i = 0; i < 128; i++) {
-                // Compute amplitude spectrum approximation
                 const mag = Math.abs(Math.sin(i * 0.1) * 0.7 + (Math.random() * 0.15)) * (this.height * 0.35);
                 ctx.fillRect(i * barWidth, this.height - mag, barWidth - 1, mag);
             }
         }
     }
+    
     connect(url = '/ws/oscilloscope') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const wsUrl = url.startsWith('ws') ? url : `${protocol}//${window.location.host}${url}`;

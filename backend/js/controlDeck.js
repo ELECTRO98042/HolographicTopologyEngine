@@ -129,26 +129,19 @@ document.addEventListener('DOMContentLoaded', () => {
     bindSlider('slider-noise-thresh', 'val-noise-thresh', 'noiseThreshold');
 
     // Interference Overlays Toggle Bindings
-    document.querySelectorAll('.overlay-toggle, button[data-overlay], .interference-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            // toggle() returns true if the class is now present, false if removed
-            const isActive = btn.classList.toggle('active');
+    //document.querySelectorAll('.overlay-toggle').forEach(btn => {
+    //    btn.addEventListener('click', (e) => {
+    //        const targetBtn = e.currentTarget;
+    //        const key = targetBtn.getAttribute('data-overlay');
+    //        const isActive = targetBtn.classList.toggle('active');
 
-            const text = btn.textContent.trim().toLowerCase();
-            let key = null;
-            if (text.includes('thermal')) key = 'thermal';
-            else if (text.includes('wave')) key = 'wave';
-            else if (text.includes('emp')) key = 'emp';
-            else if (text.includes('atmos')) key = 'atmos';
-            else if (text.includes('doppler')) key = 'doppler';
-            else if (text.includes('multipath')) key = 'multipath';
-
-            if (key && window.hudConfig && window.hudConfig.overlays) {
-                window.hudConfig.overlays[key] = isActive;
-                console.log(`Overlay ${key} set to ${isActive}`);
-            }
-        });
-    });
+    //        if (key && window.hudConfig) {
+    //            window.hudConfig.overlays = window.hudConfig.overlays || {};
+    //            window.hudConfig.overlays[key] = isActive;
+    //            console.log(`[Interference Deck] Overlay ${key} set to ${isActive}`);
+    //       }
+    //    });
+    //});
 
     // Action & Export Buttons
     document.getElementById('btn-pin-all').addEventListener('click', () => {

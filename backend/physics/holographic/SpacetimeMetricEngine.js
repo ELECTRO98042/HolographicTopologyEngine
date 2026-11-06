@@ -14,10 +14,10 @@ class SpacetimeMetricEngine {
      */
     getAdSPoincareMetric(coords) {
         const [t, x, y, z] = coords;
-        if (z <= 0) throw new Error("Bulk coordinate z must be strictly positive (z > 0).");
-        
-        const factor = Math.pow(this.AdSRadius / z, 2);
-        // Diagonal metric components [g_tt, g_xx, g_yy, g_zz]
+        // Enforce safe boundary cutoff to prevent infinite metric expansion
+        const safeZ = Math.max(1e-4, z);
+
+        const factor = Math.pow(this.AdSRadius / safeZ, 2);
         return [-factor, factor, factor, factor];
     }
 
@@ -26,11 +26,9 @@ class SpacetimeMetricEngine {
      */
     computeChristoffelSymbols(coords) {
         const [t, x, y, z] = coords;
-        // Non-zero Christoffel symbols for Poincaré AdS
-        // Gamma^t_{tz} = Gamma^x_{xz} = Gamma^y_{yz} = Gamma^z_{zz} = -1/z
-        // Gamma^z_{tt} = -z / L^2, Gamma^z_{xx} = z / L^2, etc.
+        const safeZ = Math.max(1e-4, z);
         const gamma = {};
-        const invZ = 1.0 / z;
+        const invZ = 1.0 / safeZ;
 
         gamma['t_tz'] = -invZ;
         gamma['x_xz'] = -invZ;
@@ -38,31 +36,35 @@ class SpacetimeMetricEngine {
         gamma['z_zz'] = -invZ;
 
         const L2 = Math.pow(this.AdSRadius, 2);
-        gamma['z_tt'] = -z / L2;
-        gamma['z_xx'] = z / L2;
-        gamma['z_yy'] = z / L2;
+        gamma['z_tt'] = -safeZ / L2;
+        gamma['z_xx'] = safeZ / L2;
+        gamma['z_yy'] = safeZ / L2;
 
         return gamma;
     }
 
     /**
-     * Integrates a null or timelike geodesic step using the geodesic equation.
+     * Integrates a null or timelike geodesic step with clamped boundary protection.
      */
     stepGeodesic(position, momentum, stepSize = 0.01) {
         const [t, x, y, z] = position;
         const [pt, px, py, pz] = momentum;
         const gamma = this.computeChristoffelSymbols(position);
 
-        // Simple Euler/Verlet symplectic update for demonstration
-        const dt = pt * Math.pow(z / this.AdSRadius, 2);
-        const dx = px * Math.pow(z / this.AdSRadius, 2);
-        const dy = py * Math.pow(z / this.AdSRadius, 2);
-        const dz = pz * Math.pow(z / this.AdSRadius, 2);
+        const scale = Math.pow(Math.max(1e-4, z) / this.AdSRadius, 2);
+        const dt = pt * scale;
+        const dx = px * scale;
+        const dy = py * scale;
+        const dz = pz * scale;
 
-        // Update position
-        const newPos = [t + dt * stepSize, x + dx * stepSize, y + dy * stepSize, Math.max(0.001, z + dz * stepSize)];
-        
-        // Acceleration updates via connection terms: dp^mu / lambda = - Gamma^mu_{alpha beta} p^alpha p^beta
+        // Bounded position update preventing boundary collapse
+        const newPos = [
+            t + dt * stepSize,
+            x + dx * stepSize,
+            y + dy * stepSize,
+            Math.max(0.001, z + dz * stepSize)
+        ];
+
         const dpz = - (gamma['z_tt'] * pt * pt + gamma['z_xx'] * px * px + gamma['z_yy'] * py * py + 2 * gamma['z_zz'] * pz * pz);
         const newMom = [pt, px, py, pz + dpz * stepSize];
 
@@ -70,4 +72,4 @@ class SpacetimeMetricEngine {
     }
 }
 
-module.exports = SpacetimeMetricEngine;
+window.SpacetimeMetricEngine = SpacetimeMetricEngine;

@@ -4,9 +4,18 @@ export class RawMatrixViewer {
         this.currentData = null;
         this.gridSize = 32;
         this.isHueMode = true; // true = Option B (Full Hue Heatmap), false = Option A (Monochrome Depth Sweep)
+        this.numberFormat = 'float'; // Default format ('float', 'hex', 'sci')
 
         this.renderLayout(); // <-- Add this here!
         this.initListeners();
+        // Ingest live physics nodes from Main HUD broadcast channel
+        const telemetryChannel = new BroadcastChannel('holographic_telemetry_channel');
+        telemetryChannel.onmessage = (event) => {
+            const data = event.data;
+            if (data && data.type === 'hud_update' && data.nodes) {
+                this.update(data.nodes);
+            }
+        };
     }
     renderLayout() {
         this.container.innerHTML = `
@@ -103,6 +112,50 @@ export class RawMatrixViewer {
                     : 'Mode: Monochrome Sweep (A)';
             });
         }
+        // --- NEW: Format Toolbar Button Bindings ---
+        const btnHex = document.getElementById('formatHex');
+        const btnFloat = document.getElementById('formatFloatBtn');
+        const btnSci = document.getElementById('formatSciBtn');
+
+        const updateFormatButtons = (activeBtn) => {
+            [btnHex, btnFloat, btnSci].forEach(b => {
+                if (!b) return;
+                b.classList.remove('active');
+                b.style.background = 'transparent';
+                b.style.color = '#00ffcc';
+            });
+            if (activeBtn) {
+                activeBtn.classList.add('active');
+                activeBtn.style.background = '#00ffcc';
+                activeBtn.style.color = '#000';
+            }
+        };
+        // Set initial active state for FLOAT32 button
+        if (btnFloat) updateFormatButtons(btnFloat);
+
+        if (btnHex) {
+            btnHex.addEventListener('click', () => {
+                this.numberFormat = 'hex';
+                updateFormatButtons(btnHex);
+                if (this.currentData) this.renderGrid(this.currentData);
+            });
+        }
+
+        if (btnFloat) {
+            btnFloat.addEventListener('click', () => {
+                this.numberFormat = 'float';
+                updateFormatButtons(btnFloat);
+                if (this.currentData) this.renderGrid(this.currentData);
+            });
+        }
+
+        if (btnSci) {
+            btnSci.addEventListener('click', () => {
+                this.numberFormat = 'sci';
+                updateFormatButtons(btnSci);
+                if (this.currentData) this.renderGrid(this.currentData);
+            });
+        }
     }
 
     toggleColorMode() {
@@ -112,7 +165,20 @@ export class RawMatrixViewer {
         }
     }
 
-    update(float32Array) {
+    update(input) {
+        if (!input) return;
+
+        // If receiving nodes array from broadcast channel, convert to Float32Array
+        let float32Array;
+        if (Array.isArray(input)) {
+            float32Array = new Float32Array(input.length);
+            for (let i = 0; i < input.length; i++) {
+                float32Array[i] = input[i].x || 0;
+            }
+        } else {
+            float32Array = input;
+        }
+
         const sliceSize = this.gridSize * this.gridSize; // 1024 elements per slice
         const multiSliceData = new Float32Array(sliceSize * 32);
 
@@ -210,7 +276,18 @@ export class RawMatrixViewer {
                 const localIdx = r * N + c;
                 const dataIdx = startIdx + localIdx;
                 const val = data[dataIdx] !== undefined ? data[dataIdx] : 0.0;
-                const formattedVal = val.toFixed(3);
+                // Dynamic Number Formatting
+                let formattedVal = '';
+                if (this.numberFormat === 'hex') {
+                    const intVal = Math.abs(Math.round(val * 100)) & 0xFFFF;
+                    formattedVal = '0x' + intVal.toString(16).toUpperCase().padStart(4, '0');
+                } else if (this.numberFormat === 'sci') {
+                    // Dirac / Bra-Ket Quantum Amplitude Notation
+                    const amp = val.toFixed(2);
+                    formattedVal = `⟨ψ|${amp}⟩`;
+                } else {
+                    formattedVal = val.toFixed(3);
+                }
 
                 let bgStyle = '';
                 const normVal = Math.max(-1, Math.min(1, val / 2.0)); // Normalize amplitude between -1 and 1

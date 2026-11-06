@@ -8,8 +8,25 @@ class PhysicsArbiter {
         // Instantiate core physics engines as read-only arbiters
         this.metricEngine = new SpacetimeMetricEngine({ dimension: 4, AdSRadius: 1.0 });
         this.hamiltonianEngine = new PhaseSpaceHamiltonianEngine({ mass: 1.0, omega: 1.5, lambda: 0.2 });
+        this.isLocked = false;
     }
-
+    setAllLocked(locked) {
+        this.isLocked = locked;
+        if (window.deckViewPort && window.deckViewPort.nodes) {
+            window.deckViewPort.nodes.forEach(node => {
+                node.locked = locked;
+                if (locked && node.mesh && node.mesh.position) {
+                    node.position = {
+                        x: node.mesh.position.x,
+                        y: node.mesh.position.y,
+                        z: node.mesh.position.z
+                    };
+                }
+            });
+        }
+        console.log(`[PhysicsArbiter] Holographic boundary state: ${locked ? 'LOCKED' : 'LINKED'}`);
+        return this.isLocked;
+    }
     /**
      * Intercepts and validates a node drop payload.
      * Returns a verdict object containing status, color code, telemetry message, and sanitized node data.

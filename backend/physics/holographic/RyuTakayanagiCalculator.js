@@ -10,33 +10,31 @@ class RyuTakayanagiCalculator {
 
     /**
      * Computes the minimal surface area for a spherical boundary subregion of radius R in AdS_4.
-     * Area formula in AdS: A = (2 * pi * L^2 / epsilon) - (2 * pi * L^2 / R) for leading divergences.
+     * Enforces strict regularization to prevent negative area/entropy anomalies.
      */
     calculateMinimalSurfaceArea(subregionRadius, cutoffEpsilon = 0.01) {
+        if (subregionRadius <= cutoffEpsilon) {
+            throw new Error("Subregion radius must strictly exceed UV cutoff epsilon.");
+        }
         const L2 = Math.pow(this.AdSRadius, 2);
         const divergentTerm = (2 * Math.PI * L2) / cutoffEpsilon;
         const finiteTerm = (2 * Math.PI * L2) / subregionRadius;
-        
-        return Math.max(0, divergentTerm - finiteTerm);
+
+        // Ensure strictly non-negative geometric area projection
+        return Math.max(1e-7, divergentTerm - finiteTerm);
     }
 
-    /**
-     * Computes entanglement entropy S for a given boundary subregion.
-     */
     computeEntanglementEntropy(subregionRadius, cutoffEpsilon = 0.01) {
         const area = this.calculateMinimalSurfaceArea(subregionRadius, cutoffEpsilon);
         return area / (4.0 * this.newtonConstant);
     }
 
-    /**
-     * Generates discrete coordinate points along the bulk minimal surface semi-circle/hemisphere.
-     */
     generateSurfaceMesh(subregionRadius, resolution = 20) {
         const points = [];
         for (let i = 0; i <= resolution; i++) {
             const theta = (i / resolution) * Math.PI;
             const x = subregionRadius * Math.cos(theta);
-            const z = subregionRadius * Math.sin(theta); // Hemispheric bulk profile z^2 + x^2 = R^2
+            const z = subregionRadius * Math.sin(theta);
             points.push({ x, y: 0, z: Math.max(0.001, z) });
         }
         return points;

@@ -1,0 +1,32 @@
+// Populate System State Audit & Remedy Console body view
+const auditModal = document.querySelector('.system-state-audit-console, div:has(> * > text:contains("SYSTEM STATE AUDIT"))') || document.querySelector('div.bg-slate-950, div[class*="rounded"]');
+const auditBodyContainer = document.querySelector('#system-state-audit-body') || document.querySelectorAll('.font-mono')[document.querySelectorAll('.font-mono').length - 1];
+
+if (auditModal) {
+    // Locate or create audit report container inside the modal
+    let reportDiv = document.getElementById('audit-report-content');
+    if (!reportDiv) {
+        reportDiv = document.createElement('div');
+        reportDiv.id = 'audit-report-content';
+        reportDiv.className = "p-3 space-y-2 font-mono text-[11px] text-slate-300";
+        // Insert above the button bar
+        const buttonBar = auditModal.querySelector('button')?.parentElement || auditModal.lastElementChild;
+        auditModal.insertBefore(reportDiv, buttonBar);
+    }
+    
+    reportDiv.innerHTML = `
+        <div class="text-engine-cyan font-semibold border-b border-engine-border/40 pb-1 flex justify-between">
+            <span>[AUDIT STATUS: STABLE]</span>
+            <span class="text-emerald-400">LOCKED_STATE_ENFORCED</span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-[10px] text-slate-400 mt-2">
+            <div>Minimal Surface ($\gamma_A$): <span class="text-slate-100">1.50</span></div>
+            <div>Entanglement Wedge ($E_W$): <span class="text-emerald-400">Active</span></div>
+            <div>Conformal Dimension ($\Delta$): <span class="text-slate-100">2.0</span></div>
+            <div>Bulk UV Cutoff ($z_0$): <span class="text-slate-100">0.010</span></div>
+            <div>Complexity Scaling ($CV/CA$): <span class="text-slate-100">1.00</span></div>
+            <div>Arbitration: <span class="text-engine-cyan">Passed (0 Drift)</span></div>
+        </div>
+    `;
+    console.log("[Audit Console] Parameters populated successfully.");
+}

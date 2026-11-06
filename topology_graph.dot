@@ -1,0 +1,18 @@
+digraph HolographicTopology {
+    rankdir=LR;
+    node [shape=box, style="filled,rounded", fillcolor="#1e1e2e", fontcolor="#cdd6f4", fontname="Helvetica", penwidth=2];
+    edge [fontcolor="#bac2de", fontname="Helvetica", fontsize=10];
+
+    // Core holographic and metric nodes
+    "N-001" [label="Metric Base\n(AdS Poincaré)", color="#89b4fa"];
+    "N-002" [label="Spacetime Bulk\n(Geodesic Integrator)", color="#a6e3a1"];
+    "N-003" [label="Entanglement Surface\n(Ryu-Takayanagi)", color="#f9e2af"];
+    "N-004" [label="Phase Space Hamiltonian\n(Anharmonic Oscillator)", color="#eba0ac"];
+
+    // Adjacency edges annotated with explicit metric tensor coupling weights (kappa)
+    "N-001" -> "N-002" [label="kappa = 1.00", color="#89b4fa", penwidth=2.5];
+    "N-002" -> "N-003" [label="kappa = 0.85", color="#a6e3a1", penwidth=2.0];
+    "N-002" -> "N-004" [label="kappa = 0.75", color="#fab387", penwidth=1.8];
+    "N-003" -> "N-001" [label="kappa = 0.90", color="#f9e2af", penwidth=2.2];
+    "N-004" -> "N-002" [label="kappa = 0.80", color="#eba0ac", penwidth=2.0];
+}

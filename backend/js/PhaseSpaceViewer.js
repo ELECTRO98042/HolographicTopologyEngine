@@ -11,6 +11,14 @@ export class PhaseSpaceViewer {
         this.renderLayout();
         this.bindEvents();
         this.startLoop();
+        // Ingest live physics nodes from Main HUD broadcast channel
+        const telemetryChannel = new BroadcastChannel('holographic_telemetry_channel');
+        telemetryChannel.onmessage = (event) => {
+            const data = event.data;
+            if (data && data.type === 'hud_update' && data.nodes) {
+                this.update(data.nodes);
+            }
+        };
     }
 
     renderLayout() {
@@ -141,6 +149,18 @@ export class PhaseSpaceViewer {
     }
 
     update(data) {
+        if (!data) return;
+
+        // If receiving nodes array from broadcast channel, convert to Float32Array
+        if (Array.isArray(data)) {
+            const floatArray = new Float32Array(data.length);
+            data.forEach((node, idx) => {
+                floatArray[idx] = node.x || 0;
+            });
+            this.currentData = floatArray;
+            return;
+        }
+
         // Just store the buffer; rendering happens on rAF tick
         this.currentData = data;
     }

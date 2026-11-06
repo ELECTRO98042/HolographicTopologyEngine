@@ -76,6 +76,20 @@ export class TopologyEngineViewer {
             { name: 'Velocity', color: '#3b82f6', visible: true, operators: ['v·∇', '∂_t', 'J_ij'] },
             { name: 'Holographic', color: '#d946ef', visible: true, operators: ['<O>', 'T_μν', 'c'] },
         ];
+        // Ingest live physics nodes from Main HUD broadcast channel
+        const telemetryChannel = new BroadcastChannel('holographic_telemetry_channel');
+        telemetryChannel.onmessage = (event) => {
+            const data = event.data;
+            if (data && data.type === 'hud_update' && data.nodes) {
+                const floatData = new Float32Array(data.nodes.length * 3);
+                data.nodes.forEach((node, idx) => {
+                    floatData[idx * 3] = node.x || 0;
+                    floatData[idx * 3 + 1] = node.y || 0;
+                    floatData[idx * 3 + 2] = node.z || 0;
+                });
+                this.updateMeshBuffer(floatData);
+            }
+        };
     }
 
     renderLayout() {

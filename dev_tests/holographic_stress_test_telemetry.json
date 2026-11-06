@@ -1,0 +1,90 @@
+{
+  "version": "v2.5",
+  "timestamp": "2026-11-04T10:57:00Z",
+  "test_suite": "Multi-Node Holographic Boundary Stress Test",
+  "arbitration_status": "ACTIVE_LOCKED",
+  "global_parameters": {
+    "minimal_surface_radius_gamma_A": 1.5,
+    "entanglement_wedge_E_W": "Active",
+    "conformal_dimension_delta": 2.0,
+    "bulk_uv_cutoff_z0": 0.01,
+    "complexity_scaling_CV_CA": 1.0,
+    "framerate_fps": 44,
+    "draw_calls": 14,
+    "geometries": 13,
+    "active_nodes_count": 3,
+    "active_links_count": 8
+  },
+  "nodes": [
+    {
+      "id": "N-001",
+      "name": "AdS Boundary Shell",
+      "type": "TOPOLOGY",
+      "formula": "dS^d / CFT_d-1 Boundary",
+      "epistemicStatus": "PASSED: STATUS_00_PASSED",
+      "locked": true,
+      "position": {
+        "x": 0.0,
+        "y": 0.6,
+        "z": 0.0
+      },
+      "parameters": {
+        "CS_Level_k": 1,
+        "Result_Metric": 1.0
+      }
+    },
+    {
+      "id": "N-002",
+      "name": "Minkowski Space / Boundary Node Left",
+      "type": "METRIC",
+      "formula": "η_μν = diag(-1,1,1,1)",
+      "epistemicStatus": "PASSED: STATUS_00_PASSED",
+      "locked": true,
+      "position": {
+        "x": -1.5,
+        "y": 0.6,
+        "z": 2.3071
+      },
+      "parameters": {
+        "Spacetime_Interval": 1.0
+      }
+    },
+    {
+      "id": "N-003",
+      "name": "Abelian U(1) EM / Boundary Node Right",
+      "type": "FIELD",
+      "formula": "F_μν = ∂_μ A_ν - ∂_ν A_μ",
+      "epistemicStatus": "PASSED: STATUS_00_PASSED",
+      "locked": true,
+      "position": {
+        "x": 1.5,
+        "y": 0.6,
+        "z": -2.3071
+      },
+      "parameters": {
+        "Conformal_Dim_Delta": 2.0,
+        "Result_Metric": 1.0
+      }
+    }
+  ],
+  "connections": [
+    {
+      "source": "N-001",
+      "target": "N-002",
+      "bond_type": "TOPOLOGY_METRIC",
+      "status": "STABLE"
+    },
+    {
+      "source": "N-001",
+      "target": "N-003",
+      "bond_type": "TOPOLOGY_FIELD",
+      "status": "STABLE"
+    },
+    {
+      "source": "N-002",
+      "target": "N-003",
+      "bond_type": "METRIC_FIELD",
+      "status": "STABLE"
+    }
+  ]
+}

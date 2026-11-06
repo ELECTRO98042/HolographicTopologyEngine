@@ -34,6 +34,26 @@
 <body>
     <div id="channel-mount" style="width: 100vw; height: 100vh; position: relative;"></div>
     <div id="lattice-container"></div>
+    <!-- CH-02 View Container (Topology Lattice 3D) -->
+    <div id="view-CH-02" class="channel-view"
+        style="display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex;">
+        <canvas id="canvas-CH-02" style="flex: 1; height: 100%; display: block;"></canvas>
+    
+        <!-- Lattice Control Panel Sidebar -->
+        <div
+            style="width: 280px; background: #080d0d; border-left: 1.5px solid #00ffcc33; padding: 16px; display: flex; flex-direction: column; gap: 16px; z-index: 5;">
+            <div style="color: #00ffcc; font-size: 12px; font-weight: bold; letter-spacing: 1px;">LATTICE CONTROLS</div>
+            <div
+                style="background: rgba(0,255,204,0.05); border: 1.5px solid #00ffcc33; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; font-size: 10px; color: #00ffcc;">
+                    <span>Z-Height Scale:</span><span id="val-zscale">1.00x</span>
+                </div>
+                <input type="range" id="slider-zscale" min="0.1" max="5.0" step="0.1" value="1.0"
+                    style="width: 100%; accent-color: #00ffcc;">
+            </div>
+        </div>
+    </div>
+    
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             const mount = document.getElementById('channel-mount');

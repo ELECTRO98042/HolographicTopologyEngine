@@ -12,8 +12,8 @@
   <script src="js/lucide.js"></script>
 
   <!-- Core Physics Engines & Arbiter Middleware (Load before app scripts) -->
-  <script src="/backend/physics/holographic/SpacetimeMetricEngine.js"></script>
-  <script src="/backend/physics/dynamics/PhaseSpaceHamiltonianEngine.js"></script>
+  <script src="/physics/holographic/SpacetimeMetricEngine.js"></script>
+  <script src="/physics/dynamics/PhaseSpaceHamiltonianEngine.js"></script>
   <script src="/js/physicsArbiter.js"></script>
   
   <!-- Local Application Script -->
@@ -502,6 +502,14 @@
         <div id="aux-render-viewport"
           class="w-full flex-1 bg-slate-900/60 rounded border border-engine-border/40 flex items-center justify-center text-xs font-mono text-slate-400">
           [Auxiliary Render Viewport]
+        </div>
+        <div id="node-coords-subsystem" class="subsystem-group" style="display: none;">
+          <label class="subsystem-label">Selected Node Position ($x, y, z$)</label>
+          <div class="coord-input-row" style="display: flex; gap: 6px; margin-top: 4px;">
+            <input type="number" id="node-coord-x" class="hud-input" placeholder="X" step="1">
+            <input type="number" id="node-coord-y" class="hud-input" placeholder="Y" step="1">
+            <input type="number" id="node-coord-z" class="hud-input" placeholder="Z" step="1">
+          </div>
         </div>
       </div>
     

@@ -1,5 +1,8 @@
 import * as THREE from './vendor/graphics/three.js';
 import { OrbitControls } from './vendor/graphics/OrbitControls.js';
+import '../../physics/holographic/SpacetimeMetricEngine.js';
+import '../../physics/dynamics/PhaseSpaceHamiltonianEngine.js';
+import './physicsArbiter.js';
 
 window.THREE = THREE;
 window.OrbitControls = OrbitControls;
@@ -152,6 +155,55 @@ const extendedPantryTemplates = [
         description: 'Thermal effective Hamiltonian associated with modular density matrices of subregions.'
     }
 ];
+// Attach click handler to the Topology Inspector link/lock button
+document.addEventListener('click', (e) => {
+    const btn = e.target.closest('button, span');
+    if (btn && btn.textContent.includes('TOPOLOGY')) {
+        const isCurrentlyLocked = btn.textContent.includes('LOCKED');
+        const nextLockState = !isCurrentlyLocked;
+
+        // Toggle button text & styling
+        if (nextLockState) {
+            btn.textContent = 'TOPOLOGY (LOCKED)';
+            btn.style.borderColor = 'rgba(16, 185, 129, 0.4)';
+            btn.style.color = '#10b981';
+        } else {
+            btn.textContent = 'TOPOLOGY (LINKED)';
+            btn.style.borderColor = 'rgba(139, 92, 246, 0.4)';
+            btn.style.color = '#8b5cf6';
+        }
+
+        // Enforce via Physics Arbiter & Deck Viewport
+        if (window.physicsArbiter && typeof window.physicsArbiter.setAllLocked === 'function') {
+            window.physicsArbiter.setAllLocked(nextLockState);
+        }
+    }
+});
+// 1. Call this whenever a node is selected/focused in your viewport
+window.updateSelectedNodeInspector = function (node) {
+    // If no node is passed, fall back to the first node in the active graph/deck if available
+    if (!node && window.activeNodes && window.activeNodes.length > 0) {
+        node = window.activeNodes[0];
+    }
+
+    window.selectedNode = node;
+    const xIn = document.getElementById('input-coord-x');
+    const yIn = document.getElementById('input-coord-y');
+    const zIn = document.getElementById('input-coord-z');
+
+    // Check both node.position or direct mesh position vector if applicable
+    const pos = node ? (node.position || (node.mesh && node.mesh.position)) : null;
+
+    if (pos) {
+        if (xIn) xIn.value = (pos.x || 0).toFixed(4);
+        if (yIn) yIn.value = (pos.y || 0).toFixed(4);
+        if (zIn) zIn.value = (pos.z || 0).toFixed(4);
+    } else {
+        if (xIn) xIn.value = '0.0000';
+        if (yIn) yIn.value = '0.0000';
+        if (zIn) zIn.value = '0.0000';
+    }
+};
 
 // --- AUXILIARY RENDER VIEWPORT: SEMANTIC COLOR KEY LEGEND ---
 function initAuxiliaryColorKey() {
@@ -160,6 +212,21 @@ function initAuxiliaryColorKey() {
 
     auxViewport.className = "w-full flex-1 bg-slate-950/90 rounded border border-engine-border/60 p-2.5 overflow-y-auto font-mono text-[10px]";
     auxViewport.innerHTML = `
+        <div class="subsystem-group">
+            <div class="subsystem-header">// NODE COORDS (PRECISION)</div>
+            <div class="hud-input-row">
+                <label>X:</label>
+                <input type="number" id="input-coord-x" class="hud-input" step="0.0001" value="0.0000">
+            </div>
+            <div class="hud-input-row">
+                <label>Y:</label>
+                <input type="number" id="input-coord-y" class="hud-input" step="0.0001" value="0.0000">
+            </div>
+            <div class="hud-input-row">
+                <label>Z:</label>
+                <input type="number" id="input-coord-z" class="hud-input" step="0.0001" value="0.0000">
+            </div>
+        </div>
         <div class="space-y-2">
             <div class="text-engine-cyan uppercase tracking-wider font-semibold pb-1 border-b border-engine-border/40 flex justify-between items-center">
                 <span>// NODE COLOR KEY</span>
@@ -197,6 +264,39 @@ function initAuxiliaryColorKey() {
             </div>
         </div>
     `;
+    ['x', 'y', 'z'].forEach(axis => {
+        const input = document.getElementById(`input-coord-${axis}`);
+        if (input) {
+            input.addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                if (window.selectedNode && !isNaN(val)) {
+                    // 1. Update logical position data
+                    if (window.selectedNode.position) {
+                        window.selectedNode.position[axis] = val;
+                    }
+
+                    // 2. Update Three.js mesh position directly for instant visual feedback
+                    if (window.selectedNode.mesh && window.selectedNode.mesh.position) {
+                        window.selectedNode.mesh.position[axis] = val;
+                        window.selectedNode.mesh.matrixWorldNeedsUpdate = true;
+                    }
+
+                    // 3. Update connecting lines/wires if your deck has a line update method
+                    if (window.deckInstance && typeof window.deckInstance.updateConnectionLines === 'function') {
+                        window.deckInstance.updateConnectionLines(window.selectedNode);
+                    }
+
+                    // 4. Notify physics arbiter to lock position and prevent drift
+                    if (window.physicsArbiter && typeof window.physicsArbiter.updateNodePosition === 'function') {
+                        window.physicsArbiter.updateNodePosition(
+                            window.selectedNode.id,
+                            window.selectedNode.position || window.selectedNode.mesh.position
+                        );
+                    }
+                }
+            });
+        }
+    });
 }
 
 if (document.readyState === 'loading') {
@@ -628,6 +728,9 @@ class DeckViewport {
             // --- SELECTING A NODE FOR THE FIRST TIME ---
             this.selectedNode = node;
 
+            // Update the coordinates in right side window UI for the newly selected node
+            if (window.updateSelectedNodeInspector) window.updateSelectedNodeInspector(node); // <-- Add here
+
             // Store current color before highlighting yellow
             if (node.mesh && node.mesh.material) {
                 // If currentTheme isn't set yet, determine it from material color
@@ -644,6 +747,9 @@ class DeckViewport {
             // --- DESELECTING THE CURRENTLY SELECTED NODE ---
             this.restoreNodeColor(this.selectedNode);
             this.selectedNode = null;
+
+            // Update the coordinates in right side window UI for the deselected node
+            if (window.updateSelectedNodeInspector) window.updateSelectedNodeInspector(null); // <-- Add here
             this.resetInspectorUI();
 
         } else {
@@ -670,6 +776,8 @@ class DeckViewport {
             // Set new target node to active focus yellow
             targetNode.mesh.material = new THREE.MeshBasicMaterial({ color: 0xfacc15, wireframe: true });
             this.selectedNode = targetNode;
+            // Update the coordinates in right side window UI for the newly selected node
+            if (window.updateSelectedNodeInspector) window.updateSelectedNodeInspector(targetNode); // <-- Add here
             this.updateInspectorForNode(targetNode, "LINKED");
         }
     }
