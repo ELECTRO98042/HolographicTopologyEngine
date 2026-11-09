@@ -1,0 +1,8 @@
+# Preface {.unnumbered}
+
+Welcome to **The Holographic Topology Bible**, the publication-grade technical manual and operational reference for the **Holographic Topology Engine (HTE v2.8.2)**. 
+
+This manual is engineered for physicists, researchers, and advanced system operators seeking a rigorous bridge between microscopic quantum information substrates (such as boundary qubit lattices and Integrated Information Theory) and macroscopic emergent spacetime geometry (AdS/CFT bulk projections).
+
+## Scope and Structure
+Spanning core architecture, boundary state initialization, causal complexity metrics, holographic dictionaries, renormalization group flows, UI flight decks, testing suites, and extensible scripting APIs, this volume provides complete technical documentation for the HTE platform.

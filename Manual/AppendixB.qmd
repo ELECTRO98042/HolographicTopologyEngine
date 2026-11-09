@@ -1,0 +1,93 @@
+# Appendix B - Command Reference & CLI/DSL Syntax
+
+## Section 1: Purpose & Scientific Rationale (The "Why")
+
+### Item B.1.1: Standardized Operator Commands and Scripting Reference
+
+#### Introduction
+While graphical user interfaces (such as the Main HUD Workspace and Testing Suite) govern standard interactive monitoring, advanced research, batch processing, and custom prototyping require precise command-line control and programmatic scripting. Appendix B provides the definitive reference for the Holographic Topology Engine (HTE v2.8.2) command-line interface (CLI) execution flags, the Domain Specific Language (DSL) used within the Freestyle Build Workspace, and file management commands.
+
+* **Ensuring Reproducible Batch Runs:** To provide standardized terminal arguments that lock in seeds, tier overrides, and export formats for automated experimental pipelines.
+* **Empowering Advanced Prototyping:** To document the syntax required for writing custom matrix transformations and boundary node manipulations via the Integrated Scripting Console.
+
+---
+
+## Section 2: Project Scope (The "What" and "Where")
+
+### Item B.2.1: Technical Boundaries & Syntax Inclusions
+
+#### A. Functional Scope (In-Scope)
+* **CLI Execution Flags:** Terminal parameters governing background daemon behavior, deterministic PRNG seeding, Arbiter exception handling, and automated output serialization.
+* **HTE Domain Specific Language (DSL) Syntax:** Grammar rules, variable assignments, and matrix operators for scripting custom boundary topologies and quantum state evolutions.
+* **Snapshot & View Management Commands:** Syntax and file extension protocols for saving, loading, and inspecting `.hte_snapshot` and `.hte_view` payloads.
+
+#### B. Out-of-Scope (Explicit Exclusions)
+* **Operating System Kernel Configuration:** Terminal commands are restricted to the Python virtual environment and HTE backend process layer; direct OS-level kernel tuning is excluded.
+
+---
+
+## Section 3: Project Intent (The "Spirit" & Desired Impact)
+
+### Item B.3.1: Operator and Developer Utility
+
+#### Introduction
+The intent behind this reference guide is to give system operators and scripters immediate, error-free access to the syntax required to automate, extend, and debug simulations across all three engine environments.
+
+---
+
+## Section 4: CLI Execution Flags & Terminal Commands
+
+### Item B.4.1: Core Terminal Arguments
+
+When executing the HTE backend compute engine from the terminal, the following flags govern runtime execution:
+
+```bash
+python -m hte.core.engine [OPTIONS]
+
+    --seed <STRING>: Initializes the pseudorandom number generator with a fixed alphanumeric string to guarantee bit-perfect reproducibility across simulation runs.
+
+    --env <ENVIRONMENT>: Selects the initial operating environment at boot. Valid parameters: hud, testing, freestyle.
+
+    --qubit-limit <INT>: Configures the active boundary qubit ceiling (default: 50). Note: Values exceeding 50 trigger hardware allocation warnings.
+
+    --arbiter-mode <TIER>: Sets the Pipeline Arbiter enforcement level. Valid parameters: permissive (Tier 1 warnings only), standard (Default 3-tier action), strict (Immediate Tier 3 halt on minor drift).
+
+    --export-dir <PATH>: Specifies the target directory for automated data serialization dumps (HDF5, CSV, JSON).
+
+Section 5: HTE Domain Specific Language (DSL) Syntax
+Item B.5.1: Scripting Console Grammar
+
+The HTE DSL allows researchers to construct custom boundary topologies and manipulate density matrices directly within the Freestyle Build Workspace.
+A. Node Allocation & Entanglement Tethers
+
+// Spawn a 1D ring of 16 qubits
+node_ring = QubitLattice.generate(dim=1, count=16, seed="ALPHA-9")
+
+// Establish custom weighted entanglement tether between nodes
+bind_tensor(node_ring[0], node_ring[8], weight=0.85, metric="von_neumann")
+
+B. Density Matrix & Partitioning Commands
+
+// Assign custom density operator
+rho_custom = Matrix.load_file("inputs/custom_state.h5")
+
+// Execute Minimum Information Partition search
+mip_result = IIT.compute_mip(rho_custom, depth=4)
+
+// Output integrated information metric
+print("Calculated Phi:", mip_result.phi_value)
+
+Section 6: Snapshot & View File Management
+Item B.6.1: Checkpoint File Operations
+
+    .hte_snapshot: Immutable checkpoint files generated in the Scientific Testing Suite containing density matrix spectra, adjacency matrices, and SHA-256 validation hashes.
+
+        CLI Load Command: hte-cli restore --snapshot session_0412.hte_snapshot
+
+    .hte_view: Workspace configuration files capturing multi-monitor window layouts, camera angles, mathematical zoom factors, and active heatmap palettes.
+
+        CLI Load Command: hte-cli load-view --config custom_lab.hte_view
+
+Section 7: Anatomical Diagram Reference
+
+[image describing function goes here] figure B.1 - terminal execution flow diagram, CLI argument hierarchy, and DSL compilation pipeline inside the integrated scripting console

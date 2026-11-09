@@ -227,6 +227,32 @@
             color: #00ffcc66;
             letter-spacing: 0.5px;
         }
+        /* JSON Import Button in Spatial Control Deck Header */
+        .deck-header .header-json-btn {
+            background: transparent !important;
+            background-color: transparent !important;
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 9px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+            padding: 3px 6px;
+            cursor: pointer;
+            margin: 0 4px;
+            border-radius: 2px;
+            line-height: 1.1;
+            text-align: center;
+            transition: all 0.2s ease;
+        }
+
+        .deck-header .header-json-btn:hover {
+            background: #00ffcc !important;
+            color: #05050a;
+            box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
+        }       
+
+
     </style>
     <link rel="stylesheet" href="css/testingSuite.css">
 </head>
@@ -243,8 +269,12 @@
     <!-- Spatial Control Deck -->
     <div id="spatial-control-deck">
         <div class="deck-header">
-            <h3>Spatial Control Deck</h3>
-            <button id="deck-collapse-btn" title="Toggle Deck">−</button>
+            <h3>SPATIAL CONTROL DECK</h3>
+            <!-- Text-based button matching the HUD style -->
+            <button id="import-json-btn" class="header-json-btn">JSON IMPORT</button>
+            <input type="file" id="topologyJsonInput" accept=".json" style="display: none;" />
+        
+            <button id="deck-collapse-btn" title="Toggle Deck">-</button>
         </div>
 
         <div class="deck-body" id="deck-body-content">
@@ -476,6 +506,91 @@
 
         // Spatial Control Deck: Interference Overlays Toggle Bindings
         document.addEventListener('DOMContentLoaded', () => {
+            const importBtn = document.getElementById('import-json-btn');
+            const fileInput = document.getElementById('topologyJsonInput');
+
+            if (importBtn && fileInput) {
+                // Trigger hidden file input when the header button is clicked
+                importBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    fileInput.click();
+                });
+
+                // Handle file selection and parsing
+                fileInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const topologyData = JSON.parse(e.target.result);
+
+                            // In frontend/index.html inside reader.onload:
+                            if (topologyData.nodes && Array.isArray(topologyData.nodes)) {
+                                const validNodes = [];
+
+                                // Detect if the schema explicitly declares a 3D spatial coordinate standard
+                                const isExplicit3D = topologyData.coordinate_system === '3D' ||
+                                    topologyData.nodes.some(n => n.z !== undefined && n.z !== 0);
+
+                                const screenOffsetX = 320;
+                                const screenOffsetY = 300;
+
+                                for (const [index, n] of topologyData.nodes.entries()) {
+                                    let posX, posY, posZ;
+
+                                    if (isExplicit3D) {
+                                        // True 3D spatial coordinates (AdS bulk manifold space) - scaled to match spectral shells
+                                        posX = (n.x !== undefined ? n.x : (n.position?.x || 0)) * 0.5;
+                                        posY = (n.y !== undefined ? n.y : (n.position?.y || 0)) * 0.5;
+                                        posZ = (n.z !== undefined ? n.z : (n.position?.z || 0)) * 0.5;
+                                    } else {
+                                        // 2D screen/canvas coordinates -> map and center to world origin (0,0,0)
+                                        const rawX = n.x !== undefined ? n.x : (n.position?.x || screenOffsetX);
+                                        const rawY = n.y !== undefined ? n.y : (n.position?.y || screenOffsetY);
+                                        posX = (rawX - screenOffsetX) * 0.5;
+                                        posY = (rawY - screenOffsetY) * 0.5;
+                                        posZ = n.z !== undefined ? n.z : 0;
+                                    }
+
+                                    const rawNode = {
+                                        id: n.id || `Q-00${index + 1}`,
+                                        name: n.label || n.id || `Qubit-${index + 1}`,
+                                        type: 'TOPOLOGY_NODE',
+                                        color: n.color || '#00ffcc',
+                                        x: posX,
+                                        y: posY,
+                                        z: posZ,
+                                        isPinned: true,
+                                        source: 'JSON_SCHEMA',
+                                        data: n
+                                    };
+
+                                    const verdict = window.physicsArbiter ? window.physicsArbiter.validateDrop(rawNode) : { status: 'APPROVED', node: rawNode };
+
+                                    if (verdict.status === 'APPROVED') {
+                                        validNodes.push(verdict.node);
+                                    } else {
+                                        console.warn(`[ARBITER DENIED IMPORT]: Node ${rawNode.id} rejected.`);
+                                    }
+                                }
+
+                                window.nodes = validNodes;
+                                console.log(`[JSON IMPORT] Successfully loaded ${validNodes.length} nodes using ${isExplicit3D ? '3D Spatial' : '2D Centered Screen'} mapping.`);
+                            } else {
+                                console.error("[JSON IMPORT] Invalid schema: Missing 'nodes' array.");
+                            }
+                        } catch (err) {
+                            console.error("[JSON IMPORT] Failed to parse JSON file:", err);
+                        }
+                    };
+                    reader.readAsText(file);
+
+                    // Reset input value so the same file can be re-imported if needed
+                    fileInput.value = '';
+                });
+            }
             document.querySelectorAll('.overlay-toggle').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     const targetBtn = e.currentTarget;
@@ -1616,9 +1731,21 @@
             const damping = 0.90;
 
             window.nodes.forEach((node, idx) => {
-                if (node.isPinned || node === selectedNode) return;
-
+                // Ensure telemetry/velocity/phase properties exist for overlays even if pinned
                 if (node.vx === undefined) { node.vx = 0; node.vy = 0; node.vz = 0; }
+                if (node.phase === undefined) { node.phase = Math.random() * Math.PI * 2; }
+                if (node.thermalEnergy === undefined) { node.thermalEnergy = node.isPinned ? 0.8 : 0.5; }
+
+                // Advance wave phase for interference and Doppler overlays over time
+                node.phase += (window.temporalSpeed || 1.0) * 0.05;
+
+                // Pinned nodes and selected nodes keep their spatial coordinates locked here
+                if (node.isPinned || node === selectedNode) {
+                    // Zero out forces so they don't accumulate
+                    node.fx = 0; node.fy = 0; node.fz = 0;
+                    return;
+                }
+
                 node.fx = 0; node.fy = 0; node.fz = 0;
 
                 if (node.targetX !== undefined) {

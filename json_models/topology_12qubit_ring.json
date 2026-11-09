@@ -1,0 +1,37 @@
+{
+  "topology_version": "2.8.2",
+  "lattice_type": "1D_RING_PERIODIC",
+  "num_nodes": 12,
+  "nodes": [
+    { "id": "Q-001", "label": "Q-001", "position": { "x": 0.0, "y": 100.0, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-002", "label": "Q-002", "position": { "x": 50.0, "y": 86.6, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-003", "label": "Q-003", "position": { "x": 86.6, "y": 50.0, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-004", "label": "Q-004", "position": { "x": 100.0, "y": 0.0, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-005", "label": "Q-005", "position": { "x": 86.6, "y": -50.0, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-006", "label": "Q-006", "position": { "x": 50.0, "y": -86.6, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-007", "label": "Q-007", "position": { "x": 0.0, "y": -100.0, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-008", "label": "Q-008", "position": { "x": -50.0, "y": -86.6, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-009", "label": "Q-009", "position": { "x": -86.6, "y": -50.0, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-010", "label": "Q-010", "position": { "x": -100.0, "y": 0.0, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-011", "label": "Q-011", "position": { "x": -86.6, "y": 50.0, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 },
+    { "id": "Q-012", "label": "Q-012", "position": { "x": -50.0, "y": 86.6, "z": 0.0 }, "phase": 0.0, "amplitude": 1.0 }
+  ],
+  "edges": [
+    { "source": "Q-001", "target": "Q-002", "weight": 0.75 },
+    { "source": "Q-002", "target": "Q-003", "weight": 0.75 },
+    { "source": "Q-003", "target": "Q-004", "weight": 0.75 },
+    { "source": "Q-004", "target": "Q-005", "weight": 0.75 },
+    { "source": "Q-005", "target": "Q-006", "weight": 0.75 },
+    { "source": "Q-006", "target": "Q-007", "weight": 0.75 },
+    { "source": "Q-007", "target": "Q-008", "weight": 0.75 },
+    { "source": "Q-008", "target": "Q-009", "weight": 0.75 },
+    { "source": "Q-009", "target": "Q-010", "weight": 0.75 },
+    { "source": "Q-010", "target": "Q-011", "weight": 0.75 },
+    { "source": "Q-011", "target": "Q-012", "weight": 0.75 },
+    { "source": "Q-012", "target": "Q-001", "weight": 0.75 }
+  ],
+  "metadata": {
+    "description": "12-qubit periodic ring configuration for Chapter 2 Boundary Qubit Array Architecture",
+    "engine_version": "v2.8.2"
+  }
+}

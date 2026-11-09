@@ -1,0 +1,200 @@
+# Chapter 6 - UI Flight Deck & Real-Time Telemetry Control
+
+## Section 1: Purpose & Scientific Rationale (The "Why")
+
+### Item 6.1.1: Human-in-the-Loop Holographic Control Rationale
+
+#### Introduction
+
+The Holographic Topology Engine (HTE v2.8.2) UI Flight Deck serves as the primary visual control interface connecting high-dimensional mathematical physics simulations with human operators. Modern numerical relativity and quantum informational architectures generate continuous tensor streams that are computationally intractable to audit solely through post-hoc static logs. The flight deck provides real-time state visualization, instant parameter injection, dynamic metric adjustment, and continuous Arbiter safety auditing.
+
+* **Real-Time Visual Diagnostics:** Enables direct inspection of entanglement graphs, emergent AdS bulk geometries, non-linear solitons, and causal cut planes during live temporal evolution.
+
+* **Interactive Parameter Tuning:** Allows operators to dynamic-reconfigure coupling constants ($g$), quantum state topologies, tensor rank truncations, and boundary conditions without interrupting engine execution.
+
+---
+
+## Section 2: Project Scope (The "What" and "Where")
+
+### Item 6.2.1: Flight Deck Components & Operational Inclusions
+
+#### A. Functional Scope (In-Scope)
+
+* **Top Flight Deck HUD:** Master header bar hosting live computational state indicators, execution clocks, global state toggles, and instant Arbiter abort controls.
+
+* **Main Workspace Canvas:** Interactive central canvas supporting both freestyle node-link graph editing and structured 3D holographic bulk viewports.
+
+* **Sidebar Flight Deck Controls:** Left and right parameter panels housing numeric inputs, sliders, drop-down configuration menus, and state export buttons.
+
+* **Telemetry Stream Channels (CH-01 through CH-05):** Multi-channel real-time streaming telemetry interface broadcasting density matrices, metric slices, and solver diagnostics.
+
+#### B. Out-of-Scope (Explicit Exclusions)
+
+* **Automated Batch Script Execution:** Long-range headless parameter sweeps are handled exclusively via the CLI test suite configuration engine (Chapter 9) and are not driven manually from the UI canvas.
+
+* **Direct CUDA GPU Memory Editing:** UI controls modify physical parameters and algorithmic thresholds; raw GPU memory allocation and lower-level CUDA kernel execution are managed by the core PyTorch backend engine.
+
+#### C. Interface Constraints
+
+* **Browser WebGL Overhead:** High-density 3D bulk point-cloud rendering requires WebGL 2.0 acceleration. Rendering boundary lattices exceeding $N = 64$ qubits inside the interactive canvas requires automated downsampling mode to maintain real-time frame rates.
+
+---
+
+## Section 3: Project Intent (The "Spirit" & Desired Impact)
+
+### Item 6.3.1: Ergonomic Precision & Scientific Utility
+
+#### Introduction
+
+The UI Flight Deck is designed around the principle of zero-latency scientific observability. By establishing unambiguous visual feedback for complex quantum gravity phenomena, the interface minimizes operator error and accelerates discovery cycles.
+
+* **Immediate Error Visibility:** Numerical instabilities or constraint violations ($\mathcal{H} \not\approx 0$) are highlighted visually across telemetry channels before triggering system panics.
+
+* **Consistent Subsystem Mapping:** UI panels, channel feeds, and canvas viewports maintain strict 1-to-1 functional parity with backend PyTorch tensor classes.
+
+---
+
+## Section 4: Flight Deck Header & Navigation Architecture
+
+### Item 6.4.1: Master Control Header Layout
+
+The top flight deck header remains permanently visible across all workspace views to ensure continuous monitoring of core engine metrics.
+
+| Header Element | Target Indicator / Parameter | Operational Description |
+| ----- | ----- | ----- |
+| **System Status Flag** | `IDLE`, `RUNNING`, `PAUSED`, `ERROR` | Displays live backend loop state |
+| **Execution Clock** | Elapsed Time ($t$) / Iteration Step | Tracks temporal integration progress |
+| **Arbiter Indicator** | $\mathcal{H}$ Constraint Status (Green / Red) | Live safety daemon health monitoring |
+| **Telemetry Filter** | `CH-01` to `CH-05` Select Dropdown | Filters active stream feed on HUD display |
+| **Global Control Bar** | Run, Pause, Step, Emergency Abort | Master simulation lifecycle execution toggles |
+
+---
+
+## Section 5: Main Workspace Canvas Modes
+
+### Item 6.5.1: Dual-Viewport Architecture
+
+The primary workspace canvas switches dynamically between two primary operational modes:
+
+#### A. Freestyle Qubit & Topology Node Canvas
+
+* **Network Graph Layout:** Displays boundary qubits as interactive nodes connected by weighted edge lines representing pairwise entanglement entropy ($S_{AB}$) or coupling strength ($J_{ij}$).
+
+* **Direct Node Interaction:** Operators can drag nodes to alter spatial arrangements, click individual qubits to view local density matrix components ($\rho_i$), or apply single-qubit unitary transformations via context menus.
+
+#### B. Emergent Bulk Spacetime Viewport (3D WebGL)
+
+* **Hyperbolic Bulk Projection:** Renders the 3D interior bulk metric generated by the holographic SVD mapping engine.
+
+* **Ryu-Takayanagi Surface Tracer:** Overlays minimal surfaces anchored to selected boundary subregions, visually representing holographic entanglement entropy in real time.
+
+---
+
+## Section 6: Sidebar Flight Deck Control Panels
+
+### Item 6.6.1: Subsystem Configuration Controls
+
+The sidebar flight deck provides detailed parameter adjustments organized into four collapsible panels:
+
+* **Panel A: Boundary Qubit Lattice Parameters**
+  * Qubit Count Slider ($N = 4 \dots 64$)
+  * Topology Type Menu (`1D_RING`, `2D_CONFORMAL_MESH`, `HYPERBOLIC_GRAPH`)
+  * Hamiltonian Coupling Sliders ($J, g$)
+
+* **Panel B: Causal IIT Subsystem Parameters**
+  * MIP Search Depth Selector (Depth $1 \dots 4$)
+  * Distance Metric Selection (`WASSERSTEIN`, `RELATIVE_ENTROPY`)
+  * Minimum $\Phi$ Threshold Cutoff Input Box
+
+* **Panel C: Bulk Holographic Projection Engine**
+  * Metric Tensor Selection (`MINKOWSKI_FLAT`, `SCHWARZSCHILD`, `KERR_BH`, `ADS_BULK`)
+  * SVD Truncation Cutoff ($10^{-3} \dots 10^{-10}$)
+  * AdS Curvature Scale Input ($L$)
+
+* **Panel D: Solver & Arbiter Safety Settings**
+  * Time Integrator Dropdown (`RK4`, `BSSN_STABILITY`)
+  * Step Size Input ($dt$)
+  * Max Allowable Hamiltonian Constraint Input ($\mathcal{H}_{\text{max}}$)
+
+---
+
+## Section 7: Telemetry Stream Channels (CH-01 through CH-05) Reference & Manipulation Guide
+
+### Item 6.7.1: Channel Overview & Navigation
+
+The HTE telemetry subsystem streams live computation frames over dedicated WebSocket channels. Operators can isolate specific channels using the **Telemetry Stream Filter** dropdown or top-deck channel toggles.
+
+```
++-------------------------------------------------------------+
+|                WebSocket Ingestion Core                     |
++-------------------------------------------------------------+
+   |-> CH-01: Qubit Network & Boundary Density Stream
+   |-> CH-02: 3D Topological Lattice & IIT (\Phi) Causal Stream
+   |-> CH-03: Bulk Metric & Geodesic Ray Stream
+   |-> CH-04: Soliton Dynamics & Field Phase Stream
+   |-> CH-05: System Diagnostics & Arbiter Stream
+```
+
+### Item 6.7.2: CH-01 — Qubit Network & Boundary Density Stream
+
+* **What it Measures:** Real-time quantum density matrix spectra ($\rho$), pairwise Von Neumann entropy ($S_{AB}$), and local qubit expectation values ($\langle \sigma_z \rangle$).
+
+* **UI Controls & Settings:**
+  * *Entanglement Weight Threshold Slider:* Filters out low-weight correlations below the selected value to clean up dense lattice displays.
+  * *Adjacency Matrix Toggle:* Opens a split-pane matrix view displaying raw floating-point Hilbert space inner products.
+
+* **Visual Effect on Render:** Raising the weight threshold removes weak connecting lines between boundary nodes, isolating strong entanglement clusters.
+
+---
+
+### Item 6.7.3: CH-02 — 3D Topological Lattice & IIT ($\Phi$) Causal Stream
+
+* **What it Measures:** Integrated Information scores ($\Phi$), cause-effect repertoires, and Minimum Information Partition (MIP) cuts across boundary subsystem states.
+
+* **UI Controls & Settings:**
+  * *MIP Search Depth Selector:* Adjusts partition granularity (Depth 1 through 4).
+  * *Distance Metric Toggle:* Switches between Wasserstein (Earth Mover's) distance and Quantum Relative Entropy.
+
+* **Visual Effect on Render:** Selecting Wasserstein distance dynamically projects a glowing red cutting plane across the minimum causal partition inside the 3D network view.
+
+---
+
+### Item 6.7.4: CH-03 — Bulk Metric & Geodesic Ray Stream
+
+* **What it Measures:** Emergent Riemannian metric tensors ($g_{\mu\nu}$), radial AdS depth slicing ($z$-axis profile), and light-like geodesic trajectories.
+
+* **UI Controls & Settings:**
+  * *Holographic Depth Slider ($z$-axis):* Slices radial bulk depth from boundary ($z \to 0$) to deep interior horizon layers.
+  * *Geodesic Ray Tracer Toggle:* Projects light rays through the 3D bulk point cloud.
+
+* **Visual Effect on Render:** Dragging the $z$-slider inward pulls the viewport camera through the emergent spatial slices, revealing interior spatial curvature.
+
+---
+
+### Item 6.7.5: CH-04 — Soliton Dynamics & Field Phase Stream
+
+* **What it Measures:** Topological defects, wave equation phase boundaries, skyrmions, and field kink trajectories in non-linear scalar backgrounds.
+
+* **UI Controls & Settings:**
+  * *Phase Gradient Sensitivity Input:* Sets the threshold for boundary edge detection in field manifolds.
+  * *Damping Coefficient Slider:* Controls field energy dissipation during numerical propagation steps.
+
+* **Visual Effect on Render:** Increasing phase sensitivity renders high-gradient wave crests as distinct glowing surface contours traversing the workspace.
+
+---
+
+### Item 6.7.6: CH-05 — System Diagnostics & Arbiter Stream
+
+* **What it Measures:** Hamiltonian constraint violations ($\mathcal{H} \approx 0$), momentum constraint violations ($\mathcal{M}_i \approx 0$), GPU memory saturation, and numerical integration step stability.
+
+* **UI Controls & Settings:**
+  * *Arbiter Action Dropdown:* Configures safety daemon failure response (`LOG_ONLY`, `PAUSE_EXECUTIVE`, `EMERGENCY_ROLLBACK`).
+  * *Tolerance Limit Input:* Sets maximum permitted constraint drift before triggering safety interventions.
+
+* **Visual Effect on Render:** If $\mathcal{H}$ exceeds tolerance, the main flight deck header flashes red, triggering the configured Arbiter action and pausing temporal integration.
+
+---
+
+## Section 8: Anatomical Diagram Reference
+
+*[image describing function goes here] figure 6.1 - UI Flight Deck complete interface anatomy including top header bar, dual canvas viewports, sidebar configuration panels, and telemetry stream monitors*

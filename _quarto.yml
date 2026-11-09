@@ -1,0 +1,33 @@
+project:
+  type: book
+
+book:
+  title: "The Holographic Topology Bible"
+  subtitle: "Operator & Technical Manual for Holographic Topology Engine v2.8.2"
+  author: "Steven Edward Jones"
+  chapters:
+    - index.qmd
+    - Manual/Chapter1.qmd
+    - Manual/Chapter2.qmd
+    - Manual/Chapter3.qmd
+    - Manual/Chapter4.qmd
+    - Manual/Chapter5.qmd
+    - Manual/Chapter6.qmd
+    - Manual/Chapter7.qmd
+    - Manual/Chapter8.qmd
+    - Manual/Chapter9.qmd
+    - Manual/AppendixA.qmd
+    - Manual/AppendixB.qmd
+
+format:
+  pdf:
+    documentclass: report
+    papersize: letter
+    geometry:
+      - margin=1in
+    toc: true
+    number-sections: true
+    colorlinks: true
+  html:
+    theme: cosmo
+    toc: true

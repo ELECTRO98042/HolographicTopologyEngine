@@ -1,0 +1,151 @@
+{
+  "version": "2.8.2",
+  "model_id": "fig_4_1_holographic_dictionary_bulk_manifold",
+  "coordinate_system": "3D",
+  "description": "Holographic Dictionary Transformation Pipeline, RT Minimal Surface Anchoring, and Emergent AdS Bulk Point-Cloud Manifold",
+  "nodes": [
+    {
+      "id": "Q-001",
+      "label": "Q-001",
+      "x": 0,
+      "y": -180,
+      "z": 0,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-002",
+      "label": "Q-002",
+      "x": 90,
+      "y": -155,
+      "z": 45,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-003",
+      "label": "Q-003",
+      "x": 155,
+      "y": -90,
+      "z": 90,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-004",
+      "label": "Q-004",
+      "x": 180,
+      "y": 0,
+      "z": 120,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-005",
+      "label": "Q-005",
+      "x": 155,
+      "y": 90,
+      "z": 90,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-006",
+      "label": "Q-006",
+      "x": 90,
+      "y": 155,
+      "z": 45,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-007",
+      "label": "Q-007",
+      "x": 0,
+      "y": 180,
+      "z": 0,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-008",
+      "label": "Q-008",
+      "x": -90,
+      "y": 155,
+      "z": -45,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-009",
+      "label": "Q-009",
+      "x": -155,
+      "y": 90,
+      "z": -90,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-010",
+      "label": "Q-010",
+      "x": -180,
+      "y": 0,
+      "z": -120,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-011",
+      "label": "Q-011",
+      "x": -155,
+      "y": -90,
+      "z": -90,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "Q-012",
+      "label": "Q-012",
+      "x": -90,
+      "y": -155,
+      "z": -45,
+      "category": "boundary_qubit",
+      "isPinned": true
+    },
+    {
+      "id": "N-001",
+      "label": "N-001 (Core)",
+      "x": 0,
+      "y": 0,
+      "z": 0,
+      "category": "bulk_node",
+      "isPinned": true
+    },
+    {
+      "id": "N-100",
+      "label": "N-100 (Edge)",
+      "x": 0,
+      "y": 120,
+      "z": 0,
+      "category": "bulk_node",
+      "isPinned": true
+    }
+  ],
+  "edges": [
+    {
+      "from": "Q-001",
+      "to": "N-001",
+      "label": "RT Anchor γ_A"
+    },
+    {
+      "from": "Q-004",
+      "to": "N-001",
+      "label": "RT Anchor γ_A"
+    },
+    {
+      "from": "N-001",
+      "to": "N-100",
+      "label": "AdS Radial Tether"
+    }
+  ]
+}
