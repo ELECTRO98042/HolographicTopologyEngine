@@ -181,22 +181,68 @@ class TestingSuiteWindow {
         const perfStart = performance.now();
         console.log(`[Diagnostic] launchFreestyleDeck invoked at t=${perfStart.toFixed(2)}ms`);
 
-        // If an existing window reference is active and open, focus it instead of spawning a duplicate
+        // --- SECURITY GUARD & MAIN HUD MODEL EXTRACTION ---
+        let activeModel = null;
+
+        // Extract raw edges robustly using existing naming conventions
+        const rawEdges = window.edges || window.connections || window.links || [];
+        const mappedEdges = rawEdges.map((e, idx) => {
+            const srcRaw = e.source !== undefined ? e.source : (e.from !== undefined ? e.from : e.sourceId);
+            const tgtRaw = e.target !== undefined ? e.target : (e.to !== undefined ? e.to : e.targetId);
+            return {
+                ...e,
+                index: idx,
+                source: String(typeof srcRaw === 'object' && srcRaw !== null ? (srcRaw.id || srcRaw.name) : srcRaw),
+                target: String(typeof tgtRaw === 'object' && tgtRaw !== null ? (tgtRaw.id || tgtRaw.name) : tgtRaw),
+                label: e.label || 'Tether'
+            };
+        });
+
+        if (window.deckViewPort && typeof window.deckViewPort.exportState === 'function') {
+            const exportedState = window.deckViewPort.exportState();
+            activeModel = {
+                nodes: exportedState.nodes || [],
+                edges: exportedState.connections || exportedState.edges || mappedEdges,
+                origin: 'MAIN_HUD',
+                timestamp: Date.now()
+            };
+        } else if (window.nodes && window.nodes.length > 0) {
+            activeModel = {
+                nodes: window.nodes,
+                edges: mappedEdges,
+                origin: 'MAIN_HUD',
+                timestamp: Date.now()
+            };
+        }
+
+        // Stage the secured payload with correct edges if a valid model exists
+        if (activeModel) {
+            localStorage.setItem('holographic_pending_builder_import', JSON.stringify(activeModel));
+            console.log("[Testing Suite] Main HUD model secured and staged for Builder import with edges:", activeModel);
+        }
+
+        // --- STATE #3: IF FREESTYLE DECK WINDOW IS ALREADY OPEN ---
         if (window._engineWindow && !window._engineWindow.closed) {
             window._engineWindow.focus();
             console.log("[Testing Suite] Focused existing deck viewport.");
+
+            if (activeModel) {
+                const syncChannel = new BroadcastChannel('holographic_sync_channel');
+                syncChannel.postMessage({
+                    type: 'PUSH_TO_BUILDER_LIMBO',
+                    model: activeModel
+                });
+            }
             return;
         }
 
-        // Define explicit window dimensions and features for an independent pop-out window
+        // --- STATE #2: FIRST-TIME BUILDER OPENING FROM TESTING SUITE ---
         const windowFeatures = "width=1920,height=1080,resizable=yes,scrollbars=yes,status=no,location=yes";
-
-        // Opening with an empty string name forces Firefox to create an independent popup window
         window._engineWindow = window.open("deck.html", "", windowFeatures);
 
         if (window._engineWindow) {
             window._engineWindow.focus();
-            console.log("[Testing Suite] Freestyle deck opened as a separate standalone window.");
+            console.log("[Testing Suite] Freestyle deck opened as a separate standalone window with staged Main HUD model.");
         } else {
             alert("Popup blocked! Please allow popups for this site to open the Holographic Topology Engine.");
         }

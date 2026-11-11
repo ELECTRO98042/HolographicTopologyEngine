@@ -1,0 +1,62 @@
+{
+  "type": "SYNC_FROM_HUD",
+  "version": "2.9.0",
+  "coordinate_system": "3D",
+  "timestamp": "2026-11-11T08:00:00Z",
+  "nodes": [
+    {
+      "id": "QG-01",
+      "name": "Field Node (+x)",
+      "type": "FIELD",
+      "category": "INTERMEDIATE",
+      "tier": "BULK",
+      "x": 50.0,
+      "y": 0.0,
+      "z": 50.0,
+      "color": "#10b981",
+      "attrs": { "mass": 1.0, "dampingFactor": 0.90, "formula": "(\\Box - m^2)\\phi = 0" }
+    },
+    {
+      "id": "QG-02",
+      "name": "Field Node (-x)",
+      "type": "FIELD",
+      "category": "INTERMEDIATE",
+      "tier": "BULK",
+      "x": -50.0,
+      "y": 0.0,
+      "z": 50.0,
+      "color": "#10b981",
+      "attrs": { "mass": 1.0, "dampingFactor": 0.90, "formula": "(\\Box - m^2)\\phi = 0" }
+    },
+    {
+      "id": "QG-03",
+      "name": "Field Node (+z)",
+      "type": "FIELD",
+      "category": "INTERMEDIATE",
+      "tier": "BULK",
+      "x": 50.0,
+      "y": 0.0,
+      "z": -50.0,
+      "color": "#10b981",
+      "attrs": { "mass": 1.0, "dampingFactor": 0.90, "formula": "(\\Box - m^2)\\phi = 0" }
+    },
+    {
+      "id": "QG-04",
+      "name": "Field Node (-z)",
+      "type": "FIELD",
+      "category": "INTERMEDIATE",
+      "tier": "BULK",
+      "x": -50.0,
+      "y": 0.0,
+      "z": -50.0,
+      "color": "#10b981",
+      "attrs": { "mass": 1.0, "dampingFactor": 0.90, "formula": "(\\Box - m^2)\\phi = 0" }
+    }
+  ],
+  "edges": [
+    { "source": "QG-01", "target": "QG-02", "label": "Nearest-Neighbor Coupling" },
+    { "source": "QG-02", "target": "QG-04", "label": "Nearest-Neighbor Coupling" },
+    { "source": "QG-04", "target": "QG-03", "label": "Nearest-Neighbor Coupling" },
+    { "source": "QG-03", "target": "QG-01", "label": "Nearest-Neighbor Coupling" }
+  ]
+}

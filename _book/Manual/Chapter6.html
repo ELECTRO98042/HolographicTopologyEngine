@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.11.9">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>6&nbsp; Chapter 6 - UI Flight Deck &amp; Real-Time Telemetry Control – The Holographic Topology Bible</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../Manual/Chapter7.html" rel="next">
+<link href="../Manual/Chapter5.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/scrollable-regions/scrollable-regions.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-01a495efc5497ac6e3f5457e7ed18e65.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar floating quarto-light"><a id="quarto-skip-link" class="visually-hidden-focusable" href="#quarto-document-content">Skip to main content</a>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav" aria-label="Toolbar">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="Breadcrumbs"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Manual/Chapter6.html"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Chapter 6 - UI Flight Deck &amp; Real-Time Telemetry Control</span></a></li></ol></nav>
+        <a class="flex-grow-1" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto" aria-label="Site">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">The Holographic Topology Bible</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Preface</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter1.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Chapter 1 - System Overview &amp; Architecture</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter2.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Chapter 2 - Boundary State Initialization &amp; Qubit Lattice Architecture</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter3.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Chapter 3 - Integrated Information Theory (IIT) &amp; Minimum Information Partitions (MIP)</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter4.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Chapter 4 - Bulk Geometric Projection &amp; Holographic Dictionaries</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter5.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Chapter 5 - Renormalization Group (RG) Flows &amp; Tensor Network Serialization</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter6.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Chapter 6 - UI Flight Deck &amp; Real-Time Telemetry Control</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter7.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Chapter 7 - Scientific Testing Suite &amp; Experimental Workflows</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter8.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Chapter 8 - Freestyle Build Workspace &amp; Scripting API</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter9.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Chapter 8 - Freestyle Build Workspace &amp; Scripting API</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/AppendixA.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Appendix A - Technical Glossary &amp; Definitions</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/AppendixB.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Appendix B - Command Reference &amp; CLI/DSL Syntax</span></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" aria-labelledby="toc-title" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#section-1-purpose-scientific-rationale-the-why" id="toc-section-1-purpose-scientific-rationale-the-why" class="nav-link active" data-scroll-target="#section-1-purpose-scientific-rationale-the-why"><span class="header-section-number">6.1</span> Section 1: Purpose &amp; Scientific Rationale (The “Why”)</a>
+  <ul class="collapse">
+  <li><a href="#item-6.1.1-human-in-the-loop-holographic-control-rationale" id="toc-item-6.1.1-human-in-the-loop-holographic-control-rationale" class="nav-link" data-scroll-target="#item-6.1.1-human-in-the-loop-holographic-control-rationale"><span class="header-section-number">6.1.1</span> Item 6.1.1: Human-in-the-Loop Holographic Control Rationale</a></li>
+  </ul></li>
+  <li><a href="#section-2-project-scope-the-what-and-where" id="toc-section-2-project-scope-the-what-and-where" class="nav-link" data-scroll-target="#section-2-project-scope-the-what-and-where"><span class="header-section-number">6.2</span> Section 2: Project Scope (The “What” and “Where”)</a>
+  <ul class="collapse">
+  <li><a href="#item-6.2.1-flight-deck-components-operational-inclusions" id="toc-item-6.2.1-flight-deck-components-operational-inclusions" class="nav-link" data-scroll-target="#item-6.2.1-flight-deck-components-operational-inclusions"><span class="header-section-number">6.2.1</span> Item 6.2.1: Flight Deck Components &amp; Operational Inclusions</a></li>
+  </ul></li>
+  <li><a href="#section-3-project-intent-the-spirit-desired-impact" id="toc-section-3-project-intent-the-spirit-desired-impact" class="nav-link" data-scroll-target="#section-3-project-intent-the-spirit-desired-impact"><span class="header-section-number">6.3</span> Section 3: Project Intent (The “Spirit” &amp; Desired Impact)</a>
+  <ul class="collapse">
+  <li><a href="#item-6.3.1-ergonomic-precision-scientific-utility" id="toc-item-6.3.1-ergonomic-precision-scientific-utility" class="nav-link" data-scroll-target="#item-6.3.1-ergonomic-precision-scientific-utility"><span class="header-section-number">6.3.1</span> Item 6.3.1: Ergonomic Precision &amp; Scientific Utility</a></li>
+  </ul></li>
+  <li><a href="#section-4-flight-deck-header-navigation-architecture" id="toc-section-4-flight-deck-header-navigation-architecture" class="nav-link" data-scroll-target="#section-4-flight-deck-header-navigation-architecture"><span class="header-section-number">6.4</span> Section 4: Flight Deck Header &amp; Navigation Architecture</a>
+  <ul class="collapse">
+  <li><a href="#item-6.4.1-master-control-header-layout" id="toc-item-6.4.1-master-control-header-layout" class="nav-link" data-scroll-target="#item-6.4.1-master-control-header-layout"><span class="header-section-number">6.4.1</span> Item 6.4.1: Master Control Header Layout</a></li>
+  </ul></li>
+  <li><a href="#section-5-main-workspace-canvas-modes" id="toc-section-5-main-workspace-canvas-modes" class="nav-link" data-scroll-target="#section-5-main-workspace-canvas-modes"><span class="header-section-number">6.5</span> Section 5: Main Workspace Canvas Modes</a>
+  <ul class="collapse">
+  <li><a href="#item-6.5.1-dual-viewport-architecture" id="toc-item-6.5.1-dual-viewport-architecture" class="nav-link" data-scroll-target="#item-6.5.1-dual-viewport-architecture"><span class="header-section-number">6.5.1</span> Item 6.5.1: Dual-Viewport Architecture</a></li>
+  </ul></li>
+  <li><a href="#section-6-sidebar-flight-deck-control-panels" id="toc-section-6-sidebar-flight-deck-control-panels" class="nav-link" data-scroll-target="#section-6-sidebar-flight-deck-control-panels"><span class="header-section-number">6.6</span> Section 6: Sidebar Flight Deck Control Panels</a>
+  <ul class="collapse">
+  <li><a href="#item-6.6.1-subsystem-configuration-controls" id="toc-item-6.6.1-subsystem-configuration-controls" class="nav-link" data-scroll-target="#item-6.6.1-subsystem-configuration-controls"><span class="header-section-number">6.6.1</span> Item 6.6.1: Subsystem Configuration Controls</a></li>
+  </ul></li>
+  <li><a href="#section-7-telemetry-stream-channels-ch-01-through-ch-05-reference-manipulation-guide" id="toc-section-7-telemetry-stream-channels-ch-01-through-ch-05-reference-manipulation-guide" class="nav-link" data-scroll-target="#section-7-telemetry-stream-channels-ch-01-through-ch-05-reference-manipulation-guide"><span class="header-section-number">6.7</span> Section 7: Telemetry Stream Channels (CH-01 through CH-05) Reference &amp; Manipulation Guide</a>
+  <ul class="collapse">
+  <li><a href="#item-6.7.1-channel-overview-navigation" id="toc-item-6.7.1-channel-overview-navigation" class="nav-link" data-scroll-target="#item-6.7.1-channel-overview-navigation"><span class="header-section-number">6.7.1</span> Item 6.7.1: Channel Overview &amp; Navigation</a></li>
+  <li><a href="#item-6.7.2-ch-01-qubit-network-boundary-density-stream" id="toc-item-6.7.2-ch-01-qubit-network-boundary-density-stream" class="nav-link" data-scroll-target="#item-6.7.2-ch-01-qubit-network-boundary-density-stream"><span class="header-section-number">6.7.2</span> Item 6.7.2: CH-01 — Qubit Network &amp; Boundary Density Stream</a></li>
+  <li><a href="#item-6.7.3-ch-02-3d-topological-lattice-iit-phi-causal-stream" id="toc-item-6.7.3-ch-02-3d-topological-lattice-iit-phi-causal-stream" class="nav-link" data-scroll-target="#item-6.7.3-ch-02-3d-topological-lattice-iit-phi-causal-stream"><span class="header-section-number">6.7.3</span> Item 6.7.3: CH-02 — 3D Topological Lattice &amp; IIT (<span class="math inline">\(\Phi\)</span>) Causal Stream</a></li>
+  <li><a href="#item-6.7.4-ch-03-bulk-metric-geodesic-ray-stream" id="toc-item-6.7.4-ch-03-bulk-metric-geodesic-ray-stream" class="nav-link" data-scroll-target="#item-6.7.4-ch-03-bulk-metric-geodesic-ray-stream"><span class="header-section-number">6.7.4</span> Item 6.7.4: CH-03 — Bulk Metric &amp; Geodesic Ray Stream</a></li>
+  <li><a href="#item-6.7.5-ch-04-soliton-dynamics-field-phase-stream" id="toc-item-6.7.5-ch-04-soliton-dynamics-field-phase-stream" class="nav-link" data-scroll-target="#item-6.7.5-ch-04-soliton-dynamics-field-phase-stream"><span class="header-section-number">6.7.5</span> Item 6.7.5: CH-04 — Soliton Dynamics &amp; Field Phase Stream</a></li>
+  <li><a href="#item-6.7.6-ch-05-system-diagnostics-arbiter-stream" id="toc-item-6.7.6-ch-05-system-diagnostics-arbiter-stream" class="nav-link" data-scroll-target="#item-6.7.6-ch-05-system-diagnostics-arbiter-stream"><span class="header-section-number">6.7.6</span> Item 6.7.6: CH-05 — System Diagnostics &amp; Arbiter Stream</a></li>
+  </ul></li>
+  <li><a href="#section-8-anatomical-diagram-reference" id="toc-section-8-anatomical-diagram-reference" class="nav-link" data-scroll-target="#section-8-anatomical-diagram-reference"><span class="header-section-number">6.8</span> Section 8: Anatomical Diagram Reference</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content" tabindex="-1">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Chapter 6 - UI Flight Deck &amp; Real-Time Telemetry Control</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="section-1-purpose-scientific-rationale-the-why" class="level2" data-number="6.1">
+<h2 data-number="6.1" class="anchored" data-anchor-id="section-1-purpose-scientific-rationale-the-why"><span class="header-section-number">6.1</span> Section 1: Purpose &amp; Scientific Rationale (The “Why”)</h2>
+<section id="item-6.1.1-human-in-the-loop-holographic-control-rationale" class="level3" data-number="6.1.1">
+<h3 data-number="6.1.1" class="anchored" data-anchor-id="item-6.1.1-human-in-the-loop-holographic-control-rationale"><span class="header-section-number">6.1.1</span> Item 6.1.1: Human-in-the-Loop Holographic Control Rationale</h3>
+<section id="introduction" class="level4" data-number="6.1.1.1">
+<h4 data-number="6.1.1.1" class="anchored" data-anchor-id="introduction"><span class="header-section-number">6.1.1.1</span> Introduction</h4>
+<p>The Holographic Topology Engine (HTE v2.8.2) UI Flight Deck serves as the primary visual control interface connecting high-dimensional mathematical physics simulations with human operators. Modern numerical relativity and quantum informational architectures generate continuous tensor streams that are computationally intractable to audit solely through post-hoc static logs. The flight deck provides real-time state visualization, instant parameter injection, dynamic metric adjustment, and continuous Arbiter safety auditing.</p>
+<ul>
+<li><p><strong>Real-Time Visual Diagnostics:</strong> Enables direct inspection of entanglement graphs, emergent AdS bulk geometries, non-linear solitons, and causal cut planes during live temporal evolution.</p></li>
+<li><p><strong>Interactive Parameter Tuning:</strong> Allows operators to dynamic-reconfigure coupling constants (<span class="math inline">\(g\)</span>), quantum state topologies, tensor rank truncations, and boundary conditions without interrupting engine execution.</p></li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="section-2-project-scope-the-what-and-where" class="level2" data-number="6.2">
+<h2 data-number="6.2" class="anchored" data-anchor-id="section-2-project-scope-the-what-and-where"><span class="header-section-number">6.2</span> Section 2: Project Scope (The “What” and “Where”)</h2>
+<section id="item-6.2.1-flight-deck-components-operational-inclusions" class="level3" data-number="6.2.1">
+<h3 data-number="6.2.1" class="anchored" data-anchor-id="item-6.2.1-flight-deck-components-operational-inclusions"><span class="header-section-number">6.2.1</span> Item 6.2.1: Flight Deck Components &amp; Operational Inclusions</h3>
+<section id="a.-functional-scope-in-scope" class="level4" data-number="6.2.1.1">
+<h4 data-number="6.2.1.1" class="anchored" data-anchor-id="a.-functional-scope-in-scope"><span class="header-section-number">6.2.1.1</span> A. Functional Scope (In-Scope)</h4>
+<ul>
+<li><p><strong>Top Flight Deck HUD:</strong> Master header bar hosting live computational state indicators, execution clocks, global state toggles, and instant Arbiter abort controls.</p></li>
+<li><p><strong>Main Workspace Canvas:</strong> Interactive central canvas supporting both freestyle node-link graph editing and structured 3D holographic bulk viewports.</p></li>
+<li><p><strong>Sidebar Flight Deck Controls:</strong> Left and right parameter panels housing numeric inputs, sliders, drop-down configuration menus, and state export buttons.</p></li>
+<li><p><strong>Telemetry Stream Channels (CH-01 through CH-05):</strong> Multi-channel real-time streaming telemetry interface broadcasting density matrices, metric slices, and solver diagnostics.</p></li>
+</ul>
+</section>
+<section id="b.-out-of-scope-explicit-exclusions" class="level4" data-number="6.2.1.2">
+<h4 data-number="6.2.1.2" class="anchored" data-anchor-id="b.-out-of-scope-explicit-exclusions"><span class="header-section-number">6.2.1.2</span> B. Out-of-Scope (Explicit Exclusions)</h4>
+<ul>
+<li><p><strong>Automated Batch Script Execution:</strong> Long-range headless parameter sweeps are handled exclusively via the CLI test suite configuration engine (Chapter 9) and are not driven manually from the UI canvas.</p></li>
+<li><p><strong>Direct CUDA GPU Memory Editing:</strong> UI controls modify physical parameters and algorithmic thresholds; raw GPU memory allocation and lower-level CUDA kernel execution are managed by the core PyTorch backend engine.</p></li>
+</ul>
+</section>
+<section id="c.-interface-constraints" class="level4" data-number="6.2.1.3">
+<h4 data-number="6.2.1.3" class="anchored" data-anchor-id="c.-interface-constraints"><span class="header-section-number">6.2.1.3</span> C. Interface Constraints</h4>
+<ul>
+<li><strong>Browser WebGL Overhead:</strong> High-density 3D bulk point-cloud rendering requires WebGL 2.0 acceleration. Rendering boundary lattices exceeding <span class="math inline">\(N = 64\)</span> qubits inside the interactive canvas requires automated downsampling mode to maintain real-time frame rates.</li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="section-3-project-intent-the-spirit-desired-impact" class="level2" data-number="6.3">
+<h2 data-number="6.3" class="anchored" data-anchor-id="section-3-project-intent-the-spirit-desired-impact"><span class="header-section-number">6.3</span> Section 3: Project Intent (The “Spirit” &amp; Desired Impact)</h2>
+<section id="item-6.3.1-ergonomic-precision-scientific-utility" class="level3" data-number="6.3.1">
+<h3 data-number="6.3.1" class="anchored" data-anchor-id="item-6.3.1-ergonomic-precision-scientific-utility"><span class="header-section-number">6.3.1</span> Item 6.3.1: Ergonomic Precision &amp; Scientific Utility</h3>
+<section id="introduction-1" class="level4" data-number="6.3.1.1">
+<h4 data-number="6.3.1.1" class="anchored" data-anchor-id="introduction-1"><span class="header-section-number">6.3.1.1</span> Introduction</h4>
+<p>The UI Flight Deck is designed around the principle of zero-latency scientific observability. By establishing unambiguous visual feedback for complex quantum gravity phenomena, the interface minimizes operator error and accelerates discovery cycles.</p>
+<ul>
+<li><p><strong>Immediate Error Visibility:</strong> Numerical instabilities or constraint violations (<span class="math inline">\(\mathcal{H} \not\approx 0\)</span>) are highlighted visually across telemetry channels before triggering system panics.</p></li>
+<li><p><strong>Consistent Subsystem Mapping:</strong> UI panels, channel feeds, and canvas viewports maintain strict 1-to-1 functional parity with backend PyTorch tensor classes.</p></li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="section-4-flight-deck-header-navigation-architecture" class="level2" data-number="6.4">
+<h2 data-number="6.4" class="anchored" data-anchor-id="section-4-flight-deck-header-navigation-architecture"><span class="header-section-number">6.4</span> Section 4: Flight Deck Header &amp; Navigation Architecture</h2>
+<section id="item-6.4.1-master-control-header-layout" class="level3" data-number="6.4.1">
+<h3 data-number="6.4.1" class="anchored" data-anchor-id="item-6.4.1-master-control-header-layout"><span class="header-section-number">6.4.1</span> Item 6.4.1: Master Control Header Layout</h3>
+<p>The top flight deck header remains permanently visible across all workspace views to ensure continuous monitoring of core engine metrics.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 33%">
+<col style="width: 33%">
+<col style="width: 33%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>Header Element</th>
+<th>Target Indicator / Parameter</th>
+<th>Operational Description</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><strong>System Status Flag</strong></td>
+<td><code>IDLE</code>, <code>RUNNING</code>, <code>PAUSED</code>, <code>ERROR</code></td>
+<td>Displays live backend loop state</td>
+</tr>
+<tr class="even">
+<td><strong>Execution Clock</strong></td>
+<td>Elapsed Time (<span class="math inline">\(t\)</span>) / Iteration Step</td>
+<td>Tracks temporal integration progress</td>
+</tr>
+<tr class="odd">
+<td><strong>Arbiter Indicator</strong></td>
+<td><span class="math inline">\(\mathcal{H}\)</span> Constraint Status (Green / Red)</td>
+<td>Live safety daemon health monitoring</td>
+</tr>
+<tr class="even">
+<td><strong>Telemetry Filter</strong></td>
+<td><code>CH-01</code> to <code>CH-05</code> Select Dropdown</td>
+<td>Filters active stream feed on HUD display</td>
+</tr>
+<tr class="odd">
+<td><strong>Global Control Bar</strong></td>
+<td>Run, Pause, Step, Emergency Abort</td>
+<td>Master simulation lifecycle execution toggles</td>
+</tr>
+</tbody>
+</table>
+<hr>
+</section>
+</section>
+<section id="section-5-main-workspace-canvas-modes" class="level2" data-number="6.5">
+<h2 data-number="6.5" class="anchored" data-anchor-id="section-5-main-workspace-canvas-modes"><span class="header-section-number">6.5</span> Section 5: Main Workspace Canvas Modes</h2>
+<section id="item-6.5.1-dual-viewport-architecture" class="level3" data-number="6.5.1">
+<h3 data-number="6.5.1" class="anchored" data-anchor-id="item-6.5.1-dual-viewport-architecture"><span class="header-section-number">6.5.1</span> Item 6.5.1: Dual-Viewport Architecture</h3>
+<p>The primary workspace canvas switches dynamically between two primary operational modes:</p>
+<section id="a.-freestyle-qubit-topology-node-canvas" class="level4" data-number="6.5.1.1">
+<h4 data-number="6.5.1.1" class="anchored" data-anchor-id="a.-freestyle-qubit-topology-node-canvas"><span class="header-section-number">6.5.1.1</span> A. Freestyle Qubit &amp; Topology Node Canvas</h4>
+<ul>
+<li><p><strong>Network Graph Layout:</strong> Displays boundary qubits as interactive nodes connected by weighted edge lines representing pairwise entanglement entropy (<span class="math inline">\(S_{AB}\)</span>) or coupling strength (<span class="math inline">\(J_{ij}\)</span>).</p></li>
+<li><p><strong>Direct Node Interaction:</strong> Operators can drag nodes to alter spatial arrangements, click individual qubits to view local density matrix components (<span class="math inline">\(\rho_i\)</span>), or apply single-qubit unitary transformations via context menus.</p></li>
+</ul>
+</section>
+<section id="b.-emergent-bulk-spacetime-viewport-3d-webgl" class="level4" data-number="6.5.1.2">
+<h4 data-number="6.5.1.2" class="anchored" data-anchor-id="b.-emergent-bulk-spacetime-viewport-3d-webgl"><span class="header-section-number">6.5.1.2</span> B. Emergent Bulk Spacetime Viewport (3D WebGL)</h4>
+<ul>
+<li><p><strong>Hyperbolic Bulk Projection:</strong> Renders the 3D interior bulk metric generated by the holographic SVD mapping engine.</p></li>
+<li><p><strong>Ryu-Takayanagi Surface Tracer:</strong> Overlays minimal surfaces anchored to selected boundary subregions, visually representing holographic entanglement entropy in real time.</p></li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="section-6-sidebar-flight-deck-control-panels" class="level2" data-number="6.6">
+<h2 data-number="6.6" class="anchored" data-anchor-id="section-6-sidebar-flight-deck-control-panels"><span class="header-section-number">6.6</span> Section 6: Sidebar Flight Deck Control Panels</h2>
+<section id="item-6.6.1-subsystem-configuration-controls" class="level3" data-number="6.6.1">
+<h3 data-number="6.6.1" class="anchored" data-anchor-id="item-6.6.1-subsystem-configuration-controls"><span class="header-section-number">6.6.1</span> Item 6.6.1: Subsystem Configuration Controls</h3>
+<p>The sidebar flight deck provides detailed parameter adjustments organized into four collapsible panels:</p>
+<ul>
+<li><strong>Panel A: Boundary Qubit Lattice Parameters</strong>
+<ul>
+<li>Qubit Count Slider (<span class="math inline">\(N = 4 \dots 64\)</span>)</li>
+<li>Topology Type Menu (<code>1D_RING</code>, <code>2D_CONFORMAL_MESH</code>, <code>HYPERBOLIC_GRAPH</code>)</li>
+<li>Hamiltonian Coupling Sliders (<span class="math inline">\(J, g\)</span>)</li>
+</ul></li>
+<li><strong>Panel B: Causal IIT Subsystem Parameters</strong>
+<ul>
+<li>MIP Search Depth Selector (Depth <span class="math inline">\(1 \dots 4\)</span>)</li>
+<li>Distance Metric Selection (<code>WASSERSTEIN</code>, <code>RELATIVE_ENTROPY</code>)</li>
+<li>Minimum <span class="math inline">\(\Phi\)</span> Threshold Cutoff Input Box</li>
+</ul></li>
+<li><strong>Panel C: Bulk Holographic Projection Engine</strong>
+<ul>
+<li>Metric Tensor Selection (<code>MINKOWSKI_FLAT</code>, <code>SCHWARZSCHILD</code>, <code>KERR_BH</code>, <code>ADS_BULK</code>)</li>
+<li>SVD Truncation Cutoff (<span class="math inline">\(10^{-3} \dots 10^{-10}\)</span>)</li>
+<li>AdS Curvature Scale Input (<span class="math inline">\(L\)</span>)</li>
+</ul></li>
+<li><strong>Panel D: Solver &amp; Arbiter Safety Settings</strong>
+<ul>
+<li>Time Integrator Dropdown (<code>RK4</code>, <code>BSSN_STABILITY</code>)</li>
+<li>Step Size Input (<span class="math inline">\(dt\)</span>)</li>
+<li>Max Allowable Hamiltonian Constraint Input (<span class="math inline">\(\mathcal{H}_{\text{max}}\)</span>)</li>
+</ul></li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="section-7-telemetry-stream-channels-ch-01-through-ch-05-reference-manipulation-guide" class="level2" data-number="6.7">
+<h2 data-number="6.7" class="anchored" data-anchor-id="section-7-telemetry-stream-channels-ch-01-through-ch-05-reference-manipulation-guide"><span class="header-section-number">6.7</span> Section 7: Telemetry Stream Channels (CH-01 through CH-05) Reference &amp; Manipulation Guide</h2>
+<section id="item-6.7.1-channel-overview-navigation" class="level3" data-number="6.7.1">
+<h3 data-number="6.7.1" class="anchored" data-anchor-id="item-6.7.1-channel-overview-navigation"><span class="header-section-number">6.7.1</span> Item 6.7.1: Channel Overview &amp; Navigation</h3>
+<p>The HTE telemetry subsystem streams live computation frames over dedicated WebSocket channels. Operators can isolate specific channels using the <strong>Telemetry Stream Filter</strong> dropdown or top-deck channel toggles.</p>
+<pre><code>+-------------------------------------------------------------+
+|                WebSocket Ingestion Core                     |
++-------------------------------------------------------------+
+   |-&gt; CH-01: Qubit Network &amp; Boundary Density Stream
+   |-&gt; CH-02: 3D Topological Lattice &amp; IIT (\Phi) Causal Stream
+   |-&gt; CH-03: Bulk Metric &amp; Geodesic Ray Stream
+   |-&gt; CH-04: Soliton Dynamics &amp; Field Phase Stream
+   |-&gt; CH-05: System Diagnostics &amp; Arbiter Stream</code></pre>
+</section>
+<section id="item-6.7.2-ch-01-qubit-network-boundary-density-stream" class="level3" data-number="6.7.2">
+<h3 data-number="6.7.2" class="anchored" data-anchor-id="item-6.7.2-ch-01-qubit-network-boundary-density-stream"><span class="header-section-number">6.7.2</span> Item 6.7.2: CH-01 — Qubit Network &amp; Boundary Density Stream</h3>
+<ul>
+<li><p><strong>What it Measures:</strong> Real-time quantum density matrix spectra (<span class="math inline">\(\rho\)</span>), pairwise Von Neumann entropy (<span class="math inline">\(S_{AB}\)</span>), and local qubit expectation values (<span class="math inline">\(\langle \sigma_z \rangle\)</span>).</p></li>
+<li><p><strong>UI Controls &amp; Settings:</strong></p>
+<ul>
+<li><em>Entanglement Weight Threshold Slider:</em> Filters out low-weight correlations below the selected value to clean up dense lattice displays.</li>
+<li><em>Adjacency Matrix Toggle:</em> Opens a split-pane matrix view displaying raw floating-point Hilbert space inner products.</li>
+</ul></li>
+<li><p><strong>Visual Effect on Render:</strong> Raising the weight threshold removes weak connecting lines between boundary nodes, isolating strong entanglement clusters.</p></li>
+</ul>
+<hr>
+</section>
+<section id="item-6.7.3-ch-02-3d-topological-lattice-iit-phi-causal-stream" class="level3" data-number="6.7.3">
+<h3 data-number="6.7.3" class="anchored" data-anchor-id="item-6.7.3-ch-02-3d-topological-lattice-iit-phi-causal-stream"><span class="header-section-number">6.7.3</span> Item 6.7.3: CH-02 — 3D Topological Lattice &amp; IIT (<span class="math inline">\(\Phi\)</span>) Causal Stream</h3>
+<ul>
+<li><p><strong>What it Measures:</strong> Integrated Information scores (<span class="math inline">\(\Phi\)</span>), cause-effect repertoires, and Minimum Information Partition (MIP) cuts across boundary subsystem states.</p></li>
+<li><p><strong>UI Controls &amp; Settings:</strong></p>
+<ul>
+<li><em>MIP Search Depth Selector:</em> Adjusts partition granularity (Depth 1 through 4).</li>
+<li><em>Distance Metric Toggle:</em> Switches between Wasserstein (Earth Mover’s) distance and Quantum Relative Entropy.</li>
+</ul></li>
+<li><p><strong>Visual Effect on Render:</strong> Selecting Wasserstein distance dynamically projects a glowing red cutting plane across the minimum causal partition inside the 3D network view.</p></li>
+</ul>
+<hr>
+</section>
+<section id="item-6.7.4-ch-03-bulk-metric-geodesic-ray-stream" class="level3" data-number="6.7.4">
+<h3 data-number="6.7.4" class="anchored" data-anchor-id="item-6.7.4-ch-03-bulk-metric-geodesic-ray-stream"><span class="header-section-number">6.7.4</span> Item 6.7.4: CH-03 — Bulk Metric &amp; Geodesic Ray Stream</h3>
+<ul>
+<li><p><strong>What it Measures:</strong> Emergent Riemannian metric tensors (<span class="math inline">\(g_{\mu\nu}\)</span>), radial AdS depth slicing (<span class="math inline">\(z\)</span>-axis profile), and light-like geodesic trajectories.</p></li>
+<li><p><strong>UI Controls &amp; Settings:</strong></p>
+<ul>
+<li><em>Holographic Depth Slider (<span class="math inline">\(z\)</span>-axis):</em> Slices radial bulk depth from boundary (<span class="math inline">\(z \to 0\)</span>) to deep interior horizon layers.</li>
+<li><em>Geodesic Ray Tracer Toggle:</em> Projects light rays through the 3D bulk point cloud.</li>
+</ul></li>
+<li><p><strong>Visual Effect on Render:</strong> Dragging the <span class="math inline">\(z\)</span>-slider inward pulls the viewport camera through the emergent spatial slices, revealing interior spatial curvature.</p></li>
+</ul>
+<hr>
+</section>
+<section id="item-6.7.5-ch-04-soliton-dynamics-field-phase-stream" class="level3" data-number="6.7.5">
+<h3 data-number="6.7.5" class="anchored" data-anchor-id="item-6.7.5-ch-04-soliton-dynamics-field-phase-stream"><span class="header-section-number">6.7.5</span> Item 6.7.5: CH-04 — Soliton Dynamics &amp; Field Phase Stream</h3>
+<ul>
+<li><p><strong>What it Measures:</strong> Topological defects, wave equation phase boundaries, skyrmions, and field kink trajectories in non-linear scalar backgrounds.</p></li>
+<li><p><strong>UI Controls &amp; Settings:</strong></p>
+<ul>
+<li><em>Phase Gradient Sensitivity Input:</em> Sets the threshold for boundary edge detection in field manifolds.</li>
+<li><em>Damping Coefficient Slider:</em> Controls field energy dissipation during numerical propagation steps.</li>
+</ul></li>
+<li><p><strong>Visual Effect on Render:</strong> Increasing phase sensitivity renders high-gradient wave crests as distinct glowing surface contours traversing the workspace.</p></li>
+</ul>
+<hr>
+</section>
+<section id="item-6.7.6-ch-05-system-diagnostics-arbiter-stream" class="level3" data-number="6.7.6">
+<h3 data-number="6.7.6" class="anchored" data-anchor-id="item-6.7.6-ch-05-system-diagnostics-arbiter-stream"><span class="header-section-number">6.7.6</span> Item 6.7.6: CH-05 — System Diagnostics &amp; Arbiter Stream</h3>
+<ul>
+<li><p><strong>What it Measures:</strong> Hamiltonian constraint violations (<span class="math inline">\(\mathcal{H} \approx 0\)</span>), momentum constraint violations (<span class="math inline">\(\mathcal{M}_i \approx 0\)</span>), GPU memory saturation, and numerical integration step stability.</p></li>
+<li><p><strong>UI Controls &amp; Settings:</strong></p>
+<ul>
+<li><em>Arbiter Action Dropdown:</em> Configures safety daemon failure response (<code>LOG_ONLY</code>, <code>PAUSE_EXECUTIVE</code>, <code>EMERGENCY_ROLLBACK</code>).</li>
+<li><em>Tolerance Limit Input:</em> Sets maximum permitted constraint drift before triggering safety interventions.</li>
+</ul></li>
+<li><p><strong>Visual Effect on Render:</strong> If <span class="math inline">\(\mathcal{H}\)</span> exceeds tolerance, the main flight deck header flashes red, triggering the configured Arbiter action and pausing temporal integration.</p></li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="section-8-anatomical-diagram-reference" class="level2" data-number="6.8">
+<h2 data-number="6.8" class="anchored" data-anchor-id="section-8-anatomical-diagram-reference"><span class="header-section-number">6.8</span> Section 8: Anatomical Diagram Reference</h2>
+<p><em>[image describing function goes here] figure 6.1 - UI Flight Deck complete interface anatomy including top header bar, dual canvas viewports, sidebar configuration panels, and telemetry stream monitors</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+      window.quartoDecorateExternalLinks = function (root) {
+     var links = (root || window.document).querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+          if (!link.classList.contains('no-external-icon')) {
+          }
+        }
+      }
+      };
+      window.quartoDecorateExternalLinks(window.document);
+    // Esc closes the popup (WCAG 1.4.13) and focus leaving both trigger and
+    // popup closes it (WCAG 2.4.11); tippy handles neither for interactive popups.
+    const hideOnEscAndFocusOut = {
+      name: 'hideOnEscAndFocusOut',
+      defaultValue: true,
+      fn(instance) {
+        const dismiss = () => {
+          // A show scheduled by the trigger delay would otherwise reopen it
+          instance.clearDelayTimeouts();
+          instance.hide();
+        };
+        const onKeyDown = (event) => {
+          if (event.key !== 'Escape') {
+            return;
+          }
+          // Keep Esc from also reaching page handlers (e.g. reveal.js overview),
+          // except an open reveal.js slide menu, which Esc should close too.
+          // The menu handles keys only when its keyboard option is on.
+          const menuHandlesEsc = window.Reveal?.getPlugin?.('menu')?.isOpen() &&
+            window.Reveal.getConfig().menu?.keyboard !== false;
+          if (!menuHandlesEsc) {
+            event.stopPropagation();
+          }
+          if (instance.popper.contains(window.document.activeElement)) {
+            // Disabled while refocusing so the focus trigger does not reopen it
+            instance.disable();
+            instance.reference.focus();
+            instance.enable();
+          }
+          dismiss();
+        };
+        const onFocusOut = (event) => {
+          const target = event.relatedTarget;
+          if (target && !instance.reference.contains(target) &&
+              !instance.popper.contains(target)) {
+            dismiss();
+          }
+        };
+        // On the trigger too: a click trigger (code-annotations: select) has no
+        // blur handling. Attached for the instance's lifetime so leaving the
+        // trigger also cancels a show still pending on the trigger delay.
+        instance.reference.addEventListener('focusout', onFocusOut);
+        return {
+          onShow() {
+            window.document.addEventListener('keydown', onKeyDown, true);
+            instance.popper.addEventListener('focusout', onFocusOut);
+          },
+          onHide() {
+            window.document.removeEventListener('keydown', onKeyDown, true);
+            instance.popper.removeEventListener('focusout', onFocusOut);
+          },
+          onDestroy() {
+            instance.reference.removeEventListener('focusout', onFocusOut);
+          },
+        };
+      },
+    };
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+        plugins: [hideOnEscAndFocusOut],
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          // Each band is positioned against its own containing block, which is
+          // not the offsetParent of the lines, so place it from client rects.
+          const placeBand = (band, firstEl, lastEl, codeBlock) => {
+            const container = band.offsetParent;
+            if (container === null) {
+              return;
+            }
+            const containerRect = container.getBoundingClientRect();
+            // Reveal.js scales slides with a transform, so convert client
+            // pixels back to the CSS pixels of the container.
+            const scale = containerRect.height / container.offsetHeight || 1;
+            const firstRect = firstEl.getBoundingClientRect();
+            const lastRect = lastEl.getBoundingClientRect();
+            const top = (firstRect.top - containerRect.top) / scale - container.clientTop + container.scrollTop;
+            const height = (lastRect.bottom - firstRect.top) / scale;
+            band.style.top = top - 2 + "px";
+            band.style.height = height + 4 + "px";
+            if (codeBlock) {
+              // Without the copy button wrapper, the containing block is wider
+              // than the code block, so span the code block explicitly.
+              const blockRect = codeBlock.getBoundingClientRect();
+              band.style.left = (blockRect.left - containerRect.left) / scale - container.clientLeft + container.scrollLeft + "px";
+              band.style.width = blockRect.width / scale + "px";
+            }
+          };
+          if (lineIds.length > 0) {
+            const el = window.document.getElementById(lineIds[0]);
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const parent = el.parentElement.parentElement;
+            // cook up a div (if necessary) and position it
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            placeBand(div, el, lastEl, parent.closest("div.sourceCode") || parent);
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            placeBand(gutterDiv, el, lastEl);
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+  <script type="application/javascript">
+  window.quartoScrollableRegionsLabels = {"code":"Scrollable code","output":"Scrollable output"};
+  </script>
+<nav class="page-navigation" aria-label="Page">
+  <div class="nav-page nav-page-previous">
+      <a href="../Manual/Chapter5.html" class="pagination-link" aria-label="Chapter 5 - Renormalization Group (RG) Flows &amp; Tensor Network Serialization">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Chapter 5 - Renormalization Group (RG) Flows &amp; Tensor Network Serialization</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../Manual/Chapter7.html" class="pagination-link" aria-label="Chapter 7 - Scientific Testing Suite &amp; Experimental Workflows">
+        <span class="nav-page-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Chapter 7 - Scientific Testing Suite &amp; Experimental Workflows</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

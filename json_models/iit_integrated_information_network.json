@@ -1,0 +1,49 @@
+{
+  "type": "SYNC_FROM_HUD",
+  "version": "2.9.0",
+  "coordinate_system": "3D",
+  "timestamp": "2026-11-11T08:00:00Z",
+  "nodes": [
+    {
+      "id": "IIT-MAX-01",
+      "name": "Complex Kernel Master",
+      "type": "POTENTIAL",
+      "category": "BULK_CORE",
+      "tier": "BOUNDARY",
+      "x": 0.0,
+      "y": 40.0,
+      "z": 0.0,
+      "color": "#facc15",
+      "attrs": { "mass": 2.5, "temperature": 75.0, "formula": "\\Phi = \\text{cause-effect power}" }
+    },
+    {
+      "id": "IIT-SUB-01",
+      "name": "Sub-Module Alpha",
+      "type": "TOPOLOGY",
+      "category": "INTERMEDIATE",
+      "tier": "BULK",
+      "x": 60.0,
+      "y": -20.0,
+      "z": 40.0,
+      "color": "#38bdf8",
+      "attrs": { "mass": 1.0, "temperature": 50.0, "formula": "\\text{Emd}(\\text{Mechanism})" }
+    },
+    {
+      "id": "IIT-SUB-02",
+      "name": "Sub-Module Beta",
+      "type": "TOPOLOGY",
+      "category": "INTERMEDIATE",
+      "tier": "BULK",
+      "x": -60.0,
+      "y": -20.0,
+      "z": -40.0,
+      "color": "#38bdf8",
+      "attrs": { "mass": 1.0, "temperature": 50.0, "formula": "\\text{Emd}(\\text{Mechanism})" }
+    }
+  ],
+  "edges": [
+    { "source": "IIT-MAX-01", "target": "IIT-SUB-01", "label": "Causal Feedback" },
+    { "source": "IIT-MAX-01", "target": "IIT-SUB-02", "label": "Causal Feedback" },
+    { "source": "IIT-SUB-01", "target": "IIT-SUB-02", "label": "Lateral Recurrence" }
+  ]
+}

@@ -526,6 +526,14 @@
                         try {
                             const topologyData = JSON.parse(e.target.result);
 
+                            // --- DEBUGGER CAPTURE 1 ---
+                            console.log("[DEBUG 1 - FILE PARSED]", {
+                                rawEdgesFound: topologyData.edges,
+                                edgeArrayLength: topologyData.edges?.length,
+                                fullKeys: Object.keys(topologyData)
+                            });
+                            debugger;
+
                             // In frontend/index.html inside reader.onload:
                             if (topologyData.nodes && Array.isArray(topologyData.nodes)) {
                                 const validNodes = [];
@@ -577,7 +585,60 @@
                                 }
 
                                 window.nodes = validNodes;
-                                console.log(`[JSON IMPORT] Successfully loaded ${validNodes.length} nodes using ${isExplicit3D ? '3D Spatial' : '2D Centered Screen'} mapping.`);
+                                // Robust edge extraction during file load in frontend/index.html:
+                                window.edges = topologyData.edges ||
+                                    topologyData.links ||
+                                    topologyData.connections ||
+                                    topologyData.bonds ||
+                                    topologyData.graph?.edges ||
+                                    topologyData.graph?.links || [];
+                                console.log(`[JSON IMPORT] Successfully loaded ${validNodes.length} nodes and ${window.edges.length} edges/links.`);
+
+                                const hudSyncChannel = new BroadcastChannel('holographic_sync_channel');
+                                const rawUploadedEdges = topologyData.edges || topologyData.links || topologyData.connections || topologyData.bonds || [];
+
+                                const syncPayload = {
+                                    type: 'SYNC_FROM_HUD',
+                                    version: '2.8.4',
+                                    timestamp: Date.now(),
+                                    nodes: validNodes.map(n => ({
+                                        id: n.id,
+                                        name: n.name || n.id,
+                                        type: n.type || 'TOPOLOGY_NODE',
+                                        category: n.category || 'BULK_CORE',
+                                        tier: n.tier || 'BOUNDARY',
+                                        x: n.x * 2.0,
+                                        y: n.y * 2.0,
+                                        z: (n.z || 0) * 2.0,
+                                        color: n.color
+                                    })),
+                                    edges: rawUploadedEdges.map((e, idx) => {
+                                        const srcRaw = e.source !== undefined ? e.source : (e.from !== undefined ? e.from : e.sourceId);
+                                        const tgtRaw = e.target !== undefined ? e.target : (e.to !== undefined ? e.to : e.targetId);
+                                        return {
+                                            ...e,
+                                            index: idx,
+                                            source: String(typeof srcRaw === 'object' && srcRaw !== null ? (srcRaw.id || srcRaw.name) : srcRaw),
+                                            target: String(typeof tgtRaw === 'object' && tgtRaw !== null ? (tgtRaw.id || tgtRaw.name) : tgtRaw),
+                                            label: e.label || 'Tether'
+                                        };
+                                    })
+                                };
+
+                                // 1. Save live sync state
+                                localStorage.setItem('holographic_latest_sync', JSON.stringify(syncPayload));
+
+                                // 2. Save pending builder import payload with the exact same edges
+                                localStorage.setItem('holographic_pending_builder_import', JSON.stringify({
+                                    version: topologyData.version || '2.9.0',
+                                    coordinate_system: topologyData.coordinate_system || '3D',
+                                    timestamp: Date.now(),
+                                    origin: "MAIN_HUD",
+                                    nodes: validNodes,
+                                    edges: syncPayload.edges
+                                }));
+
+                                hudSyncChannel.postMessage(syncPayload);
                             } else {
                                 console.error("[JSON IMPORT] Invalid schema: Missing 'nodes' array.");
                             }
@@ -881,39 +942,122 @@
             }
         };
 
-        const mainHUDChannel = new BroadcastChannel('holographic_sync_channel');
-        mainHUDChannel.onmessage = (event) => {
-            const message = event.data;
-            if (message && message.type === 'SYNC_TOPOLOGY' && Array.isArray(message.nodes)) {
-                const synchronizedNodes = message.nodes.map((n, index) => {
-                    const posX = (n.position && typeof n.position.x === 'number') ? n.position.x : (n.x || 0);
-                    const posY = (n.position && typeof n.position.y === 'number') ? n.position.y : (n.y || 0);
-                    const posZ = (n.position && typeof n.position.z === 'number') ? n.position.z : (n.z || 0);
+        // v.2.8.4: Bi-Directional Broadcast Channel with Loop Guard
+            let isHUDExternalSync = false;
+            const mainHUDChannel = new BroadcastChannel('holographic_sync_channel');
 
-                    let nodeColor = '#00ffcc';
-                    if (typeof n.color === 'number') {
-                        nodeColor = '#' + n.color.toString(16).padStart(6, '0');
-                    } else if (typeof n.color === 'string') {
-                        nodeColor = n.color;
+            mainHUDChannel.onmessage = (event) => {
+                const message = event.data;
+                if (!message || !Array.isArray(message.nodes)) return;
+
+                // Handle incoming sync state from the Builder Freestyle Deck
+                if (message.type === 'SYNC_FROM_BUILDER') {
+                    // ENGAGE LOCK: Prevent outgoing echo broadcasts while ingesting
+                    isHUDExternalSync = true;
+
+                    console.log("[v.2.8.4 SYNC BRIDGE] Main HUD received state update from Builder Deck.");
+
+                    const synchronizedNodes = [];
+
+                    for (const [index, n] of message.nodes.entries()) {
+                        // 1. Deterministic Intrinsic Property Evaluation (No random placeholders)
+                        const category = (n.category || n.tier || 'STANDARD').toLowerCase();
+                        let intrinsicProps;
+
+                        if (category.includes('boundary') || category.includes('qubit')) {
+                            intrinsicProps = { temperature: 45.0, thermal: 0.90, mass: 1.5, dampingFactor: 0.85 };
+                        } else if (category.includes('bulk') || category.includes('core')) {
+                            intrinsicProps = { temperature: 88.5, thermal: 0.95, mass: 2.5, dampingFactor: 0.92 };
+                        } else {
+                            intrinsicProps = { temperature: 50.0, thermal: 0.80, mass: 1.0, dampingFactor: 0.90 };
+                        }
+
+                        // 2. Map coordinates (scaling down by 0.5 factor to align with spectral shell reference frames)
+                        // INCOMING SYNC_FROM_BUILDER LISTENER (in index.html):
+                        const posX = n.x !== undefined ? n.x : 0; // Direct 1:1 NSS Parity
+                        const posY = n.y !== undefined ? n.y : 0;
+                        const posZ = n.z !== undefined ? n.z : 0;
+
+                        const synchronizedNode = {
+                            id: n.id || `Q-00${index + 1}`,
+                            name: n.label || n.name || `Qubit-${index + 1}`,
+                            type: 'TOPOLOGY_NODE',
+                            color: n.color || '#00ffcc',
+                            x: posX,
+                            y: posY,
+                            z: posZ,
+                            isPinned: true,
+                            source: 'BUILDER_FREESTYLE_SYNC',
+                            category: n.category || 'standard',
+                            tier: n.tier || 'BOUNDARY',
+                            ...intrinsicProps, // Inherit true physical parameters natively
+                            data: n
+                        };
+
+                        // 3. Validate through Physics Arbiter trusted schema mode
+                        const verdict = window.physicsArbiter ? window.physicsArbiter.validateDrop(synchronizedNode) : { status: 'APPROVED', node: synchronizedNode };
+
+                        if (verdict.status === 'APPROVED') {
+                            synchronizedNodes.push(verdict.node);
+                        } else {
+                            console.warn(`[ARBITER REJECTED SYNC NODE]: ${synchronizedNode.id}`);
+                        }
                     }
 
-                    return {
-                        id: n.id || `N-00${index + 1}`,
-                        name: n.name || `Node-${index + 1}`,
-                        type: n.type || 'Standard',
-                        color: nodeColor,
-                        x: posX,
-                        y: posY,
-                        z: posZ,
-                        isCore: index === 0,
-                        data: n
-                    };
-                });
+                    window.nodes = synchronizedNodes;
+                    _fallbackNodes = synchronizedNodes;
+                    console.log(`[v.2.8.4 SYNC] Successfully synchronized ${synchronizedNodes.length} nodes into Main HUD workspace.`);
 
-                window.nodes = synchronizedNodes;
-                _fallbackNodes = synchronizedNodes;
-            }
-        };
+                    // RELEASE LOCK after render cycle
+                    setTimeout(() => {
+                        isHUDExternalSync = false;
+                    }, 50);
+                    console.debug("[FHPP PIPELINE TEST] Main HUD Received Sync Nodes:", synchronizedNodes.length);
+                }
+            };
+            // OUTGOING HUD BROADCAST HELPER (in index.html):
+                window.broadcastHUDStateToBuilder = function (validNodes) {
+                    if (isHUDExternalSync) return;
+
+                    const payload = {
+                        type: 'SYNC_FROM_HUD',
+                        version: '2.9.0',
+                        timestamp: Date.now(),
+                        nodes: validNodes.map(n => ({
+                            id: n.id,
+                            name: n.name || n.id,
+                            type: n.type || 'TOPOLOGY_NODE',
+                            category: n.category || 'BULK_CORE',
+                            tier: n.tier || 'BOUNDARY',
+                            x: n.x,
+                            y: n.y,
+                            z: n.z || 0,
+                            color: n.color,
+                            attrs: n.attrs || {}
+                        })),
+                        edges: (window.edges || []).map((e, idx) => {
+                            const srcRaw = e.source !== undefined ? e.source : (e.from !== undefined ? e.from : e.sourceId);
+                            const tgtRaw = e.target !== undefined ? e.target : (e.to !== undefined ? e.to : e.targetId);
+                            return {
+                                ...e,
+                                index: idx,
+                                source: String(typeof srcRaw === 'object' && srcRaw !== null ? (srcRaw.id || srcRaw.name) : srcRaw),
+                                target: String(typeof tgtRaw === 'object' && tgtRaw !== null ? (tgtRaw.id || tgtRaw.name) : tgtRaw),
+                                label: e.label || 'Tether'
+                            };
+                        })
+                    };
+
+                    // --- DEBUGGER CAPTURE 2 ---
+                    console.log("[DEBUG 2 - SYNC PAYLOAD BUILT]", {
+                        payloadEdges: payload.edges,
+                        count: payload.edges.length
+                    });
+                    debugger;
+
+                    localStorage.setItem('holographic_latest_sync', JSON.stringify(payload));
+                    mainHUDChannel.postMessage(payload);
+                };
 
         let selectedNode = null;
         let isDraggingGimbal = false;

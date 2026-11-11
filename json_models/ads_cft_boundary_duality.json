@@ -1,0 +1,49 @@
+{
+  "type": "SYNC_FROM_HUD",
+  "version": "2.9.0",
+  "coordinate_system": "3D",
+  "timestamp": "2026-11-11T08:00:00Z",
+  "nodes": [
+    {
+      "id": "BULK-01",
+      "name": "AdS Center Core",
+      "type": "METRIC",
+      "category": "BULK_CORE",
+      "tier": "BULK",
+      "x": 0.0,
+      "y": 0.0,
+      "z": 0.0,
+      "color": "#0284c7",
+      "attrs": { "mass": 3.0, "temperature": 100.0, "formula": "ds^2 = (L^2/z^2)(-dt^2 + dz^2 + d\\vec{x}^2)" }
+    },
+    {
+      "id": "BND-01",
+      "name": "CFT Boundary Qubit A",
+      "type": "TOPOLOGY",
+      "category": "BOUNDARY_QUBIT",
+      "tier": "BOUNDARY",
+      "x": 90.0,
+      "y": 20.0,
+      "z": 0.0,
+      "color": "#8b5cf6",
+      "attrs": { "mass": 1.5, "temperature": 45.0, "formula": "\\langle \\mathcal{O}(x)\\mathcal{O}(y) \\rangle" }
+    },
+    {
+      "id": "BND-02",
+      "name": "CFT Boundary Qubit B",
+      "type": "TOPOLOGY",
+      "category": "BOUNDARY_QUBIT",
+      "tier": "BOUNDARY",
+      "x": -90.0,
+      "y": 20.0,
+      "z": 0.0,
+      "color": "#8b5cf6",
+      "attrs": { "mass": 1.5, "temperature": 45.0, "formula": "\\langle \\mathcal{O}(x)\\mathcal{O}(y) \\rangle" }
+    }
+  ],
+  "edges": [
+    { "source": "BULK-01", "target": "BND-01", "label": "Ryu-Takayanagi Surface" },
+    { "source": "BULK-01", "target": "BND-02", "label": "Ryu-Takayanagi Surface" },
+    { "source": "BND-01", "target": "BND-02", "label": "Entanglement Wedge" }
+  ]
+}

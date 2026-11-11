@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.11.9">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+
+<title>9&nbsp; Chapter 8 - Freestyle Build Workspace &amp; Scripting API – The Holographic Topology Bible</title>
+<style>
+/* Default styles provided by pandoc.
+** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
+*/
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: 1.5em;}
+div.column{flex: auto;}
+@media screen {
+div.columns{gap: min(4vw, 1.5em);}
+div.column{overflow-x: auto;}
+}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+</style>
+
+
+<script src="../site_libs/quarto-nav/quarto-nav.js"></script>
+<script src="../site_libs/quarto-nav/headroom.min.js"></script>
+<script src="../site_libs/clipboard/clipboard.min.js"></script>
+<script src="../site_libs/quarto-search/autocomplete.umd.js"></script>
+<script src="../site_libs/quarto-search/fuse.min.js"></script>
+<script src="../site_libs/quarto-search/quarto-search.js"></script>
+<meta name="quarto:offset" content="../">
+<link href="../Manual/AppendixA.html" rel="next">
+<link href="../Manual/Chapter8.html" rel="prev">
+<script src="../site_libs/quarto-html/quarto.js" type="module"></script>
+<script src="../site_libs/quarto-html/tabsets/tabsets.js" type="module"></script>
+<script src="../site_libs/quarto-html/scrollable-regions/scrollable-regions.js" type="module"></script>
+<script src="../site_libs/quarto-html/popper.min.js"></script>
+<script src="../site_libs/quarto-html/tippy.umd.min.js"></script>
+<script src="../site_libs/quarto-html/anchor.min.js"></script>
+<link href="../site_libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="../site_libs/quarto-html/quarto-syntax-highlighting-63b5708e65d6cd79cd7618c58d0c21e7.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="../site_libs/bootstrap/bootstrap.min.js"></script>
+<link href="../site_libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="../site_libs/bootstrap/bootstrap-01a495efc5497ac6e3f5457e7ed18e65.min.css" rel="stylesheet" append-hash="true" id="quarto-bootstrap" data-mode="light">
+<script id="quarto-search-options" type="application/json">{
+  "location": "sidebar",
+  "copy-button": false,
+  "collapse-after": 3,
+  "panel-placement": "start",
+  "type": "textbox",
+  "limit": 50,
+  "keyboard-shortcut": [
+    "f",
+    "/",
+    "s"
+  ],
+  "show-item-context": false,
+  "language": {
+    "search-no-results-text": "No results",
+    "search-matching-documents-text": "matching documents",
+    "search-copy-link-title": "Copy link to search",
+    "search-hide-matches-text": "Hide additional matches",
+    "search-more-match-text": "more match in this document",
+    "search-more-matches-text": "more matches in this document",
+    "search-clear-button-title": "Clear",
+    "search-text-placeholder": "",
+    "search-detached-cancel-button-title": "Cancel",
+    "search-submit-button-title": "Submit",
+    "search-label": "Search"
+  }
+}</script>
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script defer="" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-chtml.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN" && texText && texText.data) {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="nav-sidebar floating quarto-light"><a id="quarto-skip-link" class="visually-hidden-focusable" href="#quarto-document-content">Skip to main content</a>
+
+<div id="quarto-search-results"></div>
+  <header id="quarto-header" class="headroom fixed-top">
+  <nav class="quarto-secondary-nav" aria-label="Toolbar">
+    <div class="container-fluid d-flex">
+      <button type="button" class="quarto-btn-toggle btn" data-bs-toggle="collapse" role="button" data-bs-target=".quarto-sidebar-collapse-item" aria-controls="quarto-sidebar" aria-expanded="false" aria-label="Toggle sidebar navigation" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">
+        <i class="bi bi-layout-text-sidebar-reverse"></i>
+      </button>
+        <nav class="quarto-page-breadcrumbs" aria-label="Breadcrumbs"><ol class="breadcrumb"><li class="breadcrumb-item"><a href="../Manual/Chapter9.html"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Chapter 8 - Freestyle Build Workspace &amp; Scripting API</span></a></li></ol></nav>
+        <a class="flex-grow-1" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item" onclick="if (window.quartoToggleHeadroom) { window.quartoToggleHeadroom(); }">      
+        </a>
+      <button type="button" class="btn quarto-search-button" aria-label="Search" onclick="window.quartoOpenSearch();">
+        <i class="bi bi-search"></i>
+      </button>
+    </div>
+  </nav>
+</header>
+<!-- content -->
+<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article">
+<!-- sidebar -->
+  <nav id="quarto-sidebar" class="sidebar collapse collapse-horizontal quarto-sidebar-collapse-item sidebar-navigation floating overflow-auto" aria-label="Site">
+    <div class="pt-lg-2 mt-2 text-left sidebar-header">
+    <div class="sidebar-title mb-0 py-0">
+      <a href="../">The Holographic Topology Bible</a> 
+    </div>
+      </div>
+        <div class="mt-2 flex-shrink-0 align-items-center">
+        <div class="sidebar-search">
+        <div id="quarto-search" class="" title="Search"></div>
+        </div>
+        </div>
+    <div class="sidebar-menu-container"> 
+    <ul class="list-unstyled mt-1">
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../index.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text">Preface</span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter1.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">1</span>&nbsp; <span class="chapter-title">Chapter 1 - System Overview &amp; Architecture</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter2.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">2</span>&nbsp; <span class="chapter-title">Chapter 2 - Boundary State Initialization &amp; Qubit Lattice Architecture</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter3.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">3</span>&nbsp; <span class="chapter-title">Chapter 3 - Integrated Information Theory (IIT) &amp; Minimum Information Partitions (MIP)</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter4.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">4</span>&nbsp; <span class="chapter-title">Chapter 4 - Bulk Geometric Projection &amp; Holographic Dictionaries</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter5.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">5</span>&nbsp; <span class="chapter-title">Chapter 5 - Renormalization Group (RG) Flows &amp; Tensor Network Serialization</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter6.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">6</span>&nbsp; <span class="chapter-title">Chapter 6 - UI Flight Deck &amp; Real-Time Telemetry Control</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter7.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">7</span>&nbsp; <span class="chapter-title">Chapter 7 - Scientific Testing Suite &amp; Experimental Workflows</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter8.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Chapter 8 - Freestyle Build Workspace &amp; Scripting API</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/Chapter9.html" class="sidebar-item-text sidebar-link active">
+ <span class="menu-text"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Chapter 8 - Freestyle Build Workspace &amp; Scripting API</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/AppendixA.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Appendix A - Technical Glossary &amp; Definitions</span></span></a>
+  </div>
+</li>
+        <li class="sidebar-item">
+  <div class="sidebar-item-container"> 
+  <a href="../Manual/AppendixB.html" class="sidebar-item-text sidebar-link">
+ <span class="menu-text"><span class="chapter-number">11</span>&nbsp; <span class="chapter-title">Appendix B - Command Reference &amp; CLI/DSL Syntax</span></span></a>
+  </div>
+</li>
+    </ul>
+    </div>
+</nav>
+<div id="quarto-sidebar-glass" class="quarto-sidebar-collapse-item" data-bs-toggle="collapse" data-bs-target=".quarto-sidebar-collapse-item"></div>
+<!-- margin-sidebar -->
+    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar">
+        <nav id="TOC" role="doc-toc" aria-labelledby="toc-title" class="toc-active">
+    <h2 id="toc-title">Table of contents</h2>
+   
+  <ul>
+  <li><a href="#section-1-purpose-scientific-rationale-the-why" id="toc-section-1-purpose-scientific-rationale-the-why" class="nav-link active" data-scroll-target="#section-1-purpose-scientific-rationale-the-why"><span class="header-section-number">9.1</span> Section 1: Purpose &amp; Scientific Rationale (The “Why”)</a>
+  <ul class="collapse">
+  <li><a href="#item-8.1.1-experimental-modeling-and-extensible-scripting" id="toc-item-8.1.1-experimental-modeling-and-extensible-scripting" class="nav-link" data-scroll-target="#item-8.1.1-experimental-modeling-and-extensible-scripting"><span class="header-section-number">9.1.1</span> Item 8.1.1: Experimental Modeling and Extensible Scripting</a></li>
+  </ul></li>
+  <li><a href="#section-2-project-scope-the-what-and-where" id="toc-section-2-project-scope-the-what-and-where" class="nav-link" data-scroll-target="#section-2-project-scope-the-what-and-where"><span class="header-section-number">9.2</span> Section 2: Project Scope (The “What” and “Where”)</a>
+  <ul class="collapse">
+  <li><a href="#item-8.2.1-technical-boundaries-freestyle-subsystem-inclusions" id="toc-item-8.2.1-technical-boundaries-freestyle-subsystem-inclusions" class="nav-link" data-scroll-target="#item-8.2.1-technical-boundaries-freestyle-subsystem-inclusions"><span class="header-section-number">9.2.1</span> Item 8.2.1: Technical Boundaries &amp; Freestyle Subsystem Inclusions</a></li>
+  </ul></li>
+  <li><a href="#section-3-project-intent-the-spirit-desired-impact" id="toc-section-3-project-intent-the-spirit-desired-impact" class="nav-link" data-scroll-target="#section-3-project-intent-the-spirit-desired-impact"><span class="header-section-number">9.3</span> Section 3: Project Intent (The “Spirit” &amp; Desired Impact)</a>
+  <ul class="collapse">
+  <li><a href="#item-8.3.1-pedagogical-and-analytical-goals" id="toc-item-8.3.1-pedagogical-and-analytical-goals" class="nav-link" data-scroll-target="#item-8.3.1-pedagogical-and-analytical-goals"><span class="header-section-number">9.3.1</span> Item 8.3.1: Pedagogical and Analytical Goals</a></li>
+  </ul></li>
+  <li><a href="#section-4-mathematical-theoretical-foundations" id="toc-section-4-mathematical-theoretical-foundations" class="nav-link" data-scroll-target="#section-4-mathematical-theoretical-foundations"><span class="header-section-number">9.4</span> Section 4: Mathematical &amp; Theoretical Foundations</a>
+  <ul class="collapse">
+  <li><a href="#item-8.4.1-custom-matrix-injection-and-unconstrained-evolution" id="toc-item-8.4.1-custom-matrix-injection-and-unconstrained-evolution" class="nav-link" data-scroll-target="#item-8.4.1-custom-matrix-injection-and-unconstrained-evolution"><span class="header-section-number">9.4.1</span> Item 8.4.1: Custom Matrix Injection and Unconstrained Evolution</a></li>
+  </ul></li>
+  <li><a href="#section-5-functional-components-freestyle-workspace-architecture" id="toc-section-5-functional-components-freestyle-workspace-architecture" class="nav-link" data-scroll-target="#section-5-functional-components-freestyle-workspace-architecture"><span class="header-section-number">9.5</span> Section 5: Functional Components &amp; Freestyle Workspace Architecture</a>
+  <ul class="collapse">
+  <li><a href="#item-8.5.1-subsystem-architecture" id="toc-item-8.5.1-subsystem-architecture" class="nav-link" data-scroll-target="#item-8.5.1-subsystem-architecture"><span class="header-section-number">9.5.1</span> Item 8.5.1: Subsystem Architecture</a></li>
+  </ul></li>
+  <li><a href="#section-6-the-canvas-bootstrap-interactive-mechanics-tutorial" id="toc-section-6-the-canvas-bootstrap-interactive-mechanics-tutorial" class="nav-link" data-scroll-target="#section-6-the-canvas-bootstrap-interactive-mechanics-tutorial"><span class="header-section-number">9.6</span> Section 6: The Canvas Bootstrap &amp; Interactive Mechanics Tutorial</a>
+  <ul class="collapse">
+  <li><a href="#item-8.6.1-understanding-the-default-bootstrap-screen" id="toc-item-8.6.1-understanding-the-default-bootstrap-screen" class="nav-link" data-scroll-target="#item-8.6.1-understanding-the-default-bootstrap-screen"><span class="header-section-number">9.6.1</span> Item 8.6.1: Understanding the Default Bootstrap Screen</a></li>
+  <li><a href="#item-8.6.2-step-by-step-canvas-manipulation" id="toc-item-8.6.2-step-by-step-canvas-manipulation" class="nav-link" data-scroll-target="#item-8.6.2-step-by-step-canvas-manipulation"><span class="header-section-number">9.6.2</span> Item 8.6.2: Step-by-Step Canvas Manipulation</a></li>
+  </ul></li>
+  <li><a href="#section-7-the-pantry-node-library-behavioral-manual" id="toc-section-7-the-pantry-node-library-behavioral-manual" class="nav-link" data-scroll-target="#section-7-the-pantry-node-library-behavioral-manual"><span class="header-section-number">9.7</span> Section 7: The Pantry Node Library &amp; Behavioral Manual</a>
+  <ul class="collapse">
+  <li><a href="#item-7.7.1-drawer-1.1-spacetime-metrics-8-nodes" id="toc-item-7.7.1-drawer-1.1-spacetime-metrics-8-nodes" class="nav-link" data-scroll-target="#item-7.7.1-drawer-1.1-spacetime-metrics-8-nodes"><span class="header-section-number">9.7.1</span> Item 7.7.1: Drawer 1.1 — Spacetime Metrics (8 Nodes)</a></li>
+  <li><a href="#item-7.7.2-drawer-1.2-gauge-potentials-9-nodes" id="toc-item-7.7.2-drawer-1.2-gauge-potentials-9-nodes" class="nav-link" data-scroll-target="#item-7.7.2-drawer-1.2-gauge-potentials-9-nodes"><span class="header-section-number">9.7.2</span> Item 7.7.2: Drawer 1.2 — Gauge &amp; Potentials (9 Nodes)</a></li>
+  <li><a href="#item-7.7.3-drawer-1.3-span-boundaries-6-nodes" id="toc-item-7.7.3-drawer-1.3-span-boundaries-6-nodes" class="nav-link" data-scroll-target="#item-7.7.3-drawer-1.3-span-boundaries-6-nodes"><span class="header-section-number">9.7.3</span> Item 7.7.3: Drawer 1.3 — Span &amp; Boundaries (6 Nodes)</a></li>
+  </ul></li>
+  <li><a href="#section-8-advanced-tuning-suites-reference" id="toc-section-8-advanced-tuning-suites-reference" class="nav-link" data-scroll-target="#section-8-advanced-tuning-suites-reference"><span class="header-section-number">9.8</span> Section 8: Advanced Tuning Suites Reference</a>
+  <ul class="collapse">
+  <li><a href="#item-8.8.1-3.1-adscft-entanglement-suite" id="toc-item-8.8.1-3.1-adscft-entanglement-suite" class="nav-link" data-scroll-target="#item-8.8.1-3.1-adscft-entanglement-suite"><span class="header-section-number">9.8.1</span> Item 8.8.1: 3.1 AdS/CFT Entanglement Suite</a></li>
+  <li><a href="#item-8.8.2-3.2-einstein-constraints-gr-solver" id="toc-item-8.8.2-3.2-einstein-constraints-gr-solver" class="nav-link" data-scroll-target="#item-8.8.2-3.2-einstein-constraints-gr-solver"><span class="header-section-number">9.8.2</span> Item 8.8.2: 3.2 Einstein Constraints (GR Solver)</a></li>
+  <li><a href="#item-8.8.3-4.1-4.2-simulation-controls-stream-diagnostics" id="toc-item-8.8.3-4.1-4.2-simulation-controls-stream-diagnostics" class="nav-link" data-scroll-target="#item-8.8.3-4.1-4.2-simulation-controls-stream-diagnostics"><span class="header-section-number">9.8.3</span> Item 8.8.3: 4.1 &amp; 4.2 Simulation Controls &amp; Stream Diagnostics</a></li>
+  </ul></li>
+  <li><a href="#section-9-anatomical-diagram-reference" id="toc-section-9-anatomical-diagram-reference" class="nav-link" data-scroll-target="#section-9-anatomical-diagram-reference"><span class="header-section-number">9.9</span> Section 9: Anatomical Diagram Reference</a></li>
+  </ul>
+</nav>
+    </div>
+<!-- main -->
+<main class="content" id="quarto-document-content" tabindex="-1">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title"><span class="chapter-number">9</span>&nbsp; <span class="chapter-title">Chapter 8 - Freestyle Build Workspace &amp; Scripting API</span></h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="section-1-purpose-scientific-rationale-the-why" class="level2" data-number="9.1">
+<h2 data-number="9.1" class="anchored" data-anchor-id="section-1-purpose-scientific-rationale-the-why"><span class="header-section-number">9.1</span> Section 1: Purpose &amp; Scientific Rationale (The “Why”)</h2>
+<section id="item-8.1.1-experimental-modeling-and-extensible-scripting" class="level3" data-number="9.1.1">
+<h3 data-number="9.1.1" class="anchored" data-anchor-id="item-8.1.1-experimental-modeling-and-extensible-scripting"><span class="header-section-number">9.1.1</span> Item 8.1.1: Experimental Modeling and Extensible Scripting</h3>
+<section id="introduction" class="level4" data-number="9.1.1.1">
+<h4 data-number="9.1.1.1" class="anchored" data-anchor-id="introduction"><span class="header-section-number">9.1.1.1</span> Introduction</h4>
+<p>While preceding chapters covered structured observation (Main HUD), rigid metric auditing (Testing Suite), and serialized exports, Chapter 8 explores the <strong>Freestyle Build Workspace</strong>. The fundamental purpose of this environment is to provide an unconstrained, highly extensible experimental sandbox. Researchers use this space to bypass rigid processing pipelines, inject custom boundary topologies, test extreme mathematical edge cases, and prototype raw algorithmic logic before formalizing them into standard testing workflows.</p>
+<ul>
+<li><strong>Empowering Speculative Physics:</strong> To remove algorithmic guardrails and preset pipeline structures, allowing physicists to model non-standard quantum interactions and theoretical edge cases.</li>
+<li><strong>Extensible Scripting Integration:</strong> To offer a dedicated Integrated Scripting Console supporting the HTE Domain Specific Language (DSL) and Python execution hooks directly against the core matrix processing layer.</li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="section-2-project-scope-the-what-and-where" class="level2" data-number="9.2">
+<h2 data-number="9.2" class="anchored" data-anchor-id="section-2-project-scope-the-what-and-where"><span class="header-section-number">9.2</span> Section 2: Project Scope (The “What” and “Where”)</h2>
+<section id="item-8.2.1-technical-boundaries-freestyle-subsystem-inclusions" class="level3" data-number="9.2.1">
+<h3 data-number="9.2.1" class="anchored" data-anchor-id="item-8.2.1-technical-boundaries-freestyle-subsystem-inclusions"><span class="header-section-number">9.2.1</span> Item 8.2.1: Technical Boundaries &amp; Freestyle Subsystem Inclusions</h3>
+<section id="a.-functional-scope-in-scope" class="level4" data-number="9.2.1.1">
+<h4 data-number="9.2.1.1" class="anchored" data-anchor-id="a.-functional-scope-in-scope"><span class="header-section-number">9.2.1.1</span> A. Functional Scope (In-Scope)</h4>
+<ul>
+<li><strong>Unbounded Graph Manipulation:</strong> Interactive canvas allowing manual creation, deletion, and rewiring of boundary nodes and custom entanglement tethers, bypassing automated generation.</li>
+<li><strong>Integrated Scripting IDE:</strong> A code editor environment environment supporting syntax highlighting and execution for custom HTE DSL scripts and Python simulation hooks.</li>
+<li><strong>Live Variable Inspection:</strong> Real-time watch-pane monitoring active mathematical symbols, custom matrices, and dynamic tensor arrays in volatile memory.</li>
+<li><strong>Safety Limit Overrides:</strong> Warning-gated controls to deactivate standard constraints (such as the <span class="math inline">\(\le 50\)</span> qubit simulation ceiling) for high-resource out-of-bounds experimentation.</li>
+</ul>
+</section>
+<section id="b.-out-of-scope-explicit-exclusions" class="level4" data-number="9.2.1.2">
+<h4 data-number="9.2.1.2" class="anchored" data-anchor-id="b.-out-of-scope-explicit-exclusions"><span class="header-section-number">9.2.1.2</span> B. Out-of-Scope (Explicit Exclusions)</h4>
+<ul>
+<li><strong>Automated Audit Compliance:</strong> Because the Freestyle workspace permits unvalidated sandbox modifications, experimental runs executed here do not automatically generate immutable cryptographic audit hashes or <code>.hte_snapshot</code> verification certificates.</li>
+<li><strong>Standardized Pipeline Gating:</strong> Step-by-step breadcrumb tracking and enforced prerequisite validation checks are absent in this environment.</li>
+</ul>
+</section>
+<section id="c.-computational-constraints" class="level4" data-number="9.2.1.3">
+<h4 data-number="9.2.1.3" class="anchored" data-anchor-id="c.-computational-constraints"><span class="header-section-number">9.2.1.3</span> C. Computational Constraints</h4>
+<ul>
+<li><strong>Resource Discretion &amp; Stability Warning:</strong> Overriding safety limits or running uncompiled custom scripting loops removes memory protection walls, placing hardware stability and resource management entirely at the operator’s discretion.</li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="section-3-project-intent-the-spirit-desired-impact" class="level2" data-number="9.3">
+<h2 data-number="9.3" class="anchored" data-anchor-id="section-3-project-intent-the-spirit-desired-impact"><span class="header-section-number">9.3</span> Section 3: Project Intent (The “Spirit” &amp; Desired Impact)</h2>
+<section id="item-8.3.1-pedagogical-and-analytical-goals" class="level3" data-number="9.3.1">
+<h3 data-number="9.3.1" class="anchored" data-anchor-id="item-8.3.1-pedagogical-and-analytical-goals"><span class="header-section-number">9.3.1</span> Item 8.3.1: Pedagogical and Analytical Goals</h3>
+<section id="introduction-1" class="level4" data-number="9.3.1.1">
+<h4 data-number="9.3.1.1" class="anchored" data-anchor-id="introduction-1"><span class="header-section-number">9.3.1.1</span> Introduction</h4>
+<p>The intent behind the Freestyle Build Workspace is to serve as the theoretical “whiteboard” of the engine, giving researchers absolute creative freedom to push mathematical boundaries.</p>
+<ul>
+<li><strong>Frictionless Prototyping:</strong> To enable rapid testing of novel physical hypotheses without the overhead of formal pipeline configuration.</li>
+<li><strong>Direct Memory Interaction:</strong> To provide raw, unobstructed access to matrix execution layers for advanced computational research.</li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="section-4-mathematical-theoretical-foundations" class="level2" data-number="9.4">
+<h2 data-number="9.4" class="anchored" data-anchor-id="section-4-mathematical-theoretical-foundations"><span class="header-section-number">9.4</span> Section 4: Mathematical &amp; Theoretical Foundations</h2>
+<section id="item-8.4.1-custom-matrix-injection-and-unconstrained-evolution" class="level3" data-number="9.4.1">
+<h3 data-number="9.4.1" class="anchored" data-anchor-id="item-8.4.1-custom-matrix-injection-and-unconstrained-evolution"><span class="header-section-number">9.4.1</span> Item 8.4.1: Custom Matrix Injection and Unconstrained Evolution</h3>
+<section id="a.-arbitrary-state-initialization" class="level4" data-number="9.4.1.1">
+<h4 data-number="9.4.1.1" class="anchored" data-anchor-id="a.-arbitrary-state-initialization"><span class="header-section-number">9.4.1.1</span> A. Arbitrary State Initialization</h4>
+<p>Unlike constrained pipelines, the Freestyle workspace permits the direct loading of custom user-defined density matrices <span class="math inline">\(\rho_{\text{custom}}\)</span> that may violate standard conservation laws during prototyping phases:</p>
+<p><span class="math display">\[\rho_{\text{custom}} \neq \sum_{i} p_i |\psi_i\rangle \langle \psi_i\]</span></p>
+<p><em>(Note: Bypassing standard unitary checks triggers active warnings on the interface but permits uninhibited mathematical exploration).</em></p>
+</section>
+<section id="b.-dsl-execution-binding" class="level4" data-number="9.4.1.2">
+<h4 data-number="9.4.1.2" class="anchored" data-anchor-id="b.-dsl-execution-binding"><span class="header-section-number">9.4.1.2</span> B. DSL Execution Binding</h4>
+<p>Custom scripts submitted via the Integrated Scripting Console are compiled into low-level tensor operations via the engine’s core execution bridge:</p>
+<p><span class="math display">\[\mathcal{T}_{\text{exec}} = \text{Compile} \left( \mathcal{DSL}_{\text{script}} \parallel \text{Memory Buffer} \right)\]</span></p>
+<hr>
+</section>
+</section>
+</section>
+<section id="section-5-functional-components-freestyle-workspace-architecture" class="level2" data-number="9.5">
+<h2 data-number="9.5" class="anchored" data-anchor-id="section-5-functional-components-freestyle-workspace-architecture"><span class="header-section-number">9.5</span> Section 5: Functional Components &amp; Freestyle Workspace Architecture</h2>
+<section id="item-8.5.1-subsystem-architecture" class="level3" data-number="9.5.1">
+<h3 data-number="9.5.1" class="anchored" data-anchor-id="item-8.5.1-subsystem-architecture"><span class="header-section-number">9.5.1</span> Item 8.5.1: Subsystem Architecture</h3>
+<p><span class="math display">\[\begin{array}{|l|l|}
+\hline
+\mathbf{Integrated\;Scripting\;IDE} &amp; \mathbf{Variable\;Inspector\;Pane} \\
+\text{(Custom Python/DSL Environment)} &amp; \text{(Live State Watcher)} \\
+\hline
+\multicolumn{2}{|c|}{\mathbf{Unbounded\;Graph\;Sandbox\;(Freeform\;Node\;Manipulator)}} \\
+\hline
+\multicolumn{2}{|c|}{\mathbf{[Execute\;Script]\quad[Bypass\;Safety\;Limits]\quad[Save\;Custom\;Template]}} \\
+\hline
+\end{array}\]</span></p>
+<section id="a.-creative-modeling-components" class="level4" data-number="9.5.1.1">
+<h4 data-number="9.5.1.1" class="anchored" data-anchor-id="a.-creative-modeling-components"><span class="header-section-number">9.5.1.1</span> A. Creative Modeling Components</h4>
+<ul>
+<li><strong>Integrated Scripting Console:</strong> A code editor supporting syntax highlighting for the HTE Domain Specific Language (DSL) or embedded Python execution hooks.</li>
+<li><strong>Variable Inspector Pane:</strong> A watch-list window detailing all active, user-defined mathematical symbols, custom matrices, and tensor arrays currently sitting in volatile memory.</li>
+<li><strong>Unbounded Graph Sandbox:</strong> An interactive canvas allowing researchers to manually click, drag, add, or delete boundary nodes and draw arbitrary causal links, bypassing standard algorithmic generation.</li>
+</ul>
+</section>
+<section id="b.-extensibility-controls" class="level4" data-number="9.5.1.2">
+<h4 data-number="9.5.1.2" class="anchored" data-anchor-id="b.-extensibility-controls"><span class="header-section-number">9.5.1.2</span> B. Extensibility Controls</h4>
+<ul>
+<li><strong>Script Execution / Run Button:</strong> Compiles and runs the custom script payload directly against the engine’s core matrix processing layer.</li>
+<li><strong>Boundary Constraint Bypass Switch:</strong> A warning-gated toggle that deactivates safety constraints (such as the <span class="math inline">\(\le 50\)</span> qubit simulation limit), enabling out-of-bounds computation at the user’s risk.</li>
+<li><strong>Template Exporter:</strong> Saves the current freestyle layout as an unvalidated custom starting configuration framework for future deployments.</li>
+</ul>
+<hr>
+</section>
+</section>
+</section>
+<section id="section-6-the-canvas-bootstrap-interactive-mechanics-tutorial" class="level2" data-number="9.6">
+<h2 data-number="9.6" class="anchored" data-anchor-id="section-6-the-canvas-bootstrap-interactive-mechanics-tutorial"><span class="header-section-number">9.6</span> Section 6: The Canvas Bootstrap &amp; Interactive Mechanics Tutorial</h2>
+<section id="item-8.6.1-understanding-the-default-bootstrap-screen" class="level3" data-number="9.6.1">
+<h3 data-number="9.6.1" class="anchored" data-anchor-id="item-8.6.1-understanding-the-default-bootstrap-screen"><span class="header-section-number">9.6.1</span> Item 8.6.1: Understanding the Default Bootstrap Screen</h3>
+<p>When booting the Freestyle Build Workspace for the first time, operators are presented with a default <strong>3-node triangular network</strong> rendered on a cyan Cartesian grid.</p>
+<ul>
+<li><strong>The Cyan Grid &amp; Ring:</strong> Represents the baseline metric and coordinate mapping plane (<span class="math inline">\(X, Y, Z\)</span>) for the spatial viewport.</li>
+<li><strong>The Two Green Nodes (Gauge &amp; Potentials):</strong> Pre-allocated gauge nodes establishing baseline Abelian/non-Abelian potential loops across the initial boundary network.</li>
+<li><strong>The Purple Node (Topology &amp; Boundaries):</strong> Represents a central topological anchor point governing boundary-to-bulk projection anchoring.</li>
+<li><strong>Why it starts this way:</strong> This minimal triangular configuration serves as a stable mathematical seed, guaranteeing that an uncompiled workspace immediately possesses non-zero entanglement metrics upon boot.</li>
+</ul>
+</section>
+<section id="item-8.6.2-step-by-step-canvas-manipulation" class="level3" data-number="9.6.2">
+<h3 data-number="9.6.2" class="anchored" data-anchor-id="item-8.6.2-step-by-step-canvas-manipulation"><span class="header-section-number">9.6.2</span> Item 8.6.2: Step-by-Step Canvas Manipulation</h3>
+<ol type="1">
+<li><strong>Selecting Nodes:</strong> Click directly on any node to select it; the node border will flash yellow (<code>FOCUS</code>), opening its live parameters in the Variable Inspector Pane.</li>
+<li><strong>Moving in 3D Space:</strong> Use the precision coordinate controls (<code>X</code>, <code>Y</code>, <code>Z</code> input boxes) in the Auxiliary Subsystems deck to reposition nodes with sub-millimeter accuracy.</li>
+<li><strong>Drawing Entanglement Tethers:</strong> Click and drag from the edge port of one node to another to draw a weighted entanglement tether. The system will automatically compute initial mutual information values.</li>
+</ol>
+<hr>
+</section>
+</section>
+<section id="section-7-the-pantry-node-library-behavioral-manual" class="level2" data-number="9.7">
+<h2 data-number="9.7" class="anchored" data-anchor-id="section-7-the-pantry-node-library-behavioral-manual"><span class="header-section-number">9.7</span> Section 7: The Pantry Node Library &amp; Behavioral Manual</h2>
+<p>“The Pantry” houses the core library of physics modules, metrics, and holographic tools available for drag-and-drop deployment onto the Freestyle canvas.</p>
+<section id="item-7.7.1-drawer-1.1-spacetime-metrics-8-nodes" class="level3" data-number="9.7.1">
+<h3 data-number="9.7.1" class="anchored" data-anchor-id="item-7.7.1-drawer-1.1-spacetime-metrics-8-nodes"><span class="header-section-number">9.7.1</span> Item 7.7.1: Drawer 1.1 — Spacetime Metrics (8 Nodes)</h3>
+<ul>
+<li><strong>Minkowski Flat Metric:</strong> Spawns a flat, zero-curvature background space. <em>Behavior:</em> Disables gravitational lensing in the bulk projection window.</li>
+<li><strong>Schwarzschild Geometry:</strong> Imposes a spherically symmetric static black hole metric. <em>Behavior:</em> Renders an event horizon surrounded by photon sphere lensing rings.</li>
+<li><strong>Kerr Rotating Black Hole:</strong> Introduces angular momentum into the bulk metric. <em>Behavior:</em> Warps the coordinate grid into a spinning ergosphere.</li>
+<li><strong>FLRW Cosmological Metric:</strong> Applies isotropic expansion/contraction parameters. <em>Behavior:</em> Simulates a cosmological scale factor <span class="math inline">\(a(t)\)</span> across the bulk point cloud.</li>
+<li><strong>BTZ Rotating Black Hole:</strong> Spawns a (2+1)-dimensional anti-de Sitter black hole solution.</li>
+<li><strong>Anti-de Sitter (AdS) Bulk:</strong> Enforces a constant negative curvature spacetime background.</li>
+<li><strong>de Sitter (dS) Space:</strong> Enforces a positive cosmological constant and accelerating expansion metric.</li>
+<li><strong>Reissner-Nordström Charged BH:</strong> Adds electrostatic charge parameters to the central black hole singularity.</li>
+</ul>
+</section>
+<section id="item-7.7.2-drawer-1.2-gauge-potentials-9-nodes" class="level3" data-number="9.7.2">
+<h3 data-number="9.7.2" class="anchored" data-anchor-id="item-7.7.2-drawer-1.2-gauge-potentials-9-nodes"><span class="header-section-number">9.7.2</span> Item 7.7.2: Drawer 1.2 — Gauge &amp; Potentials (9 Nodes)</h3>
+<ul>
+<li><strong>Abelian U(1) Potential:</strong> Simulates standard electromagnetic gauge fields across boundary tethers.</li>
+<li><strong>Non-Abelian SU(2) / Yang-Mills SU(3):</strong> Introduces non-linear Yang-Mills gauge interactions representing weak and strong force symmetries.</li>
+<li><strong>Higgs Scalar Field V(<span class="math inline">\(\Phi\)</span>):</strong> Spawns a spontaneous symmetry-breaking potential field.</li>
+<li><strong>Bulk-Boundary Correlator:</strong> Establishes direct correlation channels between boundary operators and bulk fields.</li>
+<li><strong>Chern-Simons Topological Term:</strong> Introduces topological mass generation and anomaly terms.</li>
+<li><strong>Yang-Mills Instanton:</strong> Spawns localized, finite-action tunneling solutions in the gauge field.</li>
+<li><strong>Maxwell-Chern-Simons Field:</strong> Couples electromagnetic fields with topological Chern-Simons terms.</li>
+<li><strong>Scalar Higgs Potential:</strong> Configures vacuum expectation values for mass generation.</li>
+</ul>
+</section>
+<section id="item-7.7.3-drawer-1.3-span-boundaries-6-nodes" class="level3" data-number="9.7.3">
+<h3 data-number="9.7.3" class="anchored" data-anchor-id="item-7.7.3-drawer-1.3-span-boundaries-6-nodes"><span class="header-section-number">9.7.3</span> Item 7.7.3: Drawer 1.3 — Span &amp; Boundaries (6 Nodes)</h3>
+<ul>
+<li><strong>AdS/CFT Boundary Shell:</strong> Establishes the conformal boundary interface for holographic projection.</li>
+<li><strong>Chern-Simons Term:</strong> Applies boundary anomaly corrections.</li>
+<li><strong>Bulk-Boundary Correlator:</strong> Maps bulk wave propagation back to boundary sources.</li>
+<li><strong>Ryu-Takayanagi Minimal Surface:</strong> Renders the minimal surface area anchoring boundary subsystem <span class="math inline">\(A\)</span> to the bulk.</li>
+<li><strong>Entanglement Wedge Cross-Section:</strong> Computes mixed-state holographic entanglement wedges.</li>
+<li><strong>Modular Hamiltonian Shell:</strong> Implements thermal modular operator calculations for localized subsystems.</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="section-8-advanced-tuning-suites-reference" class="level2" data-number="9.8">
+<h2 data-number="9.8" class="anchored" data-anchor-id="section-8-advanced-tuning-suites-reference"><span class="header-section-number">9.8</span> Section 8: Advanced Tuning Suites Reference</h2>
+<section id="item-8.8.1-3.1-adscft-entanglement-suite" class="level3" data-number="9.8.1">
+<h3 data-number="9.8.1" class="anchored" data-anchor-id="item-8.8.1-3.1-adscft-entanglement-suite"><span class="header-section-number">9.8.1</span> Item 8.8.1: 3.1 AdS/CFT Entanglement Suite</h3>
+<ul>
+<li><strong>Minimal Surface Radius (<span class="math inline">\(\gamma_A\)</span>):</strong> Adjusts the scale of bulk minimal surfaces.</li>
+<li><strong>Entanglement Wedge (<span class="math inline">\(E_W\)</span>):</strong> Toggles subregion reconstruction boundaries.</li>
+<li><strong>Conformal Dimension (<span class="math inline">\(\Delta\)</span>):</strong> Sets operator scaling weights.</li>
+<li><strong>Bulk UV Cutoff (<span class="math inline">\(z_0\)</span>):</strong> Regulates boundary limits to prevent energy divergences.</li>
+<li><strong>Dictionary Formulation:</strong> Switches between HRT and standard dictionary mapping algorithms.</li>
+<li><strong>Complexity Scaling (CV/CA):</strong> Toggles Complexity-Volume vs.&nbsp;Complexity-Action metrics.</li>
+</ul>
+</section>
+<section id="item-8.8.2-3.2-einstein-constraints-gr-solver" class="level3" data-number="9.8.2">
+<h3 data-number="9.8.2" class="anchored" data-anchor-id="item-8.8.2-3.2-einstein-constraints-gr-solver"><span class="header-section-number">9.8.2</span> Item 8.8.2: 3.2 Einstein Constraints (GR Solver)</h3>
+<ul>
+<li><strong>Evolution System (BSSN):</strong> Sets the numerical relativity formulation for stable time evolution.</li>
+<li><strong>Slicing / Gauge Condition (<span class="math inline">\(1+\log\)</span> Slicing):</strong> Prevents coordinate collapse at singularities.</li>
+<li><strong>Hamiltonian &amp; Momentum Tolerances:</strong> Sets allowable mathematical error thresholds (<span class="math inline">\(\mathcal{H} \approx 0\)</span>).</li>
+<li><strong>Constraint Damping Mode:</strong> Applies algebraic penalty enforcement to suppress numerical noise.</li>
+</ul>
+</section>
+<section id="item-8.8.3-4.1-4.2-simulation-controls-stream-diagnostics" class="level3" data-number="9.8.3">
+<h3 data-number="9.8.3" class="anchored" data-anchor-id="item-8.8.3-4.1-4.2-simulation-controls-stream-diagnostics"><span class="header-section-number">9.8.3</span> Item 8.8.3: 4.1 &amp; 4.2 Simulation Controls &amp; Stream Diagnostics</h3>
+<ul>
+<li><strong>Global Time Scaling (<span class="math inline">\(dt\)</span>):</strong> Controls simulation clock speed.</li>
+<li><strong>Adaptive Mesh Refinement (AMR):</strong> Dynamically increases grid resolution near high-gradient zones.</li>
+<li><strong>Courant Stability Factor (CFL) &amp; Kreiss-Oliger Damping (<span class="math inline">\(\epsilon\)</span>):</strong> Prevents differential equation blow-ups.</li>
+<li><strong>Time Integrator Order:</strong> Selects numerical solvers (e.g., Runge-Kutta 2nd Order).</li>
+</ul>
+<hr>
+</section>
+</section>
+<section id="section-9-anatomical-diagram-reference" class="level2" data-number="9.9">
+<h2 data-number="9.9" class="anchored" data-anchor-id="section-9-anatomical-diagram-reference"><span class="header-section-number">9.9</span> Section 9: Anatomical Diagram Reference</h2>
+<p><em>[image describing function goes here] figure 8.1 - freestyle build workspace layout, integrated scripting IDE, variable inspector pane, pantry drawers, and unbounded graph manipulation canvas</em></p>
+
+
+</section>
+
+</main> <!-- /main -->
+<script id="quarto-html-after-body" type="application/javascript">
+  window.document.addEventListener("DOMContentLoaded", function (event) {
+    const icon = "";
+    const anchorJS = new window.AnchorJS();
+    anchorJS.options = {
+      placement: 'right',
+      icon: icon
+    };
+    anchorJS.add('.anchored');
+    const isCodeAnnotation = (el) => {
+      for (const clz of el.classList) {
+        if (clz.startsWith('code-annotation-')) {                     
+          return true;
+        }
+      }
+      return false;
+    }
+    const onCopySuccess = function(e) {
+      // button target
+      const button = e.trigger;
+      // don't keep focus
+      button.blur();
+      // flash "checked"
+      button.classList.add('code-copy-button-checked');
+      var currentTitle = button.getAttribute("title");
+      button.setAttribute("title", "Copied!");
+      let tooltip;
+      if (window.bootstrap) {
+        button.setAttribute("data-bs-toggle", "tooltip");
+        button.setAttribute("data-bs-placement", "left");
+        button.setAttribute("data-bs-title", "Copied!");
+        tooltip = new bootstrap.Tooltip(button, 
+          { trigger: "manual", 
+            customClass: "code-copy-button-tooltip",
+            offset: [0, -8]});
+        tooltip.show();    
+      }
+      setTimeout(function() {
+        if (tooltip) {
+          tooltip.hide();
+          button.removeAttribute("data-bs-title");
+          button.removeAttribute("data-bs-toggle");
+          button.removeAttribute("data-bs-placement");
+        }
+        button.setAttribute("title", currentTitle);
+        button.classList.remove('code-copy-button-checked');
+      }, 1000);
+      // clear code selection
+      e.clearSelection();
+    }
+    const getTextToCopy = function(trigger) {
+      const outerScaffold = trigger.parentElement.cloneNode(true);
+      const codeEl = outerScaffold.querySelector('code');
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+    }
+    const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+      text: getTextToCopy
+    });
+    clipboard.on('success', onCopySuccess);
+    if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+      const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+        text: getTextToCopy,
+        container: window.document.getElementById('quarto-embedded-source-code-modal')
+      });
+      clipboardModal.on('success', onCopySuccess);
+    }
+      var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+      var mailtoRegex = new RegExp(/^mailto:/);
+        var filterRegex = new RegExp('/' + window.location.host + '/');
+      var isInternal = (href) => {
+          return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+      }
+      // Inspect non-navigation links and adorn them if external
+      window.quartoDecorateExternalLinks = function (root) {
+     var links = (root || window.document).querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+      for (var i=0; i<links.length; i++) {
+        const link = links[i];
+        if (!isInternal(link.href)) {
+          // undo the damage that might have been done by quarto-nav.js in the case of
+          // links that we want to consider external
+          if (link.dataset.originalHref !== undefined) {
+            link.href = link.dataset.originalHref;
+          }
+          if (!link.classList.contains('no-external-icon')) {
+          }
+        }
+      }
+      };
+      window.quartoDecorateExternalLinks(window.document);
+    // Esc closes the popup (WCAG 1.4.13) and focus leaving both trigger and
+    // popup closes it (WCAG 2.4.11); tippy handles neither for interactive popups.
+    const hideOnEscAndFocusOut = {
+      name: 'hideOnEscAndFocusOut',
+      defaultValue: true,
+      fn(instance) {
+        const dismiss = () => {
+          // A show scheduled by the trigger delay would otherwise reopen it
+          instance.clearDelayTimeouts();
+          instance.hide();
+        };
+        const onKeyDown = (event) => {
+          if (event.key !== 'Escape') {
+            return;
+          }
+          // Keep Esc from also reaching page handlers (e.g. reveal.js overview),
+          // except an open reveal.js slide menu, which Esc should close too.
+          // The menu handles keys only when its keyboard option is on.
+          const menuHandlesEsc = window.Reveal?.getPlugin?.('menu')?.isOpen() &&
+            window.Reveal.getConfig().menu?.keyboard !== false;
+          if (!menuHandlesEsc) {
+            event.stopPropagation();
+          }
+          if (instance.popper.contains(window.document.activeElement)) {
+            // Disabled while refocusing so the focus trigger does not reopen it
+            instance.disable();
+            instance.reference.focus();
+            instance.enable();
+          }
+          dismiss();
+        };
+        const onFocusOut = (event) => {
+          const target = event.relatedTarget;
+          if (target && !instance.reference.contains(target) &&
+              !instance.popper.contains(target)) {
+            dismiss();
+          }
+        };
+        // On the trigger too: a click trigger (code-annotations: select) has no
+        // blur handling. Attached for the instance's lifetime so leaving the
+        // trigger also cancels a show still pending on the trigger delay.
+        instance.reference.addEventListener('focusout', onFocusOut);
+        return {
+          onShow() {
+            window.document.addEventListener('keydown', onKeyDown, true);
+            instance.popper.addEventListener('focusout', onFocusOut);
+          },
+          onHide() {
+            window.document.removeEventListener('keydown', onKeyDown, true);
+            instance.popper.removeEventListener('focusout', onFocusOut);
+          },
+          onDestroy() {
+            instance.reference.removeEventListener('focusout', onFocusOut);
+          },
+        };
+      },
+    };
+    function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+      const config = {
+        allowHTML: true,
+        maxWidth: 500,
+        delay: 100,
+        arrow: false,
+        appendTo: function(el) {
+            return el.parentElement;
+        },
+        interactive: true,
+        interactiveBorder: 10,
+        theme: 'quarto',
+        placement: 'bottom-start',
+        plugins: [hideOnEscAndFocusOut],
+      };
+      if (contentFn) {
+        config.content = contentFn;
+      }
+      if (onTriggerFn) {
+        config.onTrigger = onTriggerFn;
+      }
+      if (onUntriggerFn) {
+        config.onUntrigger = onUntriggerFn;
+      }
+      window.tippy(el, config); 
+    }
+    const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+    for (var i=0; i<noterefs.length; i++) {
+      const ref = noterefs[i];
+      tippyHover(ref, function() {
+        // use id or data attribute instead here
+        let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+        try { href = new URL(href).hash; } catch {}
+        const id = href.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note) {
+          return note.innerHTML;
+        } else {
+          return "";
+        }
+      });
+    }
+    const xrefs = window.document.querySelectorAll('a.quarto-xref');
+    const processXRef = (id, note) => {
+      // Strip column container classes
+      const stripColumnClz = (el) => {
+        el.classList.remove("page-full", "page-columns");
+        if (el.children) {
+          for (const child of el.children) {
+            stripColumnClz(child);
+          }
+        }
+      }
+      stripColumnClz(note)
+      if (id === null || id.startsWith('sec-')) {
+        // Special case sections, only their first couple elements
+        const container = document.createElement("div");
+        if (note.children && note.children.length > 2) {
+          container.appendChild(note.children[0].cloneNode(true));
+          for (let i = 1; i < note.children.length; i++) {
+            const child = note.children[i];
+            if (child.tagName === "P" && child.innerText === "") {
+              continue;
+            } else {
+              container.appendChild(child.cloneNode(true));
+              break;
+            }
+          }
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(container);
+          }
+          return container.innerHTML
+        } else {
+          if (window.Quarto?.typesetMath) {
+            window.Quarto.typesetMath(note);
+          }
+          return note.innerHTML;
+        }
+      } else {
+        // Remove any anchor links if they are present
+        const anchorLink = note.querySelector('a.anchorjs-link');
+        if (anchorLink) {
+          anchorLink.remove();
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        if (note.classList.contains("callout")) {
+          return note.outerHTML;
+        } else {
+          return note.innerHTML;
+        }
+      }
+    }
+    for (var i=0; i<xrefs.length; i++) {
+      const xref = xrefs[i];
+      tippyHover(xref, undefined, function(instance) {
+        instance.disable();
+        let url = xref.getAttribute('href');
+        let hash = undefined; 
+        if (url.startsWith('#')) {
+          hash = url;
+        } else {
+          try { hash = new URL(url).hash; } catch {}
+        }
+        if (hash) {
+          const id = hash.replace(/^#\/?/, "");
+          const note = window.document.getElementById(id);
+          if (note !== null) {
+            try {
+              const html = processXRef(id, note.cloneNode(true));
+              instance.setContent(html);
+            } finally {
+              instance.enable();
+              instance.show();
+            }
+          } else {
+            // See if we can fetch this
+            fetch(url.split('#')[0])
+            .then(res => res.text())
+            .then(html => {
+              const parser = new DOMParser();
+              const htmlDoc = parser.parseFromString(html, "text/html");
+              const note = htmlDoc.getElementById(id);
+              if (note !== null) {
+                const html = processXRef(id, note);
+                instance.setContent(html);
+              } 
+            }).finally(() => {
+              instance.enable();
+              instance.show();
+            });
+          }
+        } else {
+          // See if we can fetch a full url (with no hash to target)
+          // This is a special case and we should probably do some content thinning / targeting
+          fetch(url)
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.querySelector('main.content');
+            if (note !== null) {
+              // This should only happen for chapter cross references
+              // (since there is no id in the URL)
+              // remove the first header
+              if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+                note.children[0].remove();
+              }
+              const html = processXRef(null, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      }, function(instance) {
+      });
+    }
+        let selectedAnnoteEl;
+        const selectorForAnnotation = ( cell, annotation) => {
+          let cellAttr = 'data-code-cell="' + cell + '"';
+          let lineAttr = 'data-code-annotation="' +  annotation + '"';
+          const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+          return selector;
+        }
+        const selectCodeLines = (annoteEl) => {
+          const doc = window.document;
+          const targetCell = annoteEl.getAttribute("data-target-cell");
+          const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+          const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+          const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+          const lineIds = lines.map((line) => {
+            return targetCell + "-" + line;
+          })
+          // Each band is positioned against its own containing block, which is
+          // not the offsetParent of the lines, so place it from client rects.
+          const placeBand = (band, firstEl, lastEl, codeBlock) => {
+            const container = band.offsetParent;
+            if (container === null) {
+              return;
+            }
+            const containerRect = container.getBoundingClientRect();
+            // Reveal.js scales slides with a transform, so convert client
+            // pixels back to the CSS pixels of the container.
+            const scale = containerRect.height / container.offsetHeight || 1;
+            const firstRect = firstEl.getBoundingClientRect();
+            const lastRect = lastEl.getBoundingClientRect();
+            const top = (firstRect.top - containerRect.top) / scale - container.clientTop + container.scrollTop;
+            const height = (lastRect.bottom - firstRect.top) / scale;
+            band.style.top = top - 2 + "px";
+            band.style.height = height + 4 + "px";
+            if (codeBlock) {
+              // Without the copy button wrapper, the containing block is wider
+              // than the code block, so span the code block explicitly.
+              const blockRect = codeBlock.getBoundingClientRect();
+              band.style.left = (blockRect.left - containerRect.left) / scale - container.clientLeft + container.scrollLeft + "px";
+              band.style.width = blockRect.width / scale + "px";
+            }
+          };
+          if (lineIds.length > 0) {
+            const el = window.document.getElementById(lineIds[0]);
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const parent = el.parentElement.parentElement;
+            // cook up a div (if necessary) and position it
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            placeBand(div, el, lastEl, parent.closest("div.sourceCode") || parent);
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            placeBand(gutterDiv, el, lastEl);
+            selectedAnnoteEl = annoteEl;
+          }
+        };
+        const unselectCodeLines = () => {
+          const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+          elementsIds.forEach((elId) => {
+            const div = window.document.getElementById(elId);
+            if (div) {
+              div.remove();
+            }
+          });
+          selectedAnnoteEl = undefined;
+        };
+          // Handle positioning of the toggle
+      window.addEventListener(
+        "resize",
+        throttle(() => {
+          elRect = undefined;
+          if (selectedAnnoteEl) {
+            selectCodeLines(selectedAnnoteEl);
+          }
+        }, 10)
+      );
+      function throttle(fn, ms) {
+      let throttle = false;
+      let timer;
+        return (...args) => {
+          if(!throttle) { // first call gets through
+              fn.apply(this, args);
+              throttle = true;
+          } else { // all the others get throttled
+              if(timer) clearTimeout(timer); // cancel #2
+              timer = setTimeout(() => {
+                fn.apply(this, args);
+                timer = throttle = false;
+              }, ms);
+          }
+        };
+      }
+        // Attach click handler to the DT
+        const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+        for (const annoteDlNode of annoteDls) {
+          annoteDlNode.addEventListener('click', (event) => {
+            const clickedEl = event.target;
+            if (clickedEl !== selectedAnnoteEl) {
+              unselectCodeLines();
+              const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+              if (activeEl) {
+                activeEl.classList.remove('code-annotation-active');
+              }
+              selectCodeLines(clickedEl);
+              clickedEl.classList.add('code-annotation-active');
+            } else {
+              // Unselect the line
+              unselectCodeLines();
+              clickedEl.classList.remove('code-annotation-active');
+            }
+          });
+        }
+    const findCites = (el) => {
+      const parentEl = el.parentElement;
+      if (parentEl) {
+        const cites = parentEl.dataset.cites;
+        if (cites) {
+          return {
+            el,
+            cites: cites.split(' ')
+          };
+        } else {
+          return findCites(el.parentElement)
+        }
+      } else {
+        return undefined;
+      }
+    };
+    var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+    for (var i=0; i<bibliorefs.length; i++) {
+      const ref = bibliorefs[i];
+      const citeInfo = findCites(ref);
+      if (citeInfo) {
+        tippyHover(citeInfo.el, function() {
+          var popup = window.document.createElement('div');
+          citeInfo.cites.forEach(function(cite) {
+            var citeDiv = window.document.createElement('div');
+            citeDiv.classList.add('hanging-indent');
+            citeDiv.classList.add('csl-entry');
+            var biblioDiv = window.document.getElementById('ref-' + cite);
+            if (biblioDiv) {
+              citeDiv.innerHTML = biblioDiv.innerHTML;
+            }
+            popup.appendChild(citeDiv);
+          });
+          return popup.innerHTML;
+        });
+      }
+    }
+  });
+  </script>
+  <script type="application/javascript">
+  window.quartoScrollableRegionsLabels = {"code":"Scrollable code","output":"Scrollable output"};
+  </script>
+<nav class="page-navigation" aria-label="Page">
+  <div class="nav-page nav-page-previous">
+      <a href="../Manual/Chapter8.html" class="pagination-link" aria-label="Chapter 8 - Freestyle Build Workspace &amp; Scripting API">
+        <i class="bi bi-arrow-left-short"></i> <span class="nav-page-text"><span class="chapter-number">8</span>&nbsp; <span class="chapter-title">Chapter 8 - Freestyle Build Workspace &amp; Scripting API</span></span>
+      </a>          
+  </div>
+  <div class="nav-page nav-page-next">
+      <a href="../Manual/AppendixA.html" class="pagination-link" aria-label="Appendix A - Technical Glossary &amp; Definitions">
+        <span class="nav-page-text"><span class="chapter-number">10</span>&nbsp; <span class="chapter-title">Appendix A - Technical Glossary &amp; Definitions</span></span> <i class="bi bi-arrow-right-short"></i>
+      </a>
+  </div>
+</nav>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

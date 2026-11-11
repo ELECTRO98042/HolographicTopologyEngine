@@ -3,6 +3,9 @@ import { OrbitControls } from './vendor/graphics/OrbitControls.js';
 import '../../physics/holographic/SpacetimeMetricEngine.js';
 import '../../physics/dynamics/PhaseSpaceHamiltonianEngine.js';
 import './physicsArbiter.js';
+import { ImportSanityNormalizer } from './importSanityNormalizer.js';
+import { LimboStateController } from './limboStateController.js';
+import { TetherAssistant } from './tetherAssistant.js';
 
 window.THREE = THREE;
 window.OrbitControls = OrbitControls;
@@ -212,6 +215,24 @@ function initAuxiliaryColorKey() {
 
     auxViewport.className = "w-full flex-1 bg-slate-950/90 rounded border border-engine-border/60 p-2.5 overflow-y-auto font-mono text-[10px]";
     auxViewport.innerHTML = `
+        <div id="limbo-staging-panel" class="subsystem-group mb-3 pb-3 border-b border-engine-border/40" style="display: none;">
+            <div class="subsystem-header text-amber-400">// STAGING LIMBO (UNCOMMITTED)</div>
+            <div class="p-2 rounded bg-amber-950/20 border border-amber-500/30 space-y-2">
+                <div id="limbo-status-text" class="text-amber-300 font-semibold">Model in Staging Limbo</div>
+                <div id="limbo-violations-list" class="text-slate-400 space-y-1 max-h-24 overflow-y-auto font-mono"></div>
+                <div class="flex space-x-2 pt-1">
+                    <button id="btn-launch-wizard" style="background: rgba(0, 240, 255, 0.2); border: 1px solid rgba(0, 240, 255, 0.4); color: #00f0ff;" class="flex-1 py-1 rounded hover:bg-cyan-950 font-bold cursor-pointer text-[10px]">
+                        TETHER ASSISTANT
+                    </button>
+                    <button id="btn-commit-model" disabled style="background: rgba(16, 185, 129, 0.2); border: 1px solid rgba(16, 185, 129, 0.4); color: #34d399;" class="flex-1 py-1 rounded font-bold disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer text-[10px] hover:bg-emerald-950">
+                        COMMIT MODEL
+                    </button>
+                </div>
+                <button id="btn-manual-hud-sync" style="background: #1e293b; border: 1px solid #334155; color: #cbd5e1;" class="w-full py-1 rounded hover:bg-slate-700 font-mono text-[10px] cursor-pointer">
+                    🔄 UPDATE FROM MAIN HUD WORKSPACE
+                </button>
+            </div>
+        </div>
         <div class="subsystem-group">
             <div class="subsystem-header">// NODE COORDS (PRECISION)</div>
             <div class="hud-input-row">
@@ -292,6 +313,10 @@ function initAuxiliaryColorKey() {
                             window.selectedNode.id,
                             window.selectedNode.position || window.selectedNode.mesh.position
                         );
+                    }
+                    // --- v.2.8.4: Trigger sync to Main HUD on manual coordinate edit ---
+                    if (window.deckViewPort && typeof window.deckViewPort.syncToMainHUD === 'function') {
+                        window.deckViewPort.syncToMainHUD();
                     }
                 }
             });
@@ -402,6 +427,8 @@ function applyUnifiedStyling(node, status, code, customTheme = null) {
     }
 }
 
+// Global or class-level guard flag to prevent broadcast echo storms
+let isExternalSync = false;
 class DeckViewport {
     constructor(containerId) {
         this.container = document.getElementById(containerId);
@@ -416,52 +443,249 @@ class DeckViewport {
 
         this.initThree();
         this.initListeners();
+        this.initSyncListener();  // Add this for v.2.8.4 BroadcastChannel sync
         this.initDefaultModel();
         this.initTelemetrySocket();
 
         this.animate = this.animate.bind(this);
         this.animate();
+        setTimeout(() => {
+            const manualSyncBtn = document.getElementById('btn-manual-hud-sync');
+            if (manualSyncBtn) {
+                manualSyncBtn.onclick = () => {
+                    if (window.deckViewPort && typeof window.deckViewPort.pullFromMainHUD === 'function') {
+                        window.deckViewPort.pullFromMainHUD();
+                    }
+                };
+            }
+        }, 500);
     }
-    // Inside DeckViewport class in deck_render.js:
-    syncToMainHUD() {
-        if (!this.nodes || !Array.isArray(this.nodes)) {
-            console.warn("[Sync Bridge] No active nodes array found to sync.");
+    
+    
+    // 1. Add this method inside your DeckViewport class:
+    initSyncListener() {
+        const deckSyncChannel = new BroadcastChannel('holographic_sync_channel');
+
+        // Clear lingering stale cache on fresh load
+        localStorage.removeItem('holographic_latest_sync');
+
+        // Listen for live broadcast messages
+        deckSyncChannel.onmessage = (event) => {
+            const message = event.data;
+            if (!message) return;
+
+            // --- STATE #3: LIVE PUSH WHILE FREESTYLE DECK IS ALREADY OPEN ---
+            if (message.type === 'PUSH_TO_BUILDER_LIMBO' && message.model) {
+                console.log("[LIMBO] Live model update received while Builder open. Quarantining in Limbo.");
+
+                // Security check: Ensure origin is valid and not looping back from builder
+                if (message.model.origin === 'MAIN_HUD') {
+                    const sanitizedModel = ImportSanityNormalizer.sanitize(message.model);
+                    if (window.limboController) {
+                        window.limboController.enterLimbo(sanitizedModel);
+                    }
+                }
+                return;
+            }
+
+            // --- STANDARD MAIN HUD BROADCAST SYNC ---
+            if ((message.type === 'SYNC_FROM_HUD' || message.type === 'SYNC_TOPOLOGY') && Array.isArray(message.nodes)) {
+                this.applySyncedNodes(message.nodes, message.edges || message.connections || []);
+            }
+        };
+    }
+    // Helper to render HTML/Canvas text labels over Three.js nodes
+    createNodeLabel(text, colorHex = '#00f0ff') {
+        const canvas = document.createElement('canvas');
+        canvas.width = 512;  // Doubled for higher resolution
+        canvas.height = 128; // Doubled for higher resolution
+        const ctx = canvas.getContext('2d');
+
+        // ... background & styling ...
+
+        ctx.font = 'Bold 36px "Courier New", monospace'; // Increased font size
+        ctx.fillStyle = colorHex;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 256, 64); // Centered on new canvas dimensions
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(spriteMaterial);
+
+        sprite.scale.set(32, 8.0, 1); // Scaled up in 3D space to match the larger nodes
+        sprite.position.set(0, 2.5, 0); // Positioned slightly higher above the larger sphere
+
+        return sprite;
+    }
+
+    // Helper to process and render incoming nodes cleanly
+    applySyncedNodes(nodesArray, edgesArray = []) {
+        // --- 1. LIMBO INTERCEPTION GATE ---
+        if (!isExternalSync && window.limboController && !window.limboController.isLimbo) {
+            console.log("[LIMBO] Model import intercepted in applySyncedNodes. Routing to Staging Limbo.");
+
+            const rawModel = {
+                nodes: nodesArray,
+                edges: edgesArray
+            };
+
+            const sanitizedModel = ImportSanityNormalizer.sanitize(rawModel);
+            window.limboController.enterLimbo(sanitizedModel);
             return;
         }
 
-        // Inside deck_render.js syncToMainHUD()
-        const payload = {
-            type: 'SYNC_TOPOLOGY',
-            timestamp: Date.now(),
-            nodes: this.nodes.map((n, index) => {
-                const nodeData = n.data || n;
+        isExternalSync = true;
+        this.isExternalManifold = true;
+        this.clearDeckSilently();
 
-                // Auto-assign Concentric Tier based on theory type
-                let tier = 'INTERMEDIATE';
-                let nodeColor = '#10b981';
+        console.log(`[v.2.8.4 SYNC] Ingesting ${nodesArray.length} nodes and ${edgesArray?.length || 0} edges.`);
 
-                if (nodeData.type === 'TOPOLOGY' || nodeData.name.includes('Boundary')) {
-                    tier = 'BOUNDARY';
-                    nodeColor = '#8b5cf6'; // Violet
-                } else if (nodeData.type === 'METRIC' || nodeData.name.includes('Black Hole') || nodeData.name.includes('Kerr')) {
-                    tier = 'BULK_CORE';
-                    nodeColor = '#ffffff'; // White core
+        // 1. Ingest Nodes Directly Using Normalized Coordinates from Sanity Sanitizer
+        nodesArray.forEach((n, index) => {
+            const posX = n.x !== undefined ? n.x : (n.position?.x !== undefined ? n.position.x : 0);
+            const posY = n.y !== undefined ? n.y : (n.position?.y !== undefined ? n.position.y : 0);
+            const posZ = n.z !== undefined ? n.z : (n.position?.z !== undefined ? n.position.z : 0);
+
+            const pos = new THREE.Vector3(Number(posX), Number(posY), Number(posZ));
+
+            const nodeData = {
+                id: n.id || `Q-00${index + 1}`,
+                name: n.name || n.label || n.id || `Node-${index + 1}`, // <--- Exact fallback sequence
+                type: n.type || 'TOPOLOGY_NODE',
+                formula: n.formula || 'g_\mu = n_\mu'
+            };
+
+            const geometry = new THREE.SphereGeometry(1.8, 24, 24);
+            const material = new THREE.MeshBasicMaterial({
+                color: n.color ? parseInt(n.color.replace('#', '0x')) : 0x00f0ff,
+                wireframe: true
+            });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.userData = { nodeId: nodeData.id, index: index };
+            mesh.position.copy(pos);
+
+            const labelSprite = this.createNodeLabel(nodeData.name, n.color || '#00f0ff');
+            mesh.add(labelSprite);
+
+            this.scene.add(mesh);
+            const nodeObj = { data: nodeData, mesh };
+            this.nodes.push(nodeObj);
+
+            window.nodeMeshes = window.nodeMeshes || [];
+            window.nodeMeshes.push(mesh);
+        });
+
+        // 2. Universal Edge & Link Resolution
+        let connectedPairs = 0;
+        if (Array.isArray(edgesArray) && edgesArray.length > 0) {
+            edgesArray.forEach(edge => {
+                const srcRaw = edge.source !== undefined ? edge.source : edge.from;
+                const tgtRaw = edge.target !== undefined ? edge.target : edge.to;
+
+                const srcId = typeof srcRaw === 'object' && srcRaw !== null ? (srcRaw.id || srcRaw.name || srcRaw.index) : srcRaw;
+                const tgtId = typeof tgtRaw === 'object' && tgtRaw !== null ? (tgtRaw.id || tgtRaw.name || tgtRaw.index) : tgtRaw;
+
+                let nodeA = this.nodes.find(n => n.data.id === String(srcId) || n.data.name === String(srcId)) ||
+                    (typeof srcId === 'number' ? this.nodes[srcId] : null);
+
+                let nodeB = this.nodes.find(n => n.data.id === String(tgtId) || n.data.name === String(tgtId)) ||
+                    (typeof tgtId === 'number' ? this.nodes[tgtId] : null);
+
+                if (nodeA && nodeB) {
+                    this.createConnectionLine(nodeA, nodeB);
+                    connectedPairs++;
                 }
+            });
+        }
 
-                return {
-                    id: nodeData.id || `N-00${index + 1}`,
-                    name: nodeData.name || `Node-${index + 1}`,
-                    type: nodeData.type || 'Standard',
-                    tier: tier,
-                    color: nodeColor,
-                    position: n.mesh ? n.mesh.position : (n.position || { x: 0, y: 0, z: 0 })
-                };
-            })
+        if (connectedPairs === 0 && this.nodes.length > 1) {
+            for (let i = 0; i < this.nodes.length - 1; i++) {
+                this.createConnectionLine(this.nodes[i], this.nodes[i + 1]);
+            }
+            this.createConnectionLine(this.nodes[this.nodes.length - 1], this.nodes[0]);
+        }
+
+        // Auto-center camera target and position on ingested nodes bounding center for 1:1 scale alignment
+        if (this.nodes.length > 0 && this.controls) {
+            const center = new THREE.Vector3();
+            this.nodes.forEach(n => center.add(n.mesh.position));
+            center.divideScalar(this.nodes.length);
+
+            this.controls.target.copy(center);
+            this.camera.position.set(center.x, center.y + 45, center.z + 85); // 180° flipped Z offset
+            this.controls.update();
+        }
+
+        window.activeDeckNodes = this.nodes;
+        window.nodes = this.nodes.map(n => n.data);
+        this.updateNodeCountBadge();
+
+        setTimeout(() => {
+            isExternalSync = false;
+        }, 50);
+    }
+
+    // 2. Wrap your outgoing broadcast method with the guard check:
+    syncToMainHUD() {
+        if (isExternalSync) return;
+        if (!this.nodes || !Array.isArray(this.nodes)) return;
+
+        const rawStagedModel = {
+            version: '2.9.0',
+            nodes: this.nodes.map((n, index) => ({
+                id: n.data?.id || `Q-00${index + 1}`,
+                name: n.data?.name || `Node-${index + 1}`,
+                type: n.data?.type || 'TOPOLOGY_NODE',
+                x: n.mesh ? n.mesh.position.x : 0,
+                y: n.mesh ? n.mesh.position.y : 0,
+                z: n.mesh ? n.mesh.position.z : 0,
+                color: n.mesh?.material?.color ? '#' + n.mesh.material.color.getHexString() : '#00ffcc',
+                attrs: n.data?.attrs || {}
+            })),
+            edges: this.connections.map(c => ({
+                source: c.nodeA.data?.id || c.nodeA.id,
+                target: c.nodeB.data?.id || c.nodeB.id
+            }))
         };
 
+        // Serialize cleanly via normalizer adapter
+        const payload = ImportSanityNormalizer.formatForMainHUD(rawStagedModel);
+
+        console.debug("[FHPP PIPELINE TEST] Outbound Commit Payload:", {
+            version: payload.version,
+            coordinateSystem: payload.coordinate_system,
+            firstNodeCoords: { x: payload.nodes[0]?.x, y: payload.nodes[0]?.y, z: payload.nodes[0]?.z }
+        });
+
         const syncChannel = new BroadcastChannel('holographic_sync_channel');
+        localStorage.setItem('holographic_latest_sync', JSON.stringify(payload));
         syncChannel.postMessage(payload);
-        console.log("[Sync Bridge] Custom topology & colors broadcasted to Main HUD workspace:", payload);
+        console.log("[DECK SYNC] Pristine FHPP payload broadcasted to Main HUD.");
+    }
+
+    clearDeckSilently() {
+        if (this.nodes && Array.isArray(this.nodes)) {
+            this.nodes.forEach(node => {
+                if (node.mesh && this.scene) {
+                    this.scene.remove(node.mesh);
+                    if (node.mesh.geometry) node.mesh.geometry.dispose();
+                    if (node.mesh.material) node.mesh.material.dispose();
+                }
+            });
+        }
+        if (this.connections && Array.isArray(this.connections)) {
+            this.connections.forEach(conn => {
+                if (conn && conn.line && this.scene) {
+                    this.scene.remove(conn.line);
+                    if (conn.line.geometry) conn.line.geometry.dispose();
+                    if (conn.line.material) conn.line.material.dispose();
+                }
+            });
+        }
+        this.nodes = [];
+        this.connections = [];
+        this.selectedNode = null;
     }
 
     checkBondValidity(typeA, typeB) {
@@ -471,8 +695,8 @@ class DeckViewport {
     initThree() {
         const width = this.container.clientWidth || window.innerWidth;
         const height = this.container.clientHeight || window.innerHeight;
-        this.camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
-        this.camera.position.set(0, 15, 25);
+        this.camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 5000); // Increased far plane
+        this.camera.position.set(0, 45, 120);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.renderer.setSize(width, height);
@@ -494,7 +718,7 @@ class DeckViewport {
         pointLight.position.set(0, 10, 10);
         this.scene.add(pointLight);
 
-        const gridHelper = new THREE.GridHelper(40, 40, 0x00f0ff, 0x1a2436);
+        const gridHelper = new THREE.GridHelper(200, 40, 0x00f0ff, 0x1a2436);
         gridHelper.position.y = -0.01;
         this.scene.add(gridHelper);
 
@@ -537,6 +761,27 @@ class DeckViewport {
     }
 
     initDefaultModel() {
+        // --- CHECK FOR IMPORTED MODEL STAGED FROM MAIN HUD / TESTING SUITE ---
+        const pendingImport = localStorage.getItem('holographic_pending_builder_import');
+        if (pendingImport) {
+            try {
+                const parsedModel = JSON.parse(pendingImport);
+                localStorage.removeItem('holographic_pending_builder_import');
+                console.log("[BUILDER INGEST] Found pending import state. Routing to Limbo Staging.");
+
+                const sanitizedModel = ImportSanityNormalizer.sanitize(parsedModel);
+                setTimeout(() => {
+                    if (window.limboController) {
+                        window.limboController.enterLimbo(sanitizedModel);
+                    }
+                }, 100);
+                return; // Suppress default 3-node model initialization
+            } catch (err) {
+                console.error("[BUILDER INGEST] Error parsing pending import:", err);
+            }
+        }
+        // --------------------------------------------------------------------
+
         const height = 4.0 * (Math.sqrt(3) / 2);
         const defaultNodes = [
             { data: { id: "N-001", name: "AdS Boundary Shell", type: "TOPOLOGY", formula: "dS^d / CFT_d-1 Boundary" }, position: new THREE.Vector3(0, 0.6, height * 0.666) },
@@ -573,9 +818,75 @@ class DeckViewport {
     initListeners() {
         const canvas = this.renderer.domElement;
 
+        this.draggedNode = null;
+        this.dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        this.planeIntersect = new THREE.Vector3();
+
         canvas.addEventListener('dragover', (e) => e.preventDefault());
         canvas.addEventListener('drop', (e) => this.handleDrop(e));
-        canvas.addEventListener('click', (e) => this.handleClick(e));
+
+        // Node Mouse Down (Check for Node Grab vs Camera Rotate)
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), this.camera);
+
+            const intersects = raycaster.intersectObjects(this.nodes.map(n => n.mesh));
+
+            if (intersects.length > 0) {
+                // Intercept node hit: Disable OrbitControls to allow dragging
+                this.controls.enabled = false;
+                const clickedMesh = intersects[0].object;
+                this.draggedNode = this.nodes.find(n => n.mesh === clickedMesh);
+
+                if (this.draggedNode) {
+                    this.selectNode(this.draggedNode);
+                    // Align interaction plane with dragged node height
+                    this.dragPlane.setFromNormalAndCoplanarPoint(
+                        new THREE.Vector3(0, 1, 0),
+                        this.draggedNode.mesh.position
+                    );
+                }
+            }
+        });
+
+        // Node Mouse Move (Perform Spatial Dragging)
+        window.addEventListener('mousemove', (e) => {
+            if (!this.draggedNode) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+            const mouseY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), this.camera);
+
+            if (raycaster.ray.intersectPlane(this.dragPlane, this.planeIntersect)) {
+                // Move mesh in real-time
+                this.draggedNode.mesh.position.copy(this.planeIntersect);
+
+                // Update Inspector inputs live
+                if (window.updateSelectedNodeInspector) {
+                    window.updateSelectedNodeInspector(this.draggedNode);
+                }
+
+                // Broadcast updated positions to Main HUD
+                if (typeof this.syncToMainHUD === 'function') {
+                    this.syncToMainHUD();
+                }
+            }
+        });
+
+        // Mouse Up (Release Node & Re-enable Camera Orbit)
+        window.addEventListener('mouseup', () => {
+            if (this.draggedNode) {
+                this.draggedNode = null;
+                this.controls.enabled = true; // Restore orbit control
+            }
+        });
 
         window.addEventListener('resize', () => {
             if (!this.container) return;
@@ -599,28 +910,37 @@ class DeckViewport {
         setTimeout(() => { this._isHandlingDrop = false; }, 100);
 
         try {
-            const nodeData = JSON.parse(rawData);
+            const parsedData = JSON.parse(rawData);
+
+            // --- CHECK IF THIS IS A FULL MODEL IMPORT (LIMBO GATEWAY) ---
+            if (parsedData.nodes || parsedData.vertices || parsedData.edges || parsedData.links) {
+                console.log("[LIMBO] Full model import detected. Routing to Sanity Normalizer & Limbo State.");
+                const sanitizedModel = ImportSanityNormalizer.sanitize(parsedData);
+
+                if (window.limboController) {
+                    window.limboController.enterLimbo(sanitizedModel);
+                }
+                return; // Halt standard single-node spawn
+            }
+            // -------------------------------------------------------------
+
+            // Otherwise, handle standard single pantry template drop...
+            const nodeData = parsedData;
 
             // --- PHYSICS ARBITER GATEKEEPER INTERCEPTION ---
             if (window.physicsArbiter && typeof window.physicsArbiter.validateDrop === 'function') {
                 const verdict = window.physicsArbiter.validateDrop(nodeData);
-                console.log(`[ARBITER VERDICT]: ${verdict.status} (${verdict.code}) - ${verdict.message}`);
-
-                // Update Inspector UI with Arbiter status and error codes
                 this.updateInspectorWithVerdict(verdict);
 
-                // If denied, block drop entirely to protect render pipeline
                 if (verdict.status === 'DENIED') {
                     console.warn("Node drop blocked by Physics Arbiter gatekeeper:", nodeData.name);
                     return;
                 }
 
-                // Use sanitized/validated node payload
                 if (verdict.node) {
                     Object.assign(nodeData, verdict.node);
                 }
             }
-            // ----------------------------------------------
 
             const rect = this.renderer.domElement.getBoundingClientRect();
             const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
@@ -635,10 +955,8 @@ class DeckViewport {
 
             nodeData.position = { x: targetPoint.x, y: targetPoint.y, z: targetPoint.z };
 
-            // 1. Create the mesh in the engine and capture the returned node object
             const newNode = this.createNodeMesh(nodeData, targetPoint);
             if (newNode) {
-                // Ensure node is added to deck's internal list
                 if (!this.nodes.includes(newNode)) {
                     this.nodes.push(newNode);
                 }
@@ -646,7 +964,6 @@ class DeckViewport {
                 window.activeDeckNodes = this.nodes;
                 this.selectNode(newNode);
 
-                // Now trigger the sync bridge with the populated list
                 if (typeof this.syncToMainHUD === 'function') {
                     this.syncToMainHUD();
                 }
@@ -724,61 +1041,24 @@ class DeckViewport {
     }
 
     selectNode(node) {
-        if (!this.selectedNode) {
-            // --- SELECTING A NODE FOR THE FIRST TIME ---
-            this.selectedNode = node;
-
-            // Update the coordinates in right side window UI for the newly selected node
-            if (window.updateSelectedNodeInspector) window.updateSelectedNodeInspector(node); // <-- Add here
-
-            // Store current color before highlighting yellow
-            if (node.mesh && node.mesh.material) {
-                // If currentTheme isn't set yet, determine it from material color
-                if (!node.currentTheme) {
-                    node.currentTheme = 'emerald'; // default pass
-                }
-            }
-
-            // Highlight active focus yellow
-            node.mesh.material = new THREE.MeshBasicMaterial({ color: 0xfacc15, wireframe: true });
-            this.updateInspectorForNode(node, "LINK SOURCE");
-
-        } else if (this.selectedNode === node) {
-            // --- DESELECTING THE CURRENTLY SELECTED NODE ---
+        // Deselect previous node cleanly
+        if (this.selectedNode && this.selectedNode !== node) {
             this.restoreNodeColor(this.selectedNode);
+        }
+
+        if (this.selectedNode === node) {
+            // Deselect on second click
+            this.restoreNodeColor(node);
             this.selectedNode = null;
-
-            // Update the coordinates in right side window UI for the deselected node
-            if (window.updateSelectedNodeInspector) window.updateSelectedNodeInspector(null); // <-- Add here
+            if (window.updateSelectedNodeInspector) window.updateSelectedNodeInspector(null);
             this.resetInspectorUI();
-
         } else {
-            // --- SWITCHING SELECTION FROM ONE NODE TO ANOTHER ---
-            // Restore previous node to its persistent state color
-            this.restoreNodeColor(this.selectedNode);
+            // Select new node cleanly
+            this.selectedNode = node;
+            node.mesh.material = new THREE.MeshBasicMaterial({ color: 0xfacc15, wireframe: true });
 
-            const sourceNode = this.selectedNode;
-            const targetNode = node;
-            const isValid = checkBondValidity(sourceNode.data.type, targetNode.data.type);
-
-            if (!isValid) {
-                targetNode.mesh.material = new THREE.MeshBasicMaterial({ color: 0xef4444, wireframe: true });
-                targetNode.currentTheme = 'red';
-                // ... (illegal bond error handling UI) ...
-                setTimeout(() => {
-                    this.restoreNodeColor(targetNode);
-                }, 1200);
-                return;
-            }
-
-            this.createConnectionLine(sourceNode, targetNode);
-
-            // Set new target node to active focus yellow
-            targetNode.mesh.material = new THREE.MeshBasicMaterial({ color: 0xfacc15, wireframe: true });
-            this.selectedNode = targetNode;
-            // Update the coordinates in right side window UI for the newly selected node
-            if (window.updateSelectedNodeInspector) window.updateSelectedNodeInspector(targetNode); // <-- Add here
-            this.updateInspectorForNode(targetNode, "LINKED");
+            if (window.updateSelectedNodeInspector) window.updateSelectedNodeInspector(node);
+            this.updateInspectorForNode(node, "ACTIVE FOCUS");
         }
     }
 
@@ -797,6 +1077,8 @@ class DeckViewport {
     }
 
     createConnectionLine(nodeA, nodeB) {
+        if (!nodeA || !nodeB || !nodeA.mesh || !nodeB.mesh) return;
+
         const material = new THREE.LineBasicMaterial({
             color: 0x00f0ff,
             linewidth: 2,
@@ -1291,13 +1573,13 @@ class DeckViewport {
         // Re-initialize default 3-node baseline session state
         this.initDefaultModel();
 
-        if (typeof this.syncToMainHUD === 'function') {
-            try {
-                this.syncToMainHUD();
-            } catch (e) {
-                console.warn("[Deck] syncToMainHUD notice during clear:", e);
-            }
-        }
+        //if (typeof this.syncToMainHUD === 'function') {
+        //    try {
+        //        this.syncToMainHUD();
+        //    } catch (e) {
+        //        console.warn("[Deck] syncToMainHUD notice during clear:", e);
+        //    }
+        //}
 
         // --- RESET TOPOLOGY INSPECTOR BACK TO NO SELECTION ---
         const inspectorBody = document.getElementById('inspector-body');
@@ -1555,12 +1837,12 @@ class DeckViewport {
 
         if (this.ringMesh) this.ringMesh.rotation.z += 0.005;
 
-        // Physics Simulation: Repulsion & Springs
-        const repulsionStrength = 0.15; // Reduced from 0.5 to prevent violent scattering
-        const targetDistance = 4.0;
-        const springK = 0.05;
+        // Only run spring/repulsion physics if not viewing a fixed external sync manifold
+        if (!this.isExternalManifold && this.nodes && this.nodes.length > 1) {
+            /*const repulsionStrength = 0.05;
+            const targetDistance = 4.0;
+            const springK = 0.02;
 
-        if (this.nodes && this.nodes.length > 1) {
             for (let i = 0; i < this.nodes.length; i++) {
                 for (let j = i + 1; j < this.nodes.length; j++) {
                     const nodeA = this.nodes[i];
@@ -1569,7 +1851,7 @@ class DeckViewport {
 
                     const dir = new THREE.Vector3().subVectors(nodeA.mesh.position, nodeB.mesh.position);
                     const dist = dir.length() || 0.001;
-                    if (dist < 3.5) { // Tightened radius so only overlapping nodes push apart
+                    if (dist < 3.5) {
                         dir.normalize();
                         const force = (3.5 - dist) * repulsionStrength * 0.01;
                         nodeA.mesh.position.addScaledVector(dir, force);
@@ -1577,57 +1859,50 @@ class DeckViewport {
                     }
                 }
             }
+
+            if (this.connections && this.connections.length > 0) {
+                this.connections.forEach(conn => {
+                    if (!conn.nodeA || !conn.nodeB || !conn.line) return;
+
+                    const posA = conn.nodeA.mesh.position;
+                    const posB = conn.nodeB.mesh.position;
+
+                    const dir = new THREE.Vector3().subVectors(posB, posA);
+                    const dist = dir.length() || 0.001;
+                    const diff = dist - targetDistance;
+
+                    if (Math.abs(diff) > 0.01) {
+                        dir.normalize();
+                        const offset = dir.clone().multiplyScalar(diff * springK);
+                        posA.add(offset);
+                        posB.sub(offset);
+                    }
+                });
+            }*/
         }
 
+        // Always update connection line geometry to follow current node positions
         if (this.connections && this.connections.length > 0) {
             this.connections.forEach(conn => {
                 if (!conn.nodeA || !conn.nodeB || !conn.line) return;
-
-                const posA = conn.nodeA.mesh.position;
-                const posB = conn.nodeB.mesh.position;
-
-                const dir = new THREE.Vector3().subVectors(posB, posA);
-                const dist = dir.length() || 0.001;
-                const diff = dist - targetDistance;
-
-                if (Math.abs(diff) > 0.01) {
-                    dir.normalize();
-                    const offset = dir.clone().multiplyScalar(diff * springK);
-                    posA.add(offset);
-                    posB.sub(offset);
-                }
-
-                posA.y = 0.6;
-                posB.y = 0.6;
-
                 const positions = conn.line.geometry.attributes.position;
                 if (positions) {
-                    positions.setXYZ(0, posA.x, posA.y, posA.z);
-                    positions.setXYZ(1, posB.x, posB.y, posB.z);
+                    positions.setXYZ(0, conn.nodeA.mesh.position.x, conn.nodeA.mesh.position.y, conn.nodeA.mesh.position.z);
+                    positions.setXYZ(1, conn.nodeB.mesh.position.x, conn.nodeB.mesh.position.y, conn.nodeB.mesh.position.z);
                     positions.needsUpdate = true;
                 }
             });
         }
 
-        if (this.nodes) {
-            this.nodes.forEach(n => {
-                if (n && n.mesh) n.mesh.position.y = 0.6;
-            });
-        }
-
         if (this.controls) this.controls.update();
 
-        // Render Screen 1 (Primary Perspective 3D)
+        // Render viewports
         if (this.renderer && this.scene && this.camera) {
             this.renderer.render(this.scene, this.camera);
         }
-
-        // Render Screen 2 (Transverse Top-down X-Z)
         if (this.renderer2 && this.scene && this.camera2) {
             this.renderer2.render(this.scene, this.camera2);
         }
-
-        // Render Screen 3 (Elevation Side Y-Z)
         if (this.renderer3 && this.scene && this.camera3) {
             this.renderer3.render(this.scene, this.camera3);
         }
@@ -1722,7 +1997,10 @@ window.addEventListener('DOMContentLoaded', () => {
     if (container) {
         window.deckViewPort = new DeckViewport('deck-canvas-container');
 
-        // Clean, unified drop handling delegating directly to the class method
+        // Initialize Limbo & Tether Assistant controllers
+        window.limboController = new LimboStateController(window.deckViewPort);
+        window.tetherAssistant = new TetherAssistant(window.deckViewPort);
+
         container.addEventListener('dragover', (event) => {
             event.preventDefault();
             event.dataTransfer.dropEffect = 'copy';
