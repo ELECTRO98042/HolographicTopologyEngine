@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Holographic Topology Engine HUD v2.6.9</title>
+    <title>Holographic Topology Engine HUD v3.0 (WebGL Unified)</title>
     <link rel="stylesheet" href="/css/style.css">
     <style>
         body {
@@ -43,16 +43,11 @@
             margin: 5px 0;
         }
 
-        .metric-value {
-            color: #ff0055;
-            font-weight: bold;
-        }
-
         canvas {
             display: block;
         }
 
-        /* Spatial Control Deck Styling (v2.6.8) */
+        /* Spatial Control Deck Styling */
         #spatial-control-deck {
             position: absolute;
             top: 145px;
@@ -66,7 +61,7 @@
             z-index: 100;
             box-shadow: 0 0 15px rgba(0, 255, 204, 0.15);
             font-size: 11px;
-            pointer-events: auto; /* <--- Add this line */
+            pointer-events: auto;
         }
 
         .deck-header {
@@ -174,7 +169,7 @@
             border-radius: 2px;
             font-family: inherit;
             transition: all 0.2s ease;
-            pointer-events: auto; /* <--- Add this line */
+            pointer-events: auto;
         }
 
         .overlay-toggle.active {
@@ -214,53 +209,39 @@
             border-color: #00ffcc;
         }
 
-        .deck-dock-buffer {
-            margin-top: 8px;
-            padding: 5px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px dashed rgba(0, 255, 204, 0.2);
-            text-align: center;
-        }
-
-        .buffer-text {
-            font-size: 9px;
-            color: #00ffcc66;
-            letter-spacing: 0.5px;
-        }
-        /* JSON Import Button in Spatial Control Deck Header */
         .deck-header .header-json-btn {
             background: transparent !important;
-            background-color: transparent !important;
             border: 1px solid #00ffcc;
             color: #00ffcc;
             font-family: 'Courier New', Courier, monospace;
             font-size: 9px;
             font-weight: bold;
-            letter-spacing: 0.5px;
             padding: 3px 6px;
             cursor: pointer;
             margin: 0 4px;
             border-radius: 2px;
-            line-height: 1.1;
-            text-align: center;
-            transition: all 0.2s ease;
         }
 
         .deck-header .header-json-btn:hover {
             background: #00ffcc !important;
             color: #05050a;
-            box-shadow: 0 0 8px rgba(0, 255, 204, 0.4);
-        }       
-
-
+        }
     </style>
     <link rel="stylesheet" href="css/testingSuite.css">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
 </head>
 
 <body>
     <!-- Primary Telemetry HUD -->
     <div id="hud-container" style="width: 299px;">
-        <h3>HOLOGRAPHIC HUD V2.6.8</h3>
+        <h3>HOLOGRAPHIC HUD V3.0</h3>
         <div class="hud-integrity">System Integrity: 100%</div>
         <div class="hud-ee">Entanglement (See): 0.0</div>
         <div class="hud-phi">Integrated Info (Phi): 0.0</div>
@@ -270,20 +251,16 @@
     <div id="spatial-control-deck">
         <div class="deck-header">
             <h3>SPATIAL CONTROL DECK</h3>
-            <!-- Text-based button matching the HUD style -->
             <button id="import-json-btn" class="header-json-btn">JSON IMPORT</button>
             <input type="file" id="topologyJsonInput" accept=".json" style="display: none;" />
-        
             <button id="deck-collapse-btn" title="Toggle Deck">-</button>
         </div>
 
         <div class="deck-body" id="deck-body-content">
-            <!-- 1. Spatial & Visual Reference -->
             <div class="deck-section">
                 <div class="control-field">
                     <label>Reference Frame</label>
-                    <select id="ref-frame-select"
-                        onchange="window.setTopologyMode(this.value); event.stopPropagation();">
+                    <select id="ref-frame-select">
                         <option value="open">Open Space (Default)</option>
                         <option value="spheroid">Spheroid</option>
                         <option value="cubed">Cubed</option>
@@ -313,18 +290,22 @@
                 <div class="control-field">
                     <label>Color Palette / Schema</label>
                     <select id="palette-select">
-                        <option value="dynamic">Dynamic (default)</option>
-                        <option value="thermal">Thermal Dispersion</option>
-                        <option value="scifi">Quantum Entanglement</option>
-                        <option value="monochrome">Signal Integrity (SNR)</option>
-                        <option value="multispectral">TD / QE / SNR Composite</option>
+                        <option value="dynamic">Dynamic (Default)</option>
+                        <option value="qe">1. Quantum Entanglement (QE)</option>
+                        <option value="ads">2. AdS/CFT Duality</option>
+                        <option value="snr">3. Signal Integrity (SNR)</option>
+                        <option value="thermal">4. Thermal Dissipation (T)</option>
+                        <option value="em">5. Electromagnetic Field (EM)</option>
+                        <option value="doppler">6. Doppler Shift (Δf)</option>
+                        <option value="tension">7. Tensegrity Tension (sigma)</option>
+                        <option value="vacuum">8. Vacuum Fluctuations (Λ)</option>
+                        <option value="composite">Full Multiplexed Composite</option>
                     </select>
                 </div>
             </div>
 
             <hr class="deck-divider">
 
-            <!-- 2. Dynamic Scaling & Operations -->
             <div class="deck-section">
                 <div class="slider-group">
                     <div class="slider-label-row" style="align-items: center;">
@@ -375,7 +356,6 @@
 
             <hr class="deck-divider">
 
-            <!-- 3. Signal Stress Testing -->
             <div class="deck-section">
                 <label class="section-label">Interference Overlays</label>
                 <div class="overlay-grid">
@@ -387,8 +367,6 @@
                     <button class="overlay-toggle" data-overlay="multipath">Multipath</button>
                 </div>
             </div>
-
-            <hr class="deck-divider">
 
             <!-- 4. Data Persistence & State Control -->
             <div class="deck-section action-matrix">
@@ -440,7 +418,7 @@
         <div style="text-align: center; background: #020205; border: 1px solid #00ffcc33; padding: 4px;">
             <canvas id="gizmoCanvas" width="192" height="100"
                 style="cursor: grab; display: block; margin: 0 auto;"></canvas>
-            <div style="font-size: 9px; color: #00ffcc88; margin-top: 2px;">Click & Drag to Rotate Axes</div>
+            <div style="font-size: 9px; color: #00ffcc88; margin-top: 2px;">Click & Drag to Orbit</div>
         </div>
     </div>
 
@@ -448,1695 +426,373 @@
     <script type="module" src="/js/telemetryStream.js"></script>
     <script src="/js/snapshotEngine.js"></script>
 
-    <!-- Main HUD Animation Script -->
+    <!-- Unified 1:1 Pipeline Script -->
     <script type="module">
         import { ReferenceFrameManager } from '/physics/reference_frames.js';
+        // import { initHUDRenderer, setRenderMode, resetRenderCamera } from '/js/hud_render.js';
+        import { initHUDRenderer, setRenderMode, resetRenderCamera } from '/js/hud_render.js';
+
+        const refSelect = document.getElementById('ref-frame-select');
+            if (refSelect) {
+                refSelect.addEventListener('change', (e) => {
+                    e.stopImmediatePropagation();
+                    window.setTopologyMode(e.target.value);
+                }, true); // Capture phase intercepts before controlDeck.js
+            }
+
         const frameManager = new ReferenceFrameManager();
-        const canvas = document.getElementById('hudCanvas');
-        const ctx = canvas.getContext('2d');
-
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resize);
-        resize();
-
-        // Global Camera State
-        let camera = {
-            rotX: 0.3,
-            rotY: 0.0,
-            rotZ: 0.0,
-            distance: 800
-        };
+        let userSelectedMode = 'open';
 
         window.hudConfig = window.hudConfig || {
-            worldScale: parseFloat(document.getElementById('slider-world-scale')?.value || 3.0),
+            worldScale: parseFloat(document.getElementById('slider-world-scale')?.value || 1.0),
             gridDensity: 10,
             warpExaggeration: 1.0,
             motionSpeed: 1.0,
             noiseThresh: 0.05,
             overlayIntensity: 1.0,
             colorPalette: 'dynamic',
-            showFloor: document.getElementById('checkbox-floor') ? document.getElementById('checkbox-floor').checked : true,
+            streamFilter: 'all',
+            interpolationMode: 'linear',
+            showFloor: true,
             overlays: {}
         };
 
-        document.getElementById('stream-filter-select')?.addEventListener('change', (e) => {
-            const filterMode = e.target.value;
-            window.hudConfig = window.hudConfig || {};
-            window.hudConfig.streamFilter = filterMode;
-            console.log(`[Spatial Control Deck] Telemetry Stream Filter set to: ${filterMode}`);
+        // Initialize WebGL GPU Renderer first so window.hudViewport is guaranteed available
+        const hudViewport = initHUDRenderer({
+            canvas: document.getElementById('hudCanvas'),
+            gizmoCanvas: document.getElementById('gizmoCanvas'),
+            mode: 'open'
         });
 
-        document.getElementById('interpolation-select')?.addEventListener('change', (e) => {
-            const mode = e.target.value;
-            window.hudConfig = window.hudConfig || {};
-            window.hudConfig.interpolationMode = mode;
-            console.log(`[Spatial Control Deck] Data Interpolation Mode set to: ${mode}`);
-        });
+        // Unified Property & Overlay State
+        const activeOverlays = {
+            qe: true,
+            ads: true,
+            snr: false,
+            thermal: false,
+            em: false,
+            doppler: false,
+            tension: true,
+            vacuum: false,
+            wave: false,
+            emp: false,
+            atmos: false,
+            multipath: false
+        };
 
-        // Clean-Up: Palette dropdown updates diagnostic mode without destroying semantic node colors
-        document.getElementById('palette-select')?.addEventListener('change', (e) => {
-            const palette = e.target.value;
-            window.hudConfig = window.hudConfig || {};
-            window.hudConfig.colorPalette = palette;
-            console.log(`[Spatial Control Deck] Diagnostic Schema set to: ${palette}`);
-        });
+        const schemaPropertyMap = {
+            dynamic: { qe: true, ads: true, snr: false, thermal: false, em: false, doppler: false, tension: true, vacuum: false },
+            qe: { qe: true, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: false },
+            ads: { qe: false, ads: true, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: false },
+            snr: { qe: false, ads: false, snr: true, thermal: false, em: false, doppler: false, tension: false, vacuum: false },
+            thermal: { qe: false, ads: false, snr: false, thermal: true, em: false, doppler: false, tension: false, vacuum: false },
+            em: { qe: false, ads: false, snr: false, thermal: false, em: true, doppler: false, tension: false, vacuum: false },
+            doppler: { qe: false, ads: false, snr: false, thermal: false, em: false, doppler: true, tension: false, vacuum: false },
+            tension: { qe: false, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: true, vacuum: false },
+            vacuum: { qe: false, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: true },
+            composite: { qe: true, ads: true, snr: true, thermal: true, em: true, doppler: true, tension: true, vacuum: true }
+        };
 
-        // Spatial Control Deck: Interference Overlays Toggle Bindings
-        document.addEventListener('DOMContentLoaded', () => {
-            const importBtn = document.getElementById('import-json-btn');
-            const fileInput = document.getElementById('topologyJsonInput');
+        function syncOverlayButtons() {
+            document.querySelectorAll('.overlay-toggle').forEach(btn => {
+                const key = btn.getAttribute('data-overlay');
+                if (key in activeOverlays) {
+                    btn.classList.toggle('active', Boolean(activeOverlays[key]));
+                }
+            });
+        }
 
-            if (importBtn && fileInput) {
-                // Trigger hidden file input when the header button is clicked
-                importBtn.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    fileInput.click();
-                });
+        const paletteSelect = document.getElementById('palette-select');
+            if (paletteSelect) {
+                paletteSelect.addEventListener('change', (e) => {
+                    const schema = e.target.value;
+                    const mappedProps = schemaPropertyMap[schema] || schemaPropertyMap.dynamic;
 
-                // Handle file selection and parsing
-                fileInput.addEventListener('change', (event) => {
-                    const file = event.target.files[0];
-                    if (!file) return;
+                    Object.assign(activeOverlays, mappedProps);
+                    syncOverlayButtons();
 
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const topologyData = JSON.parse(e.target.result);
+                    // Update global HUD config and viewport renderer
+                    if (window.hudConfig) {
+                        window.hudConfig.colorPalette = schema;
+                        window.hudConfig.overlays = { ...activeOverlays };
+                    }
 
-                            // --- DEBUGGER CAPTURE 1 ---
-                            console.log("[DEBUG 1 - FILE PARSED]", {
-                                rawEdgesFound: topologyData.edges,
-                                edgeArrayLength: topologyData.edges?.length,
-                                fullKeys: Object.keys(topologyData)
-                            });
-                            debugger;
-
-                            // In frontend/index.html inside reader.onload:
-                            if (topologyData.nodes && Array.isArray(topologyData.nodes)) {
-                                const validNodes = [];
-
-                                // Detect if the schema explicitly declares a 3D spatial coordinate standard
-                                const isExplicit3D = topologyData.coordinate_system === '3D' ||
-                                    topologyData.nodes.some(n => n.z !== undefined && n.z !== 0);
-
-                                const screenOffsetX = 320;
-                                const screenOffsetY = 300;
-
-                                for (const [index, n] of topologyData.nodes.entries()) {
-                                    let posX, posY, posZ;
-
-                                    if (isExplicit3D) {
-                                        // True 3D spatial coordinates (AdS bulk manifold space) - scaled to match spectral shells
-                                        posX = (n.x !== undefined ? n.x : (n.position?.x || 0)) * 0.5;
-                                        posY = (n.y !== undefined ? n.y : (n.position?.y || 0)) * 0.5;
-                                        posZ = (n.z !== undefined ? n.z : (n.position?.z || 0)) * 0.5;
-                                    } else {
-                                        // 2D screen/canvas coordinates -> map and center to world origin (0,0,0)
-                                        const rawX = n.x !== undefined ? n.x : (n.position?.x || screenOffsetX);
-                                        const rawY = n.y !== undefined ? n.y : (n.position?.y || screenOffsetY);
-                                        posX = (rawX - screenOffsetX) * 0.5;
-                                        posY = (rawY - screenOffsetY) * 0.5;
-                                        posZ = n.z !== undefined ? n.z : 0;
-                                    }
-
-                                    const rawNode = {
-                                        id: n.id || `Q-00${index + 1}`,
-                                        name: n.label || n.id || `Qubit-${index + 1}`,
-                                        type: 'TOPOLOGY_NODE',
-                                        color: n.color || '#00ffcc',
-                                        x: posX,
-                                        y: posY,
-                                        z: posZ,
-                                        isPinned: true,
-                                        source: 'JSON_SCHEMA',
-                                        data: n
-                                    };
-
-                                    const verdict = window.physicsArbiter ? window.physicsArbiter.validateDrop(rawNode) : { status: 'APPROVED', node: rawNode };
-
-                                    if (verdict.status === 'APPROVED') {
-                                        validNodes.push(verdict.node);
-                                    } else {
-                                        console.warn(`[ARBITER DENIED IMPORT]: Node ${rawNode.id} rejected.`);
-                                    }
-                                }
-
-                                window.nodes = validNodes;
-                                // Robust edge extraction during file load in frontend/index.html:
-                                window.edges = topologyData.edges ||
-                                    topologyData.links ||
-                                    topologyData.connections ||
-                                    topologyData.bonds ||
-                                    topologyData.graph?.edges ||
-                                    topologyData.graph?.links || [];
-                                console.log(`[JSON IMPORT] Successfully loaded ${validNodes.length} nodes and ${window.edges.length} edges/links.`);
-
-                                const hudSyncChannel = new BroadcastChannel('holographic_sync_channel');
-                                const rawUploadedEdges = topologyData.edges || topologyData.links || topologyData.connections || topologyData.bonds || [];
-
-                                const syncPayload = {
-                                    type: 'SYNC_FROM_HUD',
-                                    version: '2.8.4',
-                                    timestamp: Date.now(),
-                                    nodes: validNodes.map(n => ({
-                                        id: n.id,
-                                        name: n.name || n.id,
-                                        type: n.type || 'TOPOLOGY_NODE',
-                                        category: n.category || 'BULK_CORE',
-                                        tier: n.tier || 'BOUNDARY',
-                                        x: n.x * 2.0,
-                                        y: n.y * 2.0,
-                                        z: (n.z || 0) * 2.0,
-                                        color: n.color
-                                    })),
-                                    edges: rawUploadedEdges.map((e, idx) => {
-                                        const srcRaw = e.source !== undefined ? e.source : (e.from !== undefined ? e.from : e.sourceId);
-                                        const tgtRaw = e.target !== undefined ? e.target : (e.to !== undefined ? e.to : e.targetId);
-                                        return {
-                                            ...e,
-                                            index: idx,
-                                            source: String(typeof srcRaw === 'object' && srcRaw !== null ? (srcRaw.id || srcRaw.name) : srcRaw),
-                                            target: String(typeof tgtRaw === 'object' && tgtRaw !== null ? (tgtRaw.id || tgtRaw.name) : tgtRaw),
-                                            label: e.label || 'Tether'
-                                        };
-                                    })
-                                };
-
-                                // 1. Save live sync state
-                                localStorage.setItem('holographic_latest_sync', JSON.stringify(syncPayload));
-
-                                // 2. Save pending builder import payload with the exact same edges
-                                localStorage.setItem('holographic_pending_builder_import', JSON.stringify({
-                                    version: topologyData.version || '2.9.0',
-                                    coordinate_system: topologyData.coordinate_system || '3D',
-                                    timestamp: Date.now(),
-                                    origin: "MAIN_HUD",
-                                    nodes: validNodes,
-                                    edges: syncPayload.edges
-                                }));
-
-                                hudSyncChannel.postMessage(syncPayload);
-                            } else {
-                                console.error("[JSON IMPORT] Invalid schema: Missing 'nodes' array.");
-                            }
-                        } catch (err) {
-                            console.error("[JSON IMPORT] Failed to parse JSON file:", err);
-                        }
-                    };
-                    reader.readAsText(file);
-
-                    // Reset input value so the same file can be re-imported if needed
-                    fileInput.value = '';
+                    if (hudViewport && typeof hudViewport.setColorPalette === 'function') {
+                        hudViewport.setColorPalette(schema);
+                        hudViewport.setOverlays({ ...activeOverlays });
+                    }
                 });
             }
-            document.querySelectorAll('.overlay-toggle').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const targetBtn = e.currentTarget;
-                    const key = targetBtn.getAttribute('data-overlay');
-                    const isActive = targetBtn.classList.toggle('active');
 
-                    window.hudConfig = window.hudConfig || {};
-                    window.hudConfig.overlays = window.hudConfig.overlays || {};
-                    window.hudConfig.overlays[key] = isActive;
+        // Interference Overlays Toggle Buttons
+        document.querySelectorAll('.overlay-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetBtn = e.currentTarget;
+                const key = targetBtn.getAttribute('data-overlay');
+                const isActive = targetBtn.classList.toggle('active');
+                activeOverlays[key] = isActive;
 
-                    console.log(`[Interference Deck] Overlay ${key} set to:`, isActive);
-                });
+                if (key === 'emp') activeOverlays.em = isActive;
+                if (key === 'wave') activeOverlays.qe = isActive;
+                if (key === 'atmos') activeOverlays.vacuum = isActive;
+                if (key === 'multipath') activeOverlays.snr = isActive;
+
+                hudViewport.setOverlays({ ...activeOverlays });
             });
         });
 
-        function initControlDeck() {
-            window.hudConfig = window.hudConfig || {};
-            window.hudConfig.worldScale = parseFloat(document.getElementById('slider-world-scale')?.value || 3.0);
-
-            const floorCheckbox = document.getElementById('checkbox-floor');
-            if (floorCheckbox) {
-                window.hudConfig.showFloor = floorCheckbox.checked;
-            } else {
-                window.hudConfig.showFloor = true;
-            }
-
-            const telemetryStreamBtn = document.getElementById('telemetryStreamBtn');
-            if (telemetryStreamBtn) {
-                telemetryStreamBtn.removeAttribute('disabled');
-                telemetryStreamBtn.addEventListener('click', window.openTelemetryStream);
-            }
+        // Stream Filter & Interpolation Mode Dropdowns
+        const streamFilterSelect = document.getElementById('stream-filter-select');
+        if (streamFilterSelect) {
+            streamFilterSelect.addEventListener('change', (e) => {
+                window.hudConfig.streamFilter = e.target.value;
+            });
         }
 
-        // --- Centralized Workspace Node State Store ---
-        let _fallbackNodes = [
-            {
-                id: 'N-001',
-                name: 'AdS Boundary Shell',
-                type: 'TOPOLOGY',
-                tier: 'BOUNDARY',
-                x: 0, y: 120, z: 0,
-                color: '#8b5cf6',
-                isCore: false
-            },
-            {
-                id: 'N-002',
-                name: 'Minkowski Space',
-                type: 'METRIC',
-                tier: 'BULK_CORE',
-                x: 0, y: 0, z: 0,
-                color: '#ffffff',
-                isCore: true
-            },
-            {
-                id: 'N-003',
-                name: 'Abelian U(1) EM',
-                type: 'FIELD',
-                tier: 'INTERMEDIATE',
-                x: -70, y: 30, z: 60,
-                color: '#10b981',
-                isCore: false
+        const interpSelect = document.getElementById('interpolation-select');
+        if (interpSelect) {
+            interpSelect.addEventListener('change', (e) => {
+                window.hudConfig.interpolationMode = e.target.value;
+            });
+        }
+
+        const floorCheckbox = document.getElementById('checkbox-floor');
+        if (floorCheckbox) {
+            floorCheckbox.addEventListener('change', (e) => {
+                window.hudConfig.showFloor = e.target.checked;
+            });
+        }
+
+        // 1:1 Bi-Directional Synchronization Bridge with Builder Deck (deck_render.js)
+        let isHUDExternalSync = false;
+        const mainHUDChannel = new BroadcastChannel('holographic_sync_channel');
+
+        mainHUDChannel.onmessage = (event) => {
+            const message = event.data;
+            if (!message || !Array.isArray(message.nodes)) return;
+
+            if (message.type === 'SYNC_FROM_BUILDER' || message.type === 'SYNC_TOPOLOGY') {
+                isHUDExternalSync = true;
+                const synchronizedNodes = [];
+
+                for (const [index, n] of message.nodes.entries()) {
+                    const posX = n.x !== undefined ? n.x : (n.position?.x || 0);
+                    const posY = n.y !== undefined ? n.y : (n.position?.y || 0);
+                    const posZ = n.z !== undefined ? n.z : (n.position?.z || 0);
+
+                    synchronizedNodes.push({
+                        id: n.id || `Q-00${index + 1}`,
+                        name: n.label || n.name || `Qubit-${index + 1}`,
+                        type: n.type || 'TOPOLOGY_NODE',
+                        color: n.color || '#00ffcc',
+                        x: posX,
+                        y: posY,
+                        z: posZ,
+                        isPinned: true,
+                        tier: n.tier || 'BOUNDARY',
+                        data: n
+                    });
+                }
+
+                window.nodes = synchronizedNodes;
+                window.edges = message.edges || message.connections || [];
+
+                setTimeout(() => { isHUDExternalSync = false; }, 50);
             }
+        };
+
+        window.broadcastHUDStateToBuilder = function (validNodes) {
+            if (isHUDExternalSync) return;
+
+            const payload = {
+                type: 'SYNC_FROM_HUD',
+                version: '3.0.0',
+                timestamp: Date.now(),
+                origin: 'MAIN_HUD',
+                nodes: validNodes.map(n => ({
+                    id: n.id,
+                    name: n.name || n.id,
+                    type: n.type || 'TOPOLOGY_NODE',
+                    tier: n.tier || 'BOUNDARY',
+                    x: n.x,
+                    y: n.y,
+                    z: n.z || 0,
+                    color: n.color
+                })),
+                edges: (window.edges || []).map((e, idx) => ({
+                    ...e,
+                    index: idx,
+                    source: String(e.source?.id || e.source || ''),
+                    target: String(e.target?.id || e.target || '')
+                }))
+            };
+
+            localStorage.setItem('holographic_latest_sync', JSON.stringify(payload));
+            mainHUDChannel.postMessage(payload);
+        };
+
+        // JSON Import Handler (1:1 ingest into Main HUD & broadcast to Builder Deck)
+        const importBtn = document.getElementById('import-json-btn');
+        const jsonInput = document.getElementById('topologyJsonInput');
+        if (importBtn && jsonInput) {
+            importBtn.addEventListener('click', () => jsonInput.click());
+            jsonInput.addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const parsed = JSON.parse(ev.target.result);
+                        const rawNodes = parsed.nodes || parsed.vertices || [];
+                        const rawEdges = parsed.edges || parsed.links || parsed.connections || [];
+
+                        window.nodes = rawNodes.map((n, idx) => ({
+                            id: n.id || `N-00${idx + 1}`,
+                            name: n.name || n.label || n.id || `Node-${idx + 1}`,
+                            type: n.type || 'TOPOLOGY_NODE',
+                            tier: n.tier || 'BOUNDARY',
+                            x: n.x !== undefined ? n.x : (n.position?.x || 0),
+                            y: n.y !== undefined ? n.y : (n.position?.y || 0),
+                            z: n.z !== undefined ? n.z : (n.position?.z || 0),
+                            color: n.color || '#00ffcc',
+                            isPinned: true,
+                            data: n
+                        }));
+                        window.edges = rawEdges;
+
+                        if (parsed.mode) {
+                            window.setTopologyMode(parsed.mode);
+                            const refSel = document.getElementById('ref-frame-select');
+                            if (refSel) refSel.value = parsed.mode;
+                        }
+
+                        window.broadcastHUDStateToBuilder(window.nodes);
+                    } catch (err) {
+                        console.error('[JSON Import] Invalid topology JSON:', err);
+                    }
+                };
+                reader.readAsText(file);
+                jsonInput.value = '';
+            });
+        }
+
+        // Default 3-node baseline synchronized with deck_render.js
+        window.nodes = [
+            { id: 'N-001', name: 'AdS Boundary Shell', type: 'TOPOLOGY', tier: 'BOUNDARY', x: 0, y: 0, z: 46, color: '#8b5cf6', isPinned: true },
+            { id: 'N-002', name: 'Minkowski Space', type: 'METRIC', tier: 'BULK_CORE', x: -40, y: 0, z: -23, color: '#ffffff', isCore: true, isPinned: true },
+            { id: 'N-003', name: 'Abelian U(1) EM', type: 'FIELD', tier: 'INTERMEDIATE', x: 40, y: 0, z: -23, color: '#10b981', isPinned: true }
+        ];
+        window.edges = [
+            { source: 'N-001', target: 'N-002' },
+            { source: 'N-001', target: 'N-003' },
+            { source: 'N-002', target: 'N-003' }
         ];
 
-        window.nodes = _fallbackNodes;
-
-        window.addEventListener('addTopologyNode', (e) => {
-            const rawNode = e.detail;
-
-            if (rawNode) {
-                const verdict = window.physicsArbiter ? window.physicsArbiter.validateDrop(rawNode) : { status: 'APPROVED', node: rawNode };
-                console.log(`[ARBITER VERDICT]: ${verdict.status}`);
-                if (verdict.status === 'DENIED') return;
-
-                const validatedNode = verdict.node;
-
-                if (validatedNode && !nodes.some(n => n.id === validatedNode.id)) {
-                    validatedNode.x = validatedNode.x || (Math.random() - 0.5) * 200;
-                    validatedNode.y = validatedNode.y || 0;
-                    validatedNode.z = validatedNode.z || (Math.random() - 0.5) * 200;
-
-                    nodes.push(validatedNode);
-                }
-            }
-        });
-
-        // 3D Projection Pipeline
-        function project3D(x, y, z, width, height) {
-            const cx = x;
-            const cy = y;
-            const cz = z || 0.0;
-
-            const cosY = Math.cos(camera.rotY), sinY = Math.sin(camera.rotY);
-            const x1 = cx * cosY - cz * sinY;
-            const z1 = cx * sinY + cz * cosY;
-
-            const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
-            const y1 = cy * cosX - z1 * sinX;
-            const z2 = cy * sinX + z1 * cosX;
-
-            const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
-            const x2 = x1 * cosZ - y1 * sinZ;
-            const y2 = x1 * sinZ + y1 * cosZ;
-
-            const fov = camera.distance;
-            const scale = fov / (fov + z2 + 300);
-
-            return {
-                px: width / 2 + x2 * scale,
-                py: height / 2 + y2 * scale,
-                scale: scale,
-                depth: z2
-            };
-        }
-
-        let userSelectedMode = 'open';
         window.setTopologyMode = function (mode) {
             if (!mode) return;
             userSelectedMode = mode;
+            console.log(`[TopologyMode] Setting mode to: "${mode}"`);
+            // Normalize mode alias if needed (e.g. 'cubic' -> 'cubed')
+            const normalizedMode = (mode === 'cubic') ? 'cubed' : mode;
 
-            frameManager.activeFrameType = mode;
-            frameManager.setMode(mode, window.nodes);
+            userSelectedMode = normalizedMode;
+            window.hudMode = normalizedMode;
 
-            const selectEl = document.getElementById('ref-frame-select');
-            if (selectEl && selectEl.value !== mode) {
-                selectEl.value = mode;
+            console.log(`[TopologyMode] Setting mode to: "${normalizedMode}"`);
+            try {
+                const radius = 120.0;
+                window.nodes.forEach((node, i) => {
+                    if (mode === 'spheroid') {
+                        const phi = Math.acos(1 - (2 * (i + 0.5)) / window.nodes.length);
+                        const theta = Math.PI * (1 + Math.sqrt(5)) * i;
+                        node.x = radius * Math.sin(phi) * Math.cos(theta);
+                        node.y = radius * Math.cos(phi);
+                        node.z = radius * Math.sin(phi) * Math.sin(theta);
+                    } else if (mode === 'cubed' || mode === 'cubic') {
+                        const half = radius * 0.6;
+                        const c = i % 3;
+                        node.x = (c === 0 ? (i % 2 === 0 ? half : -half) : (Math.random() - 0.5) * half);
+                        node.y = (c === 1 ? (i % 2 === 0 ? half : -half) : (Math.random() - 0.5) * half);
+                        node.z = (c === 2 ? (i % 2 === 0 ? half : -half) : (Math.random() - 0.5) * half);
+                    } else if (mode === 'toroidal') {
+                        const R = radius * 0.8;
+                        const r = radius * 0.3;
+                        const u = (i / window.nodes.length) * Math.PI * 2;
+                        const v = i * 2.4;
+                        node.x = (R + r * Math.cos(v)) * Math.cos(u);
+                        node.y = r * Math.sin(v);
+                        node.z = (R + r * Math.cos(v)) * Math.sin(u);
+                    } else if (mode === 'hyperbolic') {
+                        const u = ((i / window.nodes.length) - 0.5) * 4.0;
+                        const v = (i * 1.5) % (Math.PI * 2);
+                        const flare = Math.cosh(u);
+                        node.x = radius * 0.5 * flare * Math.cos(v);
+                        node.y = u * 45.0;
+                        node.z = radius * 0.5 * flare * Math.sin(v);
+                    } else if (mode === 'open') {
+                        const angleStep = (Math.PI * 2) / Math.max(1, window.nodes.length - 1);
+                        if (node.isCore || node.tier === 'BULK_CORE') {
+                            node.x = 0; node.y = 0; node.z = 0;
+                        } else {
+                            const idx = i % Math.max(1, window.nodes.length - 1);
+                            node.x = Math.cos(idx * angleStep) * 60;
+                            node.y = 0;
+                            node.z = Math.sin(idx * angleStep) * 60;
+                        }
+                    } else {
+                        console.warn(`[TopologyMode] UNKNOWN mode received: "${mode}". Defaulting node positions to origin.`);
+                    }
+                    node.isPinned = true;
+                });
+
+                setRenderMode(normalizedMode);
+                // Sync the dropdown value if called programmatically
+        const refSel = document.getElementById('ref-frame-select');
+        if (refSel && refSel.value !== normalizedMode) {
+            refSel.value = normalizedMode;
+        }
+
+                window.broadcastHUDStateToBuilder(window.nodes);
+            } catch (err) {
+                console.error(`[TopologyMode] EXCEPTION while setting mode "${mode}":`, err);
             }
-
-            const count = window.nodes.length > 0 ? window.nodes.length : 8;
-            const newNodes = [];
-
-            for (let i = 0; i < count; i++) {
-                let x = 0, y = 0, z = 0;
-                const id = `N-00${i + 1}`;
-                const isCore = (i === 0);
-
-                if (mode === 'spheroid') {
-                    const phi = Math.acos(-1 + (2 * i) / count);
-                    const theta = Math.sqrt(count * Math.PI) * phi;
-                    const r = 120;
-                    x = r * Math.cos(theta) * Math.sin(phi);
-                    y = r * Math.sin(theta) * Math.sin(phi);
-                    z = r * Math.cos(phi);
-                } else if (mode === 'cubed') {
-                    const spacing = 100;
-                    x = (i % 2 === 0 ? -1 : 1) * spacing;
-                    y = (Math.floor(i / 2) % 2 === 0 ? -1 : 1) * spacing;
-                    z = (Math.floor(i / 4) === 0 ? -1 : 1) * spacing;
-                } else if (mode === 'toroidal') {
-                    const R = 120, r = 40;
-                    const u = (i / count) * Math.PI * 2;
-                    const v = (i * 3) * Math.PI * 2 / count;
-                    x = (R + r * Math.cos(v)) * Math.cos(u);
-                    y = (R + r * Math.cos(v)) * Math.sin(u);
-                    z = r * Math.sin(v);
-                } else if (mode === 'hyperbolic') {
-                    const sinhR = Math.sinh((i + 1) * 0.4) * 30;
-                    const angle = i * 2.4;
-                    x = sinhR * Math.cos(angle);
-                    y = (i % 2 === 0 ? 1 : -1) * (i * 15);
-                    z = sinhR * Math.sin(angle);
-                } else {
-                    x = (Math.random() - 0.5) * 300;
-                    y = (Math.random() - 0.5) * 300;
-                    z = (Math.random() - 0.5) * 150;
-                }
-
-                newNodes.push({ id, x, y, z, isCore });
-            }
-            window.nodes = newNodes;
-            _fallbackNodes = newNodes;
         };
 
         window.resetCamera = function () {
-            camera.rotX = 0.3;
-            camera.rotY = 0.0;
-            camera.rotZ = 0.0;
+            resetRenderCamera();
         };
 
-        const gizmoCanvas = document.getElementById('gizmoCanvas');
-        gizmoCanvas.width = 192;
-        gizmoCanvas.height = 100;
-        const gCtx = gizmoCanvas.getContext('2d');
-        let isGizmoDragging = false;
-        let gizmoLastX = 0;
-        let gizmoLastY = 0;
-
-        gizmoCanvas.addEventListener('mousedown', (e) => {
-            isGizmoDragging = true;
-            gizmoLastX = e.clientX;
-            gizmoLastY = e.clientY;
-            gizmoCanvas.style.cursor = 'grabbing';
-        });
-
-        window.addEventListener('mousemove', (e) => {
-            if (!isGizmoDragging) return;
-            const deltaX = e.clientX - gizmoLastX;
-            const deltaY = e.clientY - gizmoLastY;
-
-            camera.rotY += deltaX * 0.02;
-            camera.rotX += deltaY * 0.02;
-            camera.rotX = Math.max(-Math.PI / 2.2, Math.min(Math.PI / 2.2, camera.rotX));
-
-            gizmoLastX = e.clientX;
-            gizmoLastY = e.clientY;
-        });
-
-        function drawGizmo() {
-            gCtx.fillStyle = '#020205';
-            gCtx.fillRect(0, 0, gizmoCanvas.width, gizmoCanvas.height);
-
-            const cx = gizmoCanvas.width / 2;
-            const cy = gizmoCanvas.height / 2;
-            const len = 35;
-
-            const axes = [
-                { label: 'X', x: len, y: 0, z: 0, color: '#ff0055' },
-                { label: 'Y', x: 0, y: len, z: 0, color: '#00ffcc' },
-                { label: 'Z', x: 0, y: 0, z: len, color: '#0066ff' }
-            ];
-
-            axes.forEach(axis => {
-                const cosY = Math.cos(camera.rotY), sinY = Math.sin(camera.rotY);
-                const cosX = Math.cos(camera.rotX), sinX = Math.sin(camera.rotX);
-                const cosZ = Math.cos(camera.rotZ), sinZ = Math.sin(camera.rotZ);
-
-                let x1 = axis.x * cosY - axis.z * sinY;
-                let z1 = axis.x * sinY + axis.z * cosY;
-                let y1 = axis.y * cosX - z1 * sinX;
-                let x2 = x1 * cosZ - y1 * sinZ;
-                let y2 = x1 * sinZ + y1 * cosZ;
-
-                gCtx.strokeStyle = axis.color;
-                gCtx.lineWidth = 2;
-                gCtx.beginPath();
-                gCtx.moveTo(cx, cy);
-                gCtx.lineTo(cx + x2, cy + y2);
-                gCtx.stroke();
-
-                gCtx.fillStyle = '#ffffff';
-                gCtx.font = '9px Courier New';
-                gCtx.fillText(axis.label, cx + x2 + 3, cy + y2 + 3);
-            });
-        }
-
-        function updateHUD(packet) {
-            const integrityEl = document.querySelector('.hud-integrity');
-            const eeEl = document.querySelector('.hud-ee');
-            const phiEl = document.querySelector('.hud-phi');
-
-            if (integrityEl) integrityEl.textContent = `System Integrity: ${packet.integrity}%`;
-            if (eeEl) eeEl.textContent = `Entanglement (See): ${packet.s_ee}`;
-            if (phiEl) phiEl.textContent = `Integrated Info (Phi): ${packet.phi}`;
-        }
-
-        const wsUrl = "ws://127.0.0.1:8000/ws/telemetry";
-        const ws = new WebSocket(wsUrl);
-        window.ws = ws;
-        window.bridge = {
-            sendAction: (action, payload) => {
-                if (ws.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ action, ...payload }));
-                }
-            }
-        };
-        ws.binaryType = "arraybuffer";
-
-        ws.onopen = () => {
-            console.log("Holographic HUD WebSocket Connected.");
-            window.bridge.sendAction("update_nodes", { nodes: nodes });
-        };
-
-        ws.onmessage = function (event) {
-            if (event.data instanceof ArrayBuffer) {
-                const floatArray = new Float32Array(event.data);
-                for (let i = 0; i < nodes.length && (i * 4 + 1) < floatArray.length; i++) {
-                    if (!nodes[i].isPinned && nodes[i] !== selectedNode) {
-                        nodes[i].targetX = floatArray[i * 4];
-                        nodes[i].targetY = floatArray[i * 4 + 1];
-                        nodes[i].targetZ = floatArray[i * 4 + 2];
-                    }
-                }
-            } else {
-                const packet = JSON.parse(event.data);
-                if (packet.type === "hud_update") {
-                    updateHUD(packet);
-                }
-            }
-        };
-
-        // v.2.8.4: Bi-Directional Broadcast Channel with Loop Guard
-            let isHUDExternalSync = false;
-            const mainHUDChannel = new BroadcastChannel('holographic_sync_channel');
-
-            mainHUDChannel.onmessage = (event) => {
-                const message = event.data;
-                if (!message || !Array.isArray(message.nodes)) return;
-
-                // Handle incoming sync state from the Builder Freestyle Deck
-                if (message.type === 'SYNC_FROM_BUILDER') {
-                    // ENGAGE LOCK: Prevent outgoing echo broadcasts while ingesting
-                    isHUDExternalSync = true;
-
-                    console.log("[v.2.8.4 SYNC BRIDGE] Main HUD received state update from Builder Deck.");
-
-                    const synchronizedNodes = [];
-
-                    for (const [index, n] of message.nodes.entries()) {
-                        // 1. Deterministic Intrinsic Property Evaluation (No random placeholders)
-                        const category = (n.category || n.tier || 'STANDARD').toLowerCase();
-                        let intrinsicProps;
-
-                        if (category.includes('boundary') || category.includes('qubit')) {
-                            intrinsicProps = { temperature: 45.0, thermal: 0.90, mass: 1.5, dampingFactor: 0.85 };
-                        } else if (category.includes('bulk') || category.includes('core')) {
-                            intrinsicProps = { temperature: 88.5, thermal: 0.95, mass: 2.5, dampingFactor: 0.92 };
-                        } else {
-                            intrinsicProps = { temperature: 50.0, thermal: 0.80, mass: 1.0, dampingFactor: 0.90 };
-                        }
-
-                        // 2. Map coordinates (scaling down by 0.5 factor to align with spectral shell reference frames)
-                        // INCOMING SYNC_FROM_BUILDER LISTENER (in index.html):
-                        const posX = n.x !== undefined ? n.x : 0; // Direct 1:1 NSS Parity
-                        const posY = n.y !== undefined ? n.y : 0;
-                        const posZ = n.z !== undefined ? n.z : 0;
-
-                        const synchronizedNode = {
-                            id: n.id || `Q-00${index + 1}`,
-                            name: n.label || n.name || `Qubit-${index + 1}`,
-                            type: 'TOPOLOGY_NODE',
-                            color: n.color || '#00ffcc',
-                            x: posX,
-                            y: posY,
-                            z: posZ,
-                            isPinned: true,
-                            source: 'BUILDER_FREESTYLE_SYNC',
-                            category: n.category || 'standard',
-                            tier: n.tier || 'BOUNDARY',
-                            ...intrinsicProps, // Inherit true physical parameters natively
-                            data: n
-                        };
-
-                        // 3. Validate through Physics Arbiter trusted schema mode
-                        const verdict = window.physicsArbiter ? window.physicsArbiter.validateDrop(synchronizedNode) : { status: 'APPROVED', node: synchronizedNode };
-
-                        if (verdict.status === 'APPROVED') {
-                            synchronizedNodes.push(verdict.node);
-                        } else {
-                            console.warn(`[ARBITER REJECTED SYNC NODE]: ${synchronizedNode.id}`);
-                        }
-                    }
-
-                    window.nodes = synchronizedNodes;
-                    _fallbackNodes = synchronizedNodes;
-                    console.log(`[v.2.8.4 SYNC] Successfully synchronized ${synchronizedNodes.length} nodes into Main HUD workspace.`);
-
-                    // RELEASE LOCK after render cycle
-                    setTimeout(() => {
-                        isHUDExternalSync = false;
-                    }, 50);
-                    console.debug("[FHPP PIPELINE TEST] Main HUD Received Sync Nodes:", synchronizedNodes.length);
-                }
-            };
-            // OUTGOING HUD BROADCAST HELPER (in index.html):
-                window.broadcastHUDStateToBuilder = function (validNodes) {
-                    if (isHUDExternalSync) return;
-
-                    const payload = {
-                        type: 'SYNC_FROM_HUD',
-                        version: '2.9.0',
-                        timestamp: Date.now(),
-                        nodes: validNodes.map(n => ({
-                            id: n.id,
-                            name: n.name || n.id,
-                            type: n.type || 'TOPOLOGY_NODE',
-                            category: n.category || 'BULK_CORE',
-                            tier: n.tier || 'BOUNDARY',
-                            x: n.x,
-                            y: n.y,
-                            z: n.z || 0,
-                            color: n.color,
-                            attrs: n.attrs || {}
-                        })),
-                        edges: (window.edges || []).map((e, idx) => {
-                            const srcRaw = e.source !== undefined ? e.source : (e.from !== undefined ? e.from : e.sourceId);
-                            const tgtRaw = e.target !== undefined ? e.target : (e.to !== undefined ? e.to : e.targetId);
-                            return {
-                                ...e,
-                                index: idx,
-                                source: String(typeof srcRaw === 'object' && srcRaw !== null ? (srcRaw.id || srcRaw.name) : srcRaw),
-                                target: String(typeof tgtRaw === 'object' && tgtRaw !== null ? (tgtRaw.id || tgtRaw.name) : tgtRaw),
-                                label: e.label || 'Tether'
-                            };
-                        })
-                    };
-
-                    // --- DEBUGGER CAPTURE 2 ---
-                    console.log("[DEBUG 2 - SYNC PAYLOAD BUILT]", {
-                        payloadEdges: payload.edges,
-                        count: payload.edges.length
-                    });
-                    debugger;
-
-                    localStorage.setItem('holographic_latest_sync', JSON.stringify(payload));
-                    mainHUDChannel.postMessage(payload);
-                };
-
-        let selectedNode = null;
-        let isDraggingGimbal = false;
-        let lastMouseX = 0;
-        let lastMouseY = 0;
-
-        function isInGimbalArea(x, y) {
-            return (
-                x >= canvas.width - 220 &&
-                x <= canvas.width - 20 &&
-                y >= canvas.height - 220 &&
-                y <= canvas.height - 40
-            );
-        }
-
-        // =========================================================================
-            // UNIFIED PHYSICAL INTERFERENCE ENGINE - COMPLETE HOLOGRAPHIC SUITE (v3.0.7)
-            // =========================================================================
-            function drawAdditiveDiagnosticOverlays(ctx, projectedNodes, tethers, activePalette) {
-                ctx.save();
-                ctx.globalCompositeOperation = 'screen';
-
-                const intensity = window.hudConfig?.overlayIntensity || 1.0;
-                const interpMode = window.hudConfig?.interpolationMode || 'linear';
-                const noiseThresh = window.hudConfig?.noiseThreshold || window.hudConfig?.noiseThresh || 0.05;
-                const timeValue = window.hudConfig?.simulationTime || (performance.now() * 0.001);
-                const overlays = window.hudConfig?.overlays || {};
-
-                const canvasWidth = ctx.canvas.width;
-                const canvasHeight = ctx.canvas.height;
-                const centerX = canvasWidth / 2;
-                const centerY = canvasHeight / 2;
-
-                const hasActiveOverlays = Object.values(overlays).some(val => val === true);
-
-                if (hasActiveOverlays) {
-                    let minNodeZ = -140;
-                    let maxNodeZ = 140;
-                    if (projectedNodes && projectedNodes.length > 0) {
-                        const zValues = projectedNodes.map(n => n.z || 0);
-                        minNodeZ = Math.min(...zValues) - 80;
-                        maxNodeZ = Math.max(...zValues) + 80;
-                    }
-
-                    const gridCols = 80;
-                    const gridRows = 72;
-                    const depthLayers = 7;
-
-                    const worldWidth = 900;
-                    const worldHeight = 900;
-                    const fov = 480;
-
-                    for (let l = 0; l < depthLayers; l++) {
-                        const baseZ = minNodeZ + (l / (depthLayers - 1)) * (maxNodeZ - minNodeZ);
-                        const bulkMetricFactor = 1.0 + (l / (depthLayers - 1)) * 0.35;
-
-                        for (let gx = 0; gx < gridCols; gx++) {
-                            for (let gy = 0; gy < gridRows; gy++) {
-                                let wx = (gx / (gridCols - 1) - 0.5) * worldWidth;
-                                let wy = (gy / (gridRows - 1) - 0.5) * worldHeight + 35;
-                                let wz = baseZ;
-
-                                let vaporDensity = 0.06;
-                                let r = 180, g = 200, b = 230;
-
-                                // ATMOSPHERIC: Smooth Volumetric Mist & Turbulent Eddy Shear
-                                if (overlays.atmos) {
-                                    const noiseHaze = Math.sin(wx * 0.015 + timeValue * 0.8) * Math.cos(wy * 0.015 - timeValue * 0.6) * 0.5 + 0.5;
-                                    const secondaryHaze = Math.sin((wx * 0.03 - wy * 0.03) + timeValue * 1.2) * 0.3;
-
-                                    let localShearDensity = 0.0;
-                                    projectedNodes.forEach(node => {
-                                        const ndx = wx - (node.x || 0);
-                                        const ndy = wy - (node.y || 0);
-                                        const dist = Math.sqrt(ndx * ndx + ndy * ndy);
-
-                                        if (dist < 340) {
-                                            const falloff = Math.pow(1.0 - dist / 340, 1.8);
-                                            localShearDensity += falloff * 0.35 * (Math.sin(dist * 0.05 - timeValue * 2.0) * 0.5 + 0.5);
-                                        }
-                                    });
-
-                                    vaporDensity += 0.05 + (noiseHaze + secondaryHaze) * 0.12 + localShearDensity;
-                                    r = 120; g = 235; b = 185;
-                                }
-
-                                // THERMAL: AdS Black Hole Hawking Radiation & Modular Hamiltonian Sinks
-                                if (overlays.thermal) {
-                                    let localThermodynamicPotential = 0.0;
-
-                                    projectedNodes.forEach(node => {
-                                        const vMag = Math.sqrt((node.vx || 0) ** 2 + (node.vy || 0) ** 2 + (node.vz || 0) ** 2);
-                                        const isCore = node.tier === 'BULK_CORE' || node.isCore;
-                                        const hawkingTemp = isCore ? 1.4 : (0.7 + vMag * 0.6);
-                                        const redshiftFactor = 1.0 / bulkMetricFactor;
-
-                                        const ndx = wx - (node.x || 0);
-                                        const ndy = wy - (node.y || 0) + 18;
-                                        const ndz = wz - (node.z || 0);
-                                        const dist3D = Math.sqrt(ndx * ndx + ndy * ndy + ndz * ndz);
-
-                                        if (dist3D < 330) {
-                                            const thermalEnvelope = Math.pow(1.0 - dist3D / 330, 1.9) * hawkingTemp * redshiftFactor;
-                                            if (vMag > 0.8 || isCore) {
-                                                localThermodynamicPotential = Math.max(localThermodynamicPotential, thermalEnvelope);
-                                            } else {
-                                                localThermodynamicPotential = Math.min(localThermodynamicPotential, -thermalEnvelope * 0.75);
-                                            }
-                                        }
-                                    });
-
-                                    if (localThermodynamicPotential > 0.05) {
-                                        vaporDensity += localThermodynamicPotential * 0.48;
-                                        r = 225 + localThermodynamicPotential * 30;
-                                        g = 55 + localThermodynamicPotential * 65;
-                                        b = 10;
-                                    } else if (localThermodynamicPotential < -0.05) {
-                                        const coldFactor = Math.abs(localThermodynamicPotential);
-                                        vaporDensity += coldFactor * 0.42;
-                                        r = 45; g = 75 + coldFactor * 55; b = 220 + coldFactor * 35;
-                                    } else {
-                                        vaporDensity += 0.04;
-                                        r = 55; g = 35; b = 130;
-                                    }
-                                }
-
-                                // WAVE: QFT Klein-Gordon Dispersion & AdS Vacuum Fluctuations
-                                if (overlays.wave) {
-                                    const vacuumJitter = (Math.sin(wx * 0.1 + wy * 0.1 + timeValue * 8.0) * 0.015) +
-                                        (Math.cos(wz * 0.2 - timeValue * 6.0) * 0.01);
-                                    vaporDensity += Math.abs(vacuumJitter);
-
-                                    let cumulativeWaveVal = 0;
-                                    let maxFalloff = 0;
-                                    const fieldMass = 0.04;
-
-                                    projectedNodes.forEach((node, nIdx) => {
-                                        const ndx = wx - (node.x || 0);
-                                        const ndy = wy - (node.y || 0);
-                                        const ndz = wz - (node.z || 0);
-                                        const dist3D = Math.sqrt(ndx * ndx + ndy * ndy + ndz * ndz);
-
-                                        if (dist3D < 360) {
-                                            const falloff = Math.pow(1.0 - dist3D / 360, 1.4);
-                                            const wavenumber = dist3D * 0.065 * bulkMetricFactor;
-                                            const dispersionFreq = Math.sqrt(wavenumber * wavenumber + fieldMass * fieldMass);
-                                            const wave = Math.sin(wavenumber - timeValue * 5.0 * dispersionFreq + nIdx * 1.2);
-
-                                            cumulativeWaveVal += wave * falloff;
-                                            maxFalloff = Math.max(maxFalloff, falloff);
-                                        }
-                                    });
-
-                                    if (maxFalloff > 0.05 || Math.abs(vacuumJitter) > 0.01) {
-                                        vaporDensity += Math.abs(cumulativeWaveVal) * 0.48;
-                                        if (cumulativeWaveVal > 0.82) {
-                                            r = 255; g = 255; b = 255; vaporDensity += 0.28;
-                                        } else if (cumulativeWaveVal > 0.32) {
-                                            r = 0; g = 255; b = 240;
-                                        } else {
-                                            r = 25; g = 120 - cumulativeWaveVal * 35; b = 255;
-                                        }
-                                    }
-                                }
-
-                                // EMP: Sharp High-Voltage Magnetohydrodynamic Shockwave Front
-                                if (overlays.emp) {
-                                    const pulseRadius = (timeValue * 300) % 580;
-                                    projectedNodes.forEach(node => {
-                                        const ndx = wx - (node.x || 0);
-                                        const ndy = wy - (node.y || 0);
-                                        const dist = Math.sqrt(ndx * ndx + ndy * ndy);
-                                        const ringDist = Math.abs(dist - pulseRadius);
-
-                                        if (ringDist < 14) {
-                                            const shockIntensity = Math.pow(1.0 - ringDist / 14, 2.5);
-                                            vaporDensity += shockIntensity * 0.85;
-                                            r = 210 + shockIntensity * 45; g = 255; b = 255;
-                                        }
-                                    });
-                                }
-
-                                // DOPPLER: Relativistic Frequency-Modulated Wavefront Bunching & Stretching
-                                if (overlays.doppler) {
-                                    projectedNodes.forEach(node => {
-                                        const vx = node.vx || 0, vy = node.vy || 0;
-                                        const speed = Math.sqrt(vx * vx + vy * vy);
-                                        if (speed > 0.1) {
-                                            const ndx = wx - (node.x || 0);
-                                            const ndy = wy - (node.y || 0);
-                                            const dist = Math.sqrt(ndx * ndx + ndy * ndy);
-
-                                            if (dist < 340 && dist > 5) {
-                                                const falloff = Math.pow(1.0 - dist / 340, 1.5);
-                                                const cosTheta = (ndx * (vx / speed) + ndy * (vy / speed)) / dist;
-                                                const beta = Math.min(0.75, speed * 0.15);
-                                                const dopplerShift = 1.0 / (1.0 - beta * cosTheta);
-
-                                                vaporDensity += Math.abs(dopplerShift - 1.0) * falloff * 0.45;
-
-                                                if (dopplerShift > 1.15) {
-                                                    r = 20; g = 240 + (dopplerShift - 1.15) * 15; b = 255;
-                                                } else if (dopplerShift < 0.85) {
-                                                    r = 255; g = 20 + (dopplerShift * 50); b = 140;
-                                                }
-                                            }
-                                        }
-                                    });
-                                }
-
-                                // MULTIPATH: Gravitational Lensing Caustic Fields
-                                if (overlays.multipath) {
-                                    tethers.forEach(tether => {
-                                        const p1 = tether.p1, p2 = tether.p2;
-                                        if (!p1 || !p2) return;
-                                        const tmx = (p1.x + p2.x) * 0.5;
-                                        const tmy = (p1.y + p2.y) * 0.5;
-                                        const ldist = Math.sqrt((wx - tmx) ** 2 + (wy - tmy) ** 2);
-                                        if (ldist < 220) {
-                                            const caustic = Math.pow(1.0 - ldist / 220, 2.0) * (Math.sin(timeValue * 4.0 + ldist * 0.05) * 0.5 + 0.5);
-                                            vaporDensity += caustic * 0.3;
-                                            r = 240; g = 190; b = 40; // Amber caustic focal glow
-                                        }
-                                    });
-                                }
-
-                                const effectiveZ = wz + fov;
-                                if (effectiveZ <= 10) continue;
-
-                                const perspectiveScale = fov / effectiveZ;
-                                const screenX = centerX + wx * perspectiveScale;
-                                const screenY = centerY + wy * perspectiveScale;
-
-                                if (screenX < 0 || screenX > canvasWidth || screenY < 0 || screenY > canvasHeight) continue;
-
-                                const finalAlpha = Math.max(0.02, Math.min(0.68, vaporDensity * intensity));
-                                ctx.fillStyle = `rgba(${Math.floor(r)}, ${Math.floor(g)}, ${Math.floor(b)}, ${finalAlpha})`;
-                                ctx.fillRect(screenX, screenY, 1.2, 1.2);
-                            }
-                        }
-                    }
-
-                    // Mesh Interactions & Highlighting
-                    projectedNodes.forEach(node => {
-                        if (node.scale <= 0) return;
-                        let highlightAlpha = 0;
-                        let strokeColor = '255, 255, 255';
-                        let strokeWidth = 1.5;
-
-                        if (overlays.emp) {
-                            const plasmaTremor = (Math.sin(timeValue * 60 + node.px) * 0.7);
-                            node.px += plasmaTremor;
-                            node.py += plasmaTremor;
-                            highlightAlpha = 0.9;
-                            strokeColor = '140, 250, 255';
-                            strokeWidth = 2.2;
-                        } else if (overlays.thermal) {
-                            const vMag = Math.sqrt((node.vx || 0) ** 2 + (node.vy || 0) ** 2 + (node.vz || 0) ** 2);
-                            const isCore = node.tier === 'BULK_CORE' || node.isCore;
-                            highlightAlpha = 0.75;
-                            strokeColor = (vMag > 0.8 || isCore) ? '255, 80, 20' : '70, 130, 255';
-                            strokeWidth = 2.0;
-                        } else if (overlays.wave) {
-                            highlightAlpha = 0.75;
-                            strokeColor = '0, 255, 240';
-                            strokeWidth = 2.0;
-                        }
-
-                        if (highlightAlpha > 0) {
-                            ctx.save();
-                            ctx.beginPath();
-                            ctx.arc(node.px, node.py, (node.radius || 6) * node.scale + 5, 0, Math.PI * 2);
-                            ctx.strokeStyle = `rgba(${strokeColor}, ${highlightAlpha * intensity})`;
-                            ctx.lineWidth = strokeWidth;
-                            ctx.stroke();
-                            ctx.restore();
-                        }
-                    });
-
-                    // Tethers & Gravitational Caustic Lensing Ghost Echoes
-                    tethers.forEach(tether => {
-                        const p1 = tether.p1, p2 = tether.p2;
-                        if (!p1 || !p2 || p1.scale <= 0 || p2.scale <= 0) return;
-
-                        const dx = p2.px - p1.px;
-                        const dy = p2.py - p1.py;
-                        const length = Math.sqrt(dx * dx + dy * dy);
-                        if (length < 2) return;
-
-                        if (overlays.multipath) {
-                            const perpX = -dy / length, perpY = dx / length;
-                            for (let m = 1; m <= 2; m++) {
-                                const offset = (m * 16.0 + Math.sin(timeValue * 3.0 + m) * 4.0) * Math.min(p1.scale, p2.scale);
-                                ctx.save();
-                                ctx.beginPath();
-                                ctx.moveTo(p1.px + perpX * offset, p1.py + perpY * offset);
-                                ctx.lineTo(p2.px + perpX * offset, p2.py + perpY * offset);
-                                ctx.strokeStyle = `rgba(240, 190, 40, ${(0.4 / m) * intensity})`;
-                                ctx.setLineDash([6, 4]);
-                                ctx.lineWidth = 1.4;
-                                ctx.stroke();
-                                ctx.restore();
-                            }
-                        }
-
-                        if (overlays.wave) {
-                            ctx.save();
-                            ctx.beginPath();
-                            ctx.moveTo(p1.px, p1.py);
-                            ctx.lineTo(p2.px, p2.py);
-                            ctx.strokeStyle = `rgba(0, 255, 240, ${0.4 * intensity})`;
-                            ctx.lineWidth = 1.5 * Math.min(p1.scale, p2.scale);
-                            ctx.stroke();
-                            ctx.restore();
-                        }
-                    });
-                }
-
-                // ---------------------------------------------------------------------
-                // 2. STANDARD COLOR PALETTE SCHEMAS (Independent)
-                // ---------------------------------------------------------------------
-                if (activePalette !== 'dynamic') {
-                    if (activePalette === 'thermal' || activePalette === 'multispectral') {
-                        projectedNodes.forEach(node => {
-                            if (node.scale <= 0) return;
-                            const vMag = Math.sqrt((node.vx || 0) ** 2 + (node.vy || 0) ** 2 + (node.vz || 0) ** 2);
-                            const isCore = node.tier === 'BULK_CORE' || node.isCore;
-
-                            if (vMag > 1.0 || isCore) {
-                                const driftY = Math.sin(timeValue * 2.0 + node.px) * 4.0;
-                                const plumeRadius = (isCore ? 45 : 28) * node.scale * (1 + vMag * 0.4);
-
-                                const grad = ctx.createRadialGradient(
-                                    node.px, node.py + driftY, 2,
-                                    node.px, node.py, plumeRadius
-                                );
-                                grad.addColorStop(0.0, `rgba(255, 60, 20, ${0.45 * intensity})`);
-                                grad.addColorStop(0.5, `rgba(220, 40, 10, ${0.2 * intensity})`);
-                                grad.addColorStop(1.0, `rgba(120, 10, 0, 0)`);
-
-                                ctx.save();
-                                ctx.beginPath();
-                                ctx.arc(node.px, node.py + driftY, plumeRadius, 0, Math.PI * 2);
-                                ctx.fillStyle = grad;
-                                ctx.fill();
-                                ctx.restore();
-                            }
-                        });
-                    }
-
-                    if (activePalette === 'scifi' || activePalette === 'multispectral') {
-                        tethers.forEach(tether => {
-                            const p1 = tether.p1, p2 = tether.p2;
-                            if (!p1 || !p2 || p1.scale <= 0 || p2.scale <= 0) return;
-
-                            const dx = p2.px - p1.px, dy = p2.py - p1.py;
-                            const length = Math.sqrt(dx * dx + dy * dy);
-                            if (length < 2) return;
-
-                            const noiseJitter = (Math.random() - 0.5) * noiseThresh * 20.0;
-                            const psiAmplitude = Math.abs(Math.sin(timeValue * 4.0 + length * 0.05)) + noiseJitter;
-                            const auraAlpha = Math.max(0.05, (0.15 + psiAmplitude * 0.35) * intensity);
-
-                            ctx.save();
-                            ctx.beginPath();
-                            ctx.strokeStyle = `rgba(168, 85, 247, ${auraAlpha})`;
-                            ctx.lineWidth = (2.0 + Math.abs(psiAmplitude) * 4.0) * Math.min(p1.scale, p2.scale);
-
-                            if (interpMode === 'discrete') {
-                                const steps = 6;
-                                ctx.moveTo(p1.px, p1.py);
-                                for (let s = 1; s <= steps; s++) {
-                                    const tPrev = (s - 1) / steps, t = s / steps;
-                                    ctx.lineTo(p1.px + dx * t, p1.py + dy * tPrev);
-                                    ctx.lineTo(p1.px + dx * t, p1.py + dy * t);
-                                }
-                            } else {
-                                const midX = (p1.px + p2.px) / 2 + (-dy / length) * (psiAmplitude * 15.0);
-                                const midY = (p1.py + p2.py) / 2 + (dx / length) * (psiAmplitude * 15.0);
-                                ctx.moveTo(p1.px, p1.py);
-                                ctx.quadraticCurveTo(midX, midY, p2.px, p2.py);
-                            }
-                            ctx.stroke();
-                            ctx.restore();
-                        });
-                    }
-
-                    if (activePalette === 'monochrome' || activePalette === 'multispectral') {
-                        tethers.forEach((tether, tIdx) => {
-                            const p1 = tether.p1, p2 = tether.p2;
-                            if (!p1 || !p2 || p1.scale <= 0 || p2.scale <= 0) return;
-
-                            const dx = p2.px - p1.px, dy = p2.py - p1.py;
-                            const length = Math.sqrt(dx * dx + dy * dy);
-                            if (length < 2) return;
-
-                            const particleCount = 3;
-                            for (let i = 0; i < particleCount; i++) {
-                                let tParam = ((timeValue * 1.5 + i * (1.0 / particleCount)) % 1.0);
-                                if (noiseThresh > 0.15 && (tIdx + i + Math.floor(timeValue * 5)) % 7 === 0) continue;
-
-                                const partX = p1.px + dx * tParam;
-                                const partY = p1.py + dy * tParam;
-                                const noiseAttenuation = Math.max(0.2, 1.0 - (noiseThresh * 1.5));
-                                const particleAlpha = (0.5 + 0.5 * Math.sin(tParam * Math.PI * 2)) * intensity * noiseAttenuation;
-
-                                ctx.save();
-                                ctx.beginPath();
-                                ctx.arc(partX, partY, 2.5 * Math.min(p1.scale, p2.scale), 0, Math.PI * 2);
-                                ctx.fillStyle = `rgba(234, 179, 8, ${particleAlpha})`;
-                                ctx.shadowColor = `rgba(234, 179, 8, 0.8)`;
-                                ctx.shadowBlur = 6;
-                                ctx.fill();
-                                ctx.restore();
-                            }
-                        });
-                    }
-                }
-
-                ctx.restore();
-            }
-
-        function drawSpectralOrbs(scaleMultiplier) {
-            const spectralTiers = [
-                { radius: 30, color: 'rgba(255, 255, 255, 0.22)', width: 1.0 },
-                { radius: 65, color: 'rgba(250, 204, 21, 0.25)', width: 0.9 },
-                { radius: 105, color: 'rgba(249, 115, 22, 0.20)', width: 0.8 },
-                { radius: 145, color: 'rgba(239, 68, 68, 0.18)', width: 0.7 },
-                { radius: 190, color: 'rgba(139, 92, 246, 0.22)', width: 0.8 },
-                { radius: 240, color: 'rgba(59, 130, 246, 0.15)', width: 0.6 }
-            ];
-
-            const timeNow = performance.now();
-            spectralTiers.forEach(tier => {
-                drawSpinNetworkShell(tier.radius * scaleMultiplier, tier.color, tier.width, timeNow);
-            });
-        }
-
-        function drawWarpedSpectralLoops(mode, scaleMultiplier, timeFactor) {
-            const spectralTiers = [
-                { radius: 40, color: 'rgba(255, 255, 255, 0.28)', width: 1.1 },
-                { radius: 80, color: 'rgba(250, 204, 21, 0.28)', width: 0.9 },
-                { radius: 120, color: 'rgba(249, 115, 22, 0.22)', width: 0.8 },
-                { radius: 160, color: 'rgba(239, 68, 68, 0.20)', width: 0.7 },
-                { radius: 200, color: 'rgba(139, 92, 246, 0.22)', width: 0.8 },
-                { radius: 240, color: 'rgba(59, 130, 246, 0.18)', width: 0.6 }
-            ];
-
-            const interactionRadius = 65;
-
-            if (mode === 'toroidal') {
-                spectralTiers.forEach((tier) => {
-                    const maxR = tier.radius * scaleMultiplier;
-                    const R = maxR * 0.5;
-                    const r = maxR * 0.5;
-                    const majorSteps = 36;
-                    const minorSteps = 18;
-
-                    for (let i = 0; i < majorSteps; i++) {
-                        const u = (i / majorSteps) * Math.PI * 2;
-                        let segmentPoints = [];
-
-                        for (let j = 0; j <= minorSteps; j++) {
-                            const v = (j / minorSteps) * Math.PI * 2;
-                            let tx = (R + r * Math.cos(v)) * Math.cos(u);
-                            let ty = r * Math.sin(v);
-                            let tz = (R + r * Math.cos(v)) * Math.sin(u);
-                            let isNearNode = false;
-
-                            if (window.nodes) {
-                                for (const node of window.nodes) {
-                                    const nx = node.x || 0, ny = node.y || 0, nz = node.z || 0;
-                                    const dist = Math.sqrt((tx - nx) ** 2 + (ty - ny) ** 2 + (tz - nz) ** 2);
-                                    if (dist < interactionRadius && dist > 0) {
-                                        isNearNode = true;
-                                        const warp = ((interactionRadius - dist) / interactionRadius) * 8.0;
-                                        tx += ((tx - nx) / dist) * warp;
-                                        ty += ((ty - ny) / dist) * warp;
-                                        tz += ((tz - nz) / dist) * warp;
-                                    }
-                                }
-                            }
-                            const p = project3D(tx, ty, tz, canvas.width, canvas.height);
-                            segmentPoints.push({ ...p, isHighlighted: isNearNode });
-                        }
-
-                        for (let j = 0; j < segmentPoints.length - 1; j++) {
-                            const p1 = segmentPoints[j], p2 = segmentPoints[j + 1];
-                            if (p1.scale > 0 && p2.scale > 0) {
-                                ctx.beginPath();
-                                ctx.moveTo(p1.px, p1.py);
-                                ctx.lineTo(p2.px, p2.py);
-                                ctx.strokeStyle = (p1.isHighlighted || p2.isHighlighted) ? 'rgba(255, 255, 255, 0.25)' : tier.color;
-                                ctx.lineWidth = (p1.isHighlighted || p2.isHighlighted) ? tier.width * 1.5 : tier.width;
-                                ctx.stroke();
-                            }
-                        }
-                    }
-                });
-
-            } else if (mode === 'cubed' || mode === 'cubic') {
-                spectralTiers.forEach((tier) => {
-                    const size = tier.radius * scaleMultiplier * 1.1;
-                    const half = size / 2;
-                    const divisions = 4;
-                    const stepSize = size / divisions;
-
-                    ctx.strokeStyle = tier.color;
-                    ctx.lineWidth = tier.width;
-
-                    const gridLines = [];
-                    for (let xStep = 0; xStep <= divisions; xStep++) {
-                        const x = -half + xStep * stepSize;
-                        for (let yStep = 0; yStep <= divisions; yStep++) {
-                            const y = -half + yStep * stepSize;
-                            gridLines.push([[x, y, -half], [x, y, half]]);
-                        }
-                        for (let zStep = 0; zStep <= divisions; zStep++) {
-                            const z = -half + zStep * stepSize;
-                            gridLines.push([[x, -half, z], [x, half, z]]);
-                        }
-                    }
-                    for (let yStep = 0; yStep <= divisions; yStep++) {
-                        const y = -half + yStep * stepSize;
-                        for (let zStep = 0; zStep <= divisions; zStep++) {
-                            const z = -half + zStep * stepSize;
-                            gridLines.push([[-half, y, z], [half, y, z]]);
-                        }
-                    }
-
-                    gridLines.forEach(([c1, c2]) => {
-                        const subSteps = 6;
-                        let subPoints = [];
-
-                        for (let s = 0; s <= subSteps; s++) {
-                            const t = s / subSteps;
-                            let tx = c1[0] + (c2[0] - c1[0]) * t;
-                            let ty = c1[1] + (c2[1] - c1[1]) * t;
-                            let tz = c1[2] + (c2[2] - c1[2]) * t;
-                            let isNearNode = false;
-
-                            if (window.nodes) {
-                                for (const node of window.nodes) {
-                                    const nx = node.x || 0, ny = node.y || 0, nz = node.z || 0;
-                                    const dist = Math.sqrt((tx - nx) ** 2 + (ty - ny) ** 2 + (tz - nz) ** 2);
-                                    if (dist < interactionRadius && dist > 0) {
-                                        isNearNode = true;
-                                        const warp = ((interactionRadius - dist) / interactionRadius) * 8.0;
-                                        tx += ((tx - nx) / dist) * warp;
-                                        ty += ((ty - ny) / dist) * warp;
-                                        tz += ((tz - nz) / dist) * warp;
-                                    }
-                                }
-                            }
-                            const p = project3D(tx, ty, tz, canvas.width, canvas.height);
-                            subPoints.push({ ...p, isHighlighted: isNearNode });
-                        }
-
-                        for (let s = 0; s < subPoints.length - 1; s++) {
-                            const p1 = subPoints[s];
-                            const p2 = subPoints[s + 1];
-                            if (p1.scale > 0 && p2.scale > 0) {
-                                ctx.beginPath();
-                                ctx.moveTo(p1.px, p1.py);
-                                ctx.lineTo(p2.px, p2.py);
-                                ctx.strokeStyle = (p1.isHighlighted || p2.isHighlighted) ? 'rgba(255, 255, 255, 0.25)' : tier.color;
-                                ctx.lineWidth = (p1.isHighlighted || p2.isHighlighted) ? tier.width * 1.4 : tier.width * 0.7;
-                                ctx.stroke();
-                            }
-                        }
-                    });
-                });
-
-            } else if (mode === 'spheroid') {
-                spectralTiers.forEach((tier) => {
-                    const rad = tier.radius * scaleMultiplier;
-                    const lats = 14;
-                    const lons = 28;
-
-                    for (let i = 0; i <= lats; i++) {
-                        const phi = (i / lats) * Math.PI;
-                        let ringPoints = [];
-                        for (let j = 0; j <= lons; j++) {
-                            const theta = (j / lons) * Math.PI * 2;
-                            let tx = rad * Math.sin(phi) * Math.cos(theta);
-                            let ty = rad * Math.cos(phi);
-                            let tz = rad * Math.sin(phi) * Math.sin(theta);
-                            let isNearNode = false;
-
-                            if (window.nodes) {
-                                for (const node of window.nodes) {
-                                    const nx = node.x || 0, ny = node.y || 0, nz = node.z || 0;
-                                    const dist = Math.sqrt((tx - nx) ** 2 + (ty - ny) ** 2 + (tz - nz) ** 2);
-                                    if (dist < interactionRadius && dist > 0) {
-                                        isNearNode = true;
-                                        const warp = ((interactionRadius - dist) / interactionRadius) * 6.0;
-                                        tx += ((tx - nx) / dist) * warp;
-                                        ty += ((ty - ny) / dist) * warp;
-                                        tz += ((tz - nz) / dist) * warp;
-                                    }
-                                }
-                            }
-                            const p = project3D(tx, ty, tz, canvas.width, canvas.height);
-                            ringPoints.push({ ...p, isHighlighted: isNearNode });
-                        }
-
-                        for (let j = 0; j < ringPoints.length - 1; j++) {
-                            const p1 = ringPoints[j], p2 = ringPoints[j + 1];
-                            if (p1.scale > 0 && p2.scale > 0) {
-                                ctx.beginPath();
-                                ctx.moveTo(p1.px, p1.py);
-                                ctx.lineTo(p2.px, p2.py);
-                                ctx.strokeStyle = (p1.isHighlighted || p2.isHighlighted) ? 'rgba(255, 255, 255, 0.45)' : tier.color;
-                                ctx.lineWidth = (p1.isHighlighted || p2.isHighlighted) ? tier.width * 1.5 : tier.width;
-                                ctx.stroke();
-                            }
-                        }
-                    }
-                });
-            } else if (mode === 'hyperbolic') {
-                spectralTiers.forEach((tier) => {
-                    const baseRadius = tier.radius * scaleMultiplier;
-                    const uSteps = 36;
-                    const vSteps = 32;
-
-                    for (let i = 0; i < vSteps; i++) {
-                        const v = ((i / (vSteps - 1)) * 6.0) - 3.0;
-                        const flareFactor = 0.08 + Math.abs(v) * 0.38 + (Math.cosh(v) - 1.0) * 0.12;
-                        const rTier = baseRadius * flareFactor;
-
-                        let segmentPoints = [];
-
-                        for (let j = 0; j <= uSteps; j++) {
-                            const u = (j / uSteps) * Math.PI * 2;
-
-                            let tx = rTier * Math.cos(u);
-                            let ty = v * 95.0 * scaleMultiplier;
-                            let tz = rTier * Math.sin(u);
-                            let isNearNode = false;
-
-                            if (window.nodes) {
-                                for (const node of window.nodes) {
-                                    const nx = node.x || 0, ny = node.y || 0, nz = node.z || 0;
-                                    const dist = Math.sqrt((tx - nx) ** 2 + (ty - ny) ** 2 + (tz - nz) ** 2);
-                                    if (dist < interactionRadius && dist > 0) {
-                                        isNearNode = true;
-                                        const warp = ((interactionRadius - dist) / interactionRadius) * 8.0;
-                                        tx += ((tx - nx) / dist) * warp;
-                                        ty += ((ty - ny) / dist) * warp;
-                                        tz += ((tz - nz) / dist) * warp;
-                                    }
-                                }
-                            }
-                            const p = project3D(tx, ty, tz, canvas.width, canvas.height);
-                            segmentPoints.push({ ...p, isHighlighted: isNearNode });
-                        }
-
-                        for (let j = 0; j < segmentPoints.length - 1; j++) {
-                            const p1 = segmentPoints[j], p2 = segmentPoints[j + 1];
-                            if (p1.scale > 0 && p2.scale > 0) {
-                                ctx.beginPath();
-                                ctx.moveTo(p1.px, p1.py);
-                                ctx.lineTo(p2.px, p2.py);
-                                ctx.strokeStyle = (p1.isHighlighted || p2.isHighlighted) ? 'rgba(255, 255, 255, 0.30)' : tier.color;
-                                ctx.lineWidth = (p1.isHighlighted || p2.isHighlighted) ? tier.width * 1.5 : tier.width;
-                                ctx.stroke();
-                            }
-                        }
-                    }
-                });
-            } else {
-                drawSpectralOrbs(scaleMultiplier);
-            }
-        }
-
-        function drawSpinNetworkShell(radius, baseStroke, lineWidth, timeFactor, warpExaggeration = 1.0) {
-            const latSteps = 36;
-            const lonSteps = 72;
-            const interactionRadius = 55;
-
-            for (let i = 1; i < latSteps; i++) {
-                const lat = (Math.PI / latSteps) * i - Math.PI / 2;
-
-                let segmentPoints = [];
-                for (let j = 0; j <= lonSteps; j++) {
-                    const lon = (Math.PI * 2 / lonSteps) * j;
-
-                    const harmonicMod = (Math.sin(lon * 6 + (timeFactor || 0) * 0.003) * 1.8) +
-                        (Math.cos(lat * 4 - (timeFactor || 0) * 0.002) * 1.2);
-
-                    let rMod = radius + harmonicMod;
-
-                    if (window.nodes) {
-                        for (const node of window.nodes) {
-                            const nx = node.x || 0;
-                            const ny = node.y || 0;
-                            const nz = node.z || 0;
-
-                            const baseShellX = rMod * Math.cos(lat) * Math.cos(lon);
-                            const baseShellY = rMod * Math.sin(lat);
-                            const baseShellZ = rMod * Math.cos(lat) * Math.sin(lon);
-
-                            const dist = Math.sqrt((baseShellX - nx) ** 2 + (baseShellY - ny) ** 2 + (baseShellZ - nz) ** 2);
-                            if (dist < 120 && dist > 0) {
-                                const warpForce = ((120 - dist) / 120) * 8.0 * warpExaggeration;
-                                rMod += warpForce;
-                            }
-                        }
-                    }
-
-                    const x = rMod * Math.cos(lat) * Math.cos(lon);
-                    const y = rMod * Math.sin(lat);
-                    const z = rMod * Math.cos(lat) * Math.sin(lon);
-
-                    let isNearNode = false;
-                    if (window.nodes) {
-                        for (const node of window.nodes) {
-                            const dist = Math.sqrt((x - (node.x || 0)) ** 2 + (y - (node.y || 0)) ** 2 + (z - (node.z || 0)) ** 2);
-                            if (dist < interactionRadius) {
-                                isNearNode = true;
-                                break;
-                            }
-                        }
-                    }
-
-                    const p = project3D(x, y, z, canvas.width, canvas.height);
-                    segmentPoints.push({ ...p, isHighlighted: isNearNode });
-                }
-
-                for (let j = 0; j < segmentPoints.length - 1; j++) {
-                    const p1 = segmentPoints[j];
-                    const p2 = segmentPoints[j + 1];
-
-                    if (p1.scale > 0 && p2.scale > 0) {
-                        ctx.beginPath();
-                        ctx.moveTo(p1.px, p1.py);
-                        ctx.lineTo(p2.px, p2.py);
-
-                        if (p1.isHighlighted || p2.isHighlighted) {
-                            ctx.strokeStyle = 'rgba(255, 255, 255, 0.40)';
-                            ctx.lineWidth = (lineWidth || 0.6) * 1.3;
-                        } else {
-                            ctx.strokeStyle = baseStroke;
-                            ctx.lineWidth = lineWidth || 0.6;
-                        }
-                        ctx.stroke();
-                    }
-                }
-            }
-        }
-
-        // Clean-Up: Vibrating tether renderer uses purely baseline cyan/amber colors
-        function drawVibratingTether(p1, p2, rawDist, timeValue) {
-                if (p1.scale <= 0 || p2.scale <= 0) return;
-
-                const dx = p2.px - p1.px;
-                const dy = p2.py - p1.py;
-                const length = Math.sqrt(dx * dx + dy * dy);
-                if (length < 2) return;
-
-                const restDist = 90.0;
-                const tension = Math.min(1.0, Math.abs(rawDist - restDist) / restDist);
-                const interpMode = window.hudConfig?.interpolationMode || 'linear';
-
-                ctx.beginPath();
-                ctx.moveTo(p1.px, p1.py);
-
-                if (interpMode === 'discrete') {
-                    // Render stair-step quantized path
-                    const steps = 10;
-                    for (let s = 1; s <= steps; s++) {
-                        const t = s / steps;
-                        const stepX = p1.px + dx * t;
-                        const prevY = p1.py + dy * ((s - 1) / steps);
-                        const stepY = p1.py + dy * t;
-                        ctx.lineTo(stepX, prevY);
-                        ctx.lineTo(stepX, stepY);
-                    }
-                } else {
-                    // Render smooth or vibrating curve
-                    const segments = 18;
-                    const frequency = 6.0;
-                    const maxAmplitude = 7.0 * tension;
-                    const nx = -dy / length;
-                    const ny = dx / length;
-
-                    for (let s = 1; s < segments; s++) {
-                        const t = s / segments;
-                        const baseX = p1.px + dx * t;
-                        const baseY = p1.py + dy * t;
-
-                        const envelope = Math.sin(t * Math.PI);
-                        const waveOffset = interpMode === 'spline' ? 1.5 : 1.0;
-                        const wave = Math.sin(t * Math.PI * frequency + (timeValue || 0) * 0.015) * maxAmplitude * envelope * waveOffset;
-
-                        ctx.lineTo(baseX + nx * wave, baseY + ny * wave);
-                    }
-                    ctx.lineTo(p2.px, p2.py);
-                }
-
-                if (tension > 0.55) {
-                    ctx.strokeStyle = 'rgba(255, 140, 0, 0.85)';
-                    ctx.lineWidth = 1.8 * Math.min(p1.scale, p2.scale);
-                } else {
-                    ctx.strokeStyle = 'rgba(6, 182, 212, 0.65)';
-                    ctx.lineWidth = (0.8 + (tension * 0.8)) * Math.min(p1.scale, p2.scale);
-                }
-                ctx.stroke();
-            }
-
-        function updateTensegrityEquilibrium() {
+        // Tensegrity equilibrium update step
+        window.hudPhysicsStep = function () {
             if (!window.nodes) return;
-
             const dt = 0.016;
             const damping = 0.90;
 
-            window.nodes.forEach((node, idx) => {
-                // Ensure telemetry/velocity/phase properties exist for overlays even if pinned
+            window.nodes.forEach((node) => {
                 if (node.vx === undefined) { node.vx = 0; node.vy = 0; node.vz = 0; }
-                if (node.phase === undefined) { node.phase = Math.random() * Math.PI * 2; }
-                if (node.thermalEnergy === undefined) { node.thermalEnergy = node.isPinned ? 0.8 : 0.5; }
-
-                // Advance wave phase for interference and Doppler overlays over time
-                node.phase += (window.temporalSpeed || 1.0) * 0.05;
-
-                // Pinned nodes and selected nodes keep their spatial coordinates locked here
-                if (node.isPinned || node === selectedNode) {
-                    // Zero out forces so they don't accumulate
+                if (node.isPinned || node === window.selectedNode) {
                     node.fx = 0; node.fy = 0; node.fz = 0;
                     return;
                 }
-
                 node.fx = 0; node.fy = 0; node.fz = 0;
 
                 if (node.targetX !== undefined) {
-                    const transitionSpring = 8.0;
-                    node.fx += (node.targetX - node.x) * transitionSpring;
-                    node.fy += (node.targetY - node.y) * transitionSpring;
-                    node.fz += (node.targetZ - node.z) * transitionSpring;
-
-                    const distToTarget = Math.sqrt((node.targetX - node.x) ** 2 + (node.targetY - node.y) ** 2 + (node.targetZ - node.z) ** 2);
-                    if (distToTarget < 1.0) {
-                        node.x = node.targetX;
-                        node.y = node.targetY;
-                        node.z = node.targetZ;
-                        delete node.targetX;
-                        delete node.targetY;
-                        delete node.targetZ;
-                    }
+                    node.fx += (node.targetX - node.x) * 8.0;
+                    node.fy += (node.targetY - node.y) * 8.0;
+                    node.fz += (node.targetZ - node.z) * 8.0;
                 }
 
-                let targetRadius = 105;
-                if (node.tier === 'BULK_CORE' || node.isCore) targetRadius = 30;
-                else if (node.tier === 'BOUNDARY') targetRadius = 190;
-
-                const currentRadius = Math.sqrt(node.x ** 2 + node.y ** 2 + node.z ** 2) || 1;
-                const radialError = targetRadius - currentRadius;
-                const springK = 12.0;
-                node.fx += (node.x / currentRadius) * radialError * springK;
-                node.fy += (node.y / currentRadius) * radialError * springK;
-                node.fz += (node.z / currentRadius) * radialError * springK;
-
-                for (let j = 0; j < window.nodes.length; j++) {
-                    if (idx === j) continue;
-                    const other = window.nodes[j];
-                    const dx = other.x - node.x;
-                    const dy = other.y - node.y;
-                    const dz = other.z - node.z;
-                    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.001;
-
-                    if (dist < 50) {
-                        const repulsion = (50 - dist) * 10.0;
-                        node.fx -= (dx / dist) * repulsion;
-                        node.fy -= (dy / dist) * repulsion;
-                        node.fz -= (dz / dist) * repulsion;
-                    }
-                }
-
-                const mass = node.mass || 1.0;
-                node.vx = (node.vx + (node.fx / mass) * dt) * damping;
-                node.vy = (node.vy + (node.fy / mass) * dt) * damping;
-                node.vz = (node.vz + (node.fz / mass) * dt) * damping;
+                node.vx = (node.vx + (node.fx / (node.mass || 1.0)) * dt) * damping;
+                node.vy = (node.vy + (node.fy / (node.mass || 1.0)) * dt) * damping;
+                node.vz = (node.vz + (node.fz / (node.mass || 1.0)) * dt) * damping;
 
                 node.x += node.vx * dt;
                 node.y += node.vy * dt;
                 node.z += node.vz * dt;
             });
-        }
+        };
 
-        // Clean-Up: Main Render Loop cleanly layered with the Additive Overlay Engine
-        function draw(timeValue) {
-            ctx.fillStyle = '#05050a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            const scaleMultiplier = window.hudConfig ? window.hudConfig.worldScale : 1.0;
-            const gridSteps = window.hudConfig ? parseInt(window.hudConfig.gridDensity) : 10;
-            const span = 250 * scaleMultiplier;
-            const showFloor = window.hudConfig ? window.hudConfig.showFloor : true;
-            const floorY = 80;
-
-            const activeMode = userSelectedMode || frameManager.activeFrameType || 'open';
-            const activePalette = window.hudConfig?.colorPalette || 'dynamic';
-            const timeVal = performance.now() * 0.001;
-
-            // 1. Update physics state
-            updateTensegrityEquilibrium();
-
-            // 2. Render reference manifolds
-            if (activeMode === 'toroidal') {
-                drawWarpedSpectralLoops('toroidal', scaleMultiplier, performance.now());
-            } else if (activeMode === 'cubed' || activeMode === 'cubic') {
-                drawWarpedSpectralLoops('cubed', scaleMultiplier, performance.now());
-            } else if (activeMode === 'hyperbolic') {
-                drawWarpedSpectralLoops('hyperbolic', scaleMultiplier, performance.now());
-            } else if (activeMode === 'spheroid') {
-                drawWarpedSpectralLoops('spheroid', scaleMultiplier, performance.now());
-            } else {
-                drawSpectralOrbs(scaleMultiplier);
-            }
-
-            // 3. Render World-Space Floor Grid
-            if (showFloor) {
-                ctx.strokeStyle = 'rgba(0, 255, 204, 0.15)';
-                ctx.lineWidth = 1;
-                for (let i = -gridSteps; i <= gridSteps; i++) {
-                    const coord = (i / gridSteps) * span;
-                    const p1 = project3D(coord, floorY, -span, canvas.width, canvas.height);
-                    const p2 = project3D(coord, floorY, span, canvas.width, canvas.height);
-                    if (p1.scale > 0 && p2.scale > 0) {
-                        ctx.beginPath(); ctx.moveTo(p1.px, p1.py); ctx.lineTo(p2.px, p2.py); ctx.stroke();
-                    }
-                    const p3 = project3D(-span, floorY, coord, canvas.width, canvas.height);
-                    const p4 = project3D(span, floorY, coord, canvas.width, canvas.height);
-                    if (p3.scale > 0 && p4.scale > 0) {
-                        ctx.beginPath(); ctx.moveTo(p3.px, p3.py); ctx.lineTo(p4.px, p4.py); ctx.stroke();
-                    }
-                }
-            }
-
-            // 4. Project Nodes & Form Tethers
-            let filteredNodes = nodes.filter(node => {
-                const filterMode = window.hudConfig?.streamFilter || 'all';
-                if (filterMode === 'primary') {
-                    return node.isCore || node.tier === 'BULK_CORE' || node.id === 'N-001';
-                } else if (filterMode === 'anomaly') {
-                    return node.entropy < 0 || (node.jitter && node.jitter > 200);
-                }
-                return true;
-            });
-
-            let projectedNodes = filteredNodes.map(node => {
-                const pos = node.position || node;
-                const effectiveScale = scaleMultiplier;
-                const p = project3D(pos.x * effectiveScale, pos.y * effectiveScale, pos.z * effectiveScale, canvas.width, canvas.height);
-                return { ...node, px: p.px, py: p.py, scale: p.scale, depth: p.depth };
-            });
-
-            const activeTethers = [];
-            for (let i = 0; i < projectedNodes.length; i++) {
-                for (let j = i + 1; j < projectedNodes.length; j++) {
-                    const n1 = projectedNodes[i];
-                    const n2 = projectedNodes[j];
-                    const rawDist = Math.sqrt((n1.x - n2.x) ** 2 + (n1.y - n2.y) ** 2 + (n1.z - n2.z) ** 2);
-                    activeTethers.push({ p1: n1, p2: n2, rawDist });
-                }
-            }
-
-            // 5. Render Non-Destructive Additive Diagnostic Overlays (BACKGROUND PASS)
-            drawAdditiveDiagnosticOverlays(ctx, projectedNodes, activeTethers, activePalette);
-
-            // 6. Render Baseline Primary Geometry (FOREGROUND PASS)
-            activeTethers.forEach(t => {
-                drawVibratingTether(t.p1, t.p2, t.rawDist, performance.now());
-            });
-
-            projectedNodes.forEach(node => {
-                if (node.scale <= 0) return;
-                const identifier = (node.data && node.data.name) ? node.data.name : (node.id || 'N-001');
-                const isCore = node.tier === 'BULK_CORE' || node.isCore;
-
-                // Baseline semantic node colors remain 100% intact
-                const nodeColor = node.color || (isCore ? '#ffffff' : '#10b981');
-
-                ctx.save();
-                ctx.fillStyle = nodeColor;
-                ctx.shadowColor = nodeColor;
-                ctx.shadowBlur = isCore ? 18 : 8;
-
-                ctx.beginPath();
-                ctx.arc(node.px, node.py, (isCore ? 7 : 4.5) * node.scale, 0, Math.PI * 2);
-                ctx.fill();
-                ctx.restore();
-
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
-                ctx.font = '10px Courier New';
-                ctx.fillText(identifier, node.px + 10, node.py + 4);
-            });
-
-            // 7. Render Gizmo Triad
-            drawGizmo();
-        }
-        // Replace or update your animation loop and time management:
-        let simulationTime = 0;
-        let lastTimestamp = performance.now();
-
-        function animationLoop(timestamp = performance.now()) {
-                const dt = (timestamp - lastTimestamp) * 0.001;
-                lastTimestamp = timestamp;
-
-                const motionSpeed = window.hudConfig?.motionSpeed ?? 1.0;
-                simulationTime += dt * motionSpeed; // Scales proper-time or freezes at 0.0x
-
-                // Expose simulation time globally so draw() and overlays can access it
-                window.hudConfig = window.hudConfig || {};
-                window.hudConfig.simulationTime = simulationTime;
-
-                draw(); // Your existing draw() call remains untouched!
-                requestAnimationFrame(animationLoop);
-            }
-
-        canvas.addEventListener('mousedown', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            if (isInGimbalArea(mouseX, mouseY)) {
-                isDraggingGimbal = true;
-                lastMouseX = e.clientX;
-                lastMouseY = e.clientY;
-                return;
-            }
-
-            for (let node of nodes) {
-                if (node.isCore) continue;
-                const p = project3D(node.x, node.y, node.z, canvas.width, canvas.height);
-                const dx = mouseX - p.px;
-                const dy = mouseY - p.py;
-                if (Math.sqrt(dx * dx + dy * dy) < 22) {
-                    selectedNode = node;
-                    isDraggingGimbal = false;
-                    return;
-                }
-            }
-        });
-
-        window.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            if (selectedNode && !selectedNode.isCore) {
-                const screenX = mouseX - canvas.width / 2;
-                const screenY = mouseY - canvas.height / 2;
-
-                const cosY = Math.cos(-camera.rotY);
-                const sinY = Math.sin(-camera.rotY);
-
-                selectedNode.x = screenX * cosY - screenY * sinY;
-                selectedNode.z = screenX * sinY + screenY * cosY;
-                selectedNode.y = 0;
-            } else if (isDraggingGimbal) {
-                const deltaX = e.clientX - lastMouseX;
-                const deltaY = e.clientY - lastMouseY;
-                camera.rotY += deltaX * 0.005;
-                camera.rotX += deltaY * 0.005;
-                lastMouseX = e.clientX;
-                lastMouseY = e.clientY;
-            }
-        });
-
-        window.addEventListener('mouseup', () => {
-            if (selectedNode && !selectedNode.isCore) {
-                selectedNode.isPinned = true;
-            }
-            selectedNode = null;
-            isDraggingGimbal = false;
-            isGizmoDragging = false;
-        });
-
+        // Sliders binding
         const bindSlider = (id, valId, unit = '') => {
             const slider = document.getElementById(id);
             const valDisplay = document.getElementById(valId);
@@ -2144,13 +800,21 @@
                 slider.addEventListener('input', (e) => {
                     const val = parseFloat(e.target.value);
                     valDisplay.textContent = e.target.value + unit;
-
                     if (window.hudConfig) {
-                        if (id === 'slider-world-scale') window.hudConfig.worldScale = val;
-                        if (id === 'slider-grid-density') {
-                            window.hudConfig.gridDensity = val;
-                            window.hudConfig.warpExaggeration = val / 10.0;
+                        if (id === 'slider-world-scale') {
+                            window.hudConfig.worldScale = val;
+
+                            // 1. Scale our modular reference frame topology
+                            if (window.referenceFrameManager && typeof window.referenceFrameManager.setScale === 'function') {
+                                window.referenceFrameManager.setScale(val);
+                            }
+
+                            // 2. Scale shader uniforms / viewport renderer components
+                            if (hudViewport && typeof hudViewport.setWorldScale === 'function') {
+                                hudViewport.setWorldScale(val);
+                            }
                         }
+                        if (id === 'slider-grid-density') { window.hudConfig.gridDensity = val; window.hudConfig.warpExaggeration = val / 10.0; }
                         if (id === 'slider-motion-speed') window.hudConfig.motionSpeed = val;
                         if (id === 'slider-noise-thresh') window.hudConfig.noiseThresh = val;
                         if (id === 'slider-overlay-intensity') window.hudConfig.overlayIntensity = val;
@@ -2159,48 +823,17 @@
             }
         };
 
-        const floorCheckbox = document.getElementById('checkbox-floor');
-        if (floorCheckbox) {
-            floorCheckbox.addEventListener('change', (e) => {
-                if (window.hudConfig) {
-                    window.hudConfig.showFloor = e.target.checked;
-                }
-            });
-        }
-
         bindSlider('slider-world-scale', 'val-world-scale');
         bindSlider('slider-grid-density', 'val-grid-density');
         bindSlider('slider-motion-speed', 'val-motion-speed', 'x');
         bindSlider('slider-noise-thresh', 'val-noise-thresh');
         bindSlider('slider-overlay-intensity', 'val-overlay-intensity', 'x');
 
-        resize();
-        initControlDeck();
-
-        animationLoop(); // <--- Kick-start the render loop here!
+        syncOverlayButtons();
     </script>
-
-    <script>
-        document.getElementById('ref-frame-select').addEventListener('change', (e) => {
-            e.stopImmediatePropagation();
-            window.setTopologyMode(e.target.value);
-        }, true);
-    </script>
-
     <script src="/js/controlDeck.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="/js/testingSuiteWindow.js"></script>
-    <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            window.testingSuite = new TestingSuiteWindow();
-            const triggerBtn = document.getElementById("btn-test-suite-trigger");
-            if (triggerBtn) {
-                triggerBtn.addEventListener("click", () => {
-                    window.testingSuite.toggleDrawer();
-                });
-            }
-        });
-    </script>
 </body>
 
 </html>

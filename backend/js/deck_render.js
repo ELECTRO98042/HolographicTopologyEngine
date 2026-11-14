@@ -495,7 +495,7 @@ class DeckViewport {
         };
     }
     // Helper to render HTML/Canvas text labels over Three.js nodes
-    createNodeLabel(text, colorHex = '#00f0ff') {
+    createNodeLabel(text, colorHex = '#ffffff') {
         const canvas = document.createElement('canvas');
         canvas.width = 512;  // Doubled for higher resolution
         canvas.height = 128; // Doubled for higher resolution
@@ -503,8 +503,8 @@ class DeckViewport {
 
         // ... background & styling ...
 
-        ctx.font = 'Bold 36px "Courier New", monospace'; // Increased font size
-        ctx.fillStyle = colorHex;
+        ctx.font = 'Bold 56px "Courier New", monospace'; // Increased font size
+        ctx.fillStyle = '#ffffff';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(text, 256, 64); // Centered on new canvas dimensions
@@ -513,8 +513,8 @@ class DeckViewport {
         const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true });
         const sprite = new THREE.Sprite(spriteMaterial);
 
-        sprite.scale.set(32, 8.0, 1); // Scaled up in 3D space to match the larger nodes
-        sprite.position.set(0, 2.5, 0); // Positioned slightly higher above the larger sphere
+        sprite.scale.set(24, 8.0, 1); // Scaled up in 3D space to match the larger nodes
+        sprite.position.set(0, 8.0, 0); // Positioned slightly higher above the larger sphere
 
         return sprite;
     }
@@ -613,7 +613,7 @@ class DeckViewport {
             center.divideScalar(this.nodes.length);
 
             this.controls.target.copy(center);
-            this.camera.position.set(center.x, center.y + 45, center.z + 85); // 180° flipped Z offset
+            this.camera.position.set(center.x, center.y + 100, center.z + 300); // 180° flipped Z offset
             this.controls.update();
         }
 
@@ -718,9 +718,14 @@ class DeckViewport {
         pointLight.position.set(0, 10, 10);
         this.scene.add(pointLight);
 
-        const gridHelper = new THREE.GridHelper(200, 40, 0x00f0ff, 0x1a2436);
-        gridHelper.position.y = -0.01;
+        // 1. Expand the floor grid dimensions
+        const gridHelper = new THREE.GridHelper(2400, 40, 0x00ffcc, 0x003333); // Doubled from 1200 to 2400
+        gridHelper.position.y = -80;
         this.scene.add(gridHelper);
+
+        // 2. Pull back default camera depth for a wider field of view
+        this.camera.position.set(0, 600, 1800); // Increased distance from (0,0,800) to (0, 1200, 3600)
+        this.camera.lookAt(0, 600, 1800);
 
         const ringGeo = new THREE.RingGeometry(4, 4.2, 64);
         const ringMat = new THREE.MeshBasicMaterial({
@@ -790,7 +795,7 @@ class DeckViewport {
         ];
 
         defaultNodes.forEach(item => {
-            const geometry = new THREE.SphereGeometry(0.6, 24, 24);
+            const geometry = new THREE.SphereGeometry(2.0, 24, 24);
             const material = new THREE.MeshBasicMaterial({ color: 0x10b981, wireframe: true }); // Default base
             const mesh = new THREE.Mesh(geometry, material);
             mesh.userData = { nodeId: item.data.id };

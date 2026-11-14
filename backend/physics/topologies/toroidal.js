@@ -1,54 +1,81 @@
-// physics/topologies/toroidal.js
-// import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.js';
+import * as THREE from '/js/vendor/graphics/three.js';
 
 export class ToroidalTopology {
     constructor() {
         this.name = 'toroidal';
     }
 
-    // Calculate smooth target positions for arbitrary node count N
+    createMesh(scale = 1.0) {
+        const group = new THREE.Group();
+        group.name = 'manifold_toroidal';
+
+        // 6 Non-Overlapping Nested Toroidal Flux Surfaces (Scaling R & r together to preserve the core hole)
+        // 1. White, 2. Yellow, 3. Orange, 4. Red, 5. Purple, 6. Blue
+        const torusConfig = [
+            { majorR: 50, tube: 15, color: 0xffffff, opacity: 0.02 }, // White (Innermost)
+            { majorR: 85, tube: 25, color: 0xfacc15, opacity: 0.03 }, // Yellow
+            { majorR: 125, tube: 35, color: 0xf97316, opacity: 0.04 }, // Orange
+            { majorR: 170, tube: 45, color: 0xef4444, opacity: 0.07 }, // Red
+            { majorR: 220, tube: 55, color: 0xa855f7, opacity: 0.09 }, // Purple
+            { majorR: 275, tube: 65, color: 0x3b82f6, opacity: 0.08 }  // Blue (Outermost)
+        ];
+
+        torusConfig.forEach((cfg, index) => {
+            const geometry = new THREE.TorusGeometry(
+                cfg.majorR * scale,
+                cfg.tube * scale,
+                24,
+                48
+            );
+            const material = new THREE.MeshBasicMaterial({
+                color: cfg.color,
+                wireframe: true,
+                transparent: true,
+                opacity: cfg.opacity,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+
+            const torusMesh = new THREE.Mesh(geometry, material);
+            torusMesh.rotation.x = Math.PI / 2;
+            torusMesh.name = `torus_shell_${index}`;
+            group.add(torusMesh);
+        });
+
+        // Core Magnetic Axis Ring
+        const axisMat = new THREE.LineBasicMaterial({
+            color: 0x00ffcc,
+            transparent: true,
+            opacity: 0.3,
+            blending: THREE.AdditiveBlending
+        });
+
+        const axisPts = [];
+        const segments = 64;
+        for (let i = 0; i <= segments; i++) {
+            const theta = (i / segments) * 2 * Math.PI;
+            axisPts.push(new THREE.Vector3(170 * scale * Math.cos(theta), 0, 170 * scale * Math.sin(theta)));
+        }
+        group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(axisPts), axisMat));
+
+        return group;
+    }
+
     calculateTargets(nodes) {
         const count = nodes.length;
+        const R = 170;
+        const r = 45;
+
         nodes.forEach((node, i) => {
-            const R = 120, r = 40;
-            const u = (i / Math.max(1, count)) * Math.PI * 2;
-            const v = (i * 3) * Math.PI * 2 / Math.max(1, count);
+            const u = (i / count) * 2 * Math.PI;
+            const v = i * 2.4;
             node.targetX = (R + r * Math.cos(v)) * Math.cos(u);
-            node.targetY = (R + r * Math.cos(v)) * Math.sin(u);
-            node.targetZ = r * Math.sin(v);
+            node.targetY = r * Math.sin(v);
+            node.targetZ = (R + r * Math.cos(v)) * Math.sin(u);
         });
     }
 
-    // Render wireframe boundary onto canvas context
-    renderBoundary(ctx, canvas, project3D, scaleMultiplier) {
-        const R = 120 * scaleMultiplier;
-        const r = 40 * scaleMultiplier;
-        const majorSteps = 32;
-        const minorSteps = 16;
-
-        ctx.strokeStyle = 'rgba(0, 255, 204, 0.22)';
-        ctx.lineWidth = 0.8;
-
-        for (let i = 0; i < majorSteps; i++) {
-            const u = (i / majorSteps) * Math.PI * 2;
-            let points = [];
-
-            for (let j = 0; j <= minorSteps; j++) {
-                const v = (j / minorSteps) * Math.PI * 2;
-                const x = (R + r * Math.cos(v)) * Math.cos(u);
-                const y = (R + r * Math.cos(v)) * Math.sin(u);
-                const z = r * Math.sin(v);
-                points.push(project3D(x, y, z, canvas.width, canvas.height));
-            }
-
-            for (let j = 0; j < points.length - 1; j++) {
-                if (points[j].scale > 0 && points[j + 1].scale > 0) {
-                    ctx.beginPath();
-                    ctx.moveTo(points[j].px, points[j].py);
-                    ctx.lineTo(points[j + 1].px, points[j + 1].py);
-                    ctx.stroke();
-                }
-            }
-        }
+    enforceConstraints(nodePositions) {
+        return nodePositions;
     }
 }
