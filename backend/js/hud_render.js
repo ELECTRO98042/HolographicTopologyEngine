@@ -2,19 +2,22 @@
 // hud_render.js — Holographic Topology Engine GPU Renderer (Three.js)
 // -----------------------------------------------------------------------------
 // All screen rendering (spectral shells, floor grid, nodes, tethers, overlays,
-// gimbal) lives here. index.html keeps the data, telemetry, import/export and
-// control-deck functions; this module consumes and updates the shared state:
-//   window.nodes, window.edges, window.hudConfig, window.hudMode
-//   window.selectedNode
-//   window.hudPhysicsStep()  // optional per-frame simulation step
+// gimbal) lives here.
 // =============================================================================
 
 import * as THREE from 'three';
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { ReferenceFrameManager } from '/physics/reference_frames.js';
+import { SubatomicNodeFactory } from '/physics/rendermath/index.js';
+import { ThermalOverlay } from '/physics/visuals/thermal_overlay.js';
+import { EmpOverlay } from '/physics/visuals/emp_overlay.js';
+
+const subatomicFactory = new SubatomicNodeFactory();
+const nodeRenderGroups = new Map();
+window.__nodeRenderGroups = nodeRenderGroups;
 
 // -----------------------------------------------------------------------------
-// Constants
+// Constants & States
 // -----------------------------------------------------------------------------
 const MAX_NODES = 32;
 const MAX_TETHERS = 48;
@@ -27,20 +30,10 @@ const REST_DIST = 90.0;
 const FLOOR_Y = -80.0;
 const BASE_SPAN = 250.0;
 
-const SPECTRAL_TIERS = [
-    { radius: 30, color: 0xffffff, opacity: 0.24 },
-    { radius: 65, color: 0xfacc15, opacity: 0.26 },
-    { radius: 105, color: 0xf97316, opacity: 0.22 },
-    { radius: 145, color: 0xef4444, opacity: 0.20 },
-    { radius: 190, color: 0x8b5cf6, opacity: 0.24 },
-    { radius: 240, color: 0x3b82f6, opacity: 0.18 }
-];
-
 // -----------------------------------------------------------------------------
 // Module state
 // -----------------------------------------------------------------------------
 let initialized = false;
-
 let renderer = null;
 let labelRenderer = null;
 let scene = null;
@@ -50,7 +43,6 @@ let gizmoRenderer = null;
 let gizmoScene = null;
 let gizmoCamera = null;
 
-let shellMesh = null;
 let shellMaterial = null;
 let shellMode = null;
 
@@ -90,6 +82,9 @@ const VAPOR_COUNT = 12000;
 let empMesh = null;
 const EMP_RINGS_PER_NODE = 2;
 const MAX_EMP_NODES = 8;
+
+let thermalOverlay = null;
+let empOverlay = null;
 
 let dopplerGeometry = null;
 let dopplerLines = null;
@@ -137,9 +132,33 @@ export function initHUDRenderer(options = {}) {
     scene.background = new THREE.Color(0x05050a);
     scene.fog = new THREE.FogExp2(0x05050a, 0.00055);
 
-    // ---> INITIALIZE REFERENCE FRAME MANAGER BOUND TO SCENE:
     window.referenceFrameManager = new ReferenceFrameManager(scene);
     window.referenceFrameManager.switchFrame('open', 1.0);
+
+    thermalOverlay = new ThermalOverlay(scene, window.referenceFrameManager, '#deck-body-content');
+    empOverlay = new EmpOverlay(scene, window.referenceFrameManager, '#deck-body-content');
+
+    window.toggleThermalOverlay = function (active) {
+        if (!thermalOverlay) return;
+        if (active) {
+            thermalOverlay.enable();
+            setOverlays({ thermal: true });
+        } else {
+            thermalOverlay.disable();
+            setOverlays({ thermal: false });
+        }
+    };
+
+    window.toggleEmpOverlay = function (active) {
+        if (!empOverlay) return;
+        if (active) {
+            empOverlay.enable();
+            setOverlays({ emp: true });
+        } else {
+            empOverlay.disable();
+            setOverlays({ emp: false });
+        }
+    };
 
     camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 1, 6000);
     camera.position.set(0, 180, 480);
@@ -173,10 +192,13 @@ export function initHUDRenderer(options = {}) {
     buildNodeMeshes();
     buildTetherMeshes();
     buildVaporField();
-    buildEMPField();
+    // buildEMPField();
     buildDopplerField();
     buildShell(options.mode || 'open');
     buildGizmo(options.gizmoCanvas || document.getElementById('gizmoCanvas'));
+
+    // Ensure empOverlay is initialized here:
+    empOverlay = new EmpOverlay(scene, window.referenceFrameManager, '#deck-body-content');
 
     attachMainCanvasEvents(canvas);
     attachGizmoEvents(options.gizmoCanvas || document.getElementById('gizmoCanvas'));
@@ -190,7 +212,7 @@ export function initHUDRenderer(options = {}) {
 
     const api = getAPI();
     window.HUDRenderer = api;
-    window.hudViewport = api; // 1:1 alias for index.html control bindings
+    window.hudViewport = api;
     return api;
 }
 
@@ -200,16 +222,9 @@ export function setColorPalette(schema) {
 
     if (shellMaterial && shellMaterial.uniforms && shellMaterial.uniforms.uColorSchema) {
         const paletteModes = {
-            'dynamic': 0,
-            'qe': 1,
-            'ads': 2,
-            'snr': 3,
-            'thermal': 4,
-            'em': 5,
-            'doppler': 6,
-            'tension': 7,
-            'vacuum': 8,
-            'composite': 9
+            'dynamic': 0, 'qe': 1, 'ads': 2, 'snr': 3,
+            'thermal': 4, 'em': 5, 'doppler': 6, 'tension': 7,
+            'vacuum': 8, 'composite': 9
         };
         shellMaterial.uniforms.uColorSchema.value = paletteModes[schema] !== undefined ? paletteModes[schema] : 0;
         shellMaterial.uniforms.uColorSchema.needsUpdate = true;
@@ -276,14 +291,12 @@ export function resetRenderCamera() {
 export function setRenderMode(mode) {
     const nextMode = mode || 'open';
     window.hudMode = nextMode;
-    
-    // Check against referenceFrameManager's active frame instead of the old shellMesh
+
     if (window.referenceFrameManager && window.referenceFrameManager.activeFrameType === nextMode) {
-        // Even if mode matches, ensure scale is synced
         window.referenceFrameManager.setScale(window.hudConfig?.worldScale || 1.0);
         return;
     }
-    
+
     buildShell(nextMode);
 }
 
@@ -380,144 +393,9 @@ function attachGizmoEvents(canvas) {
 // -----------------------------------------------------------------------------
 // Spectral reference manifolds
 // -----------------------------------------------------------------------------
-function pushLine(positions, colors, a, b, color) {
-    positions.push(a[0], a[1], a[2], b[0], b[1], b[2]);
-    colors.push(color.r, color.g, color.b, color.r, color.g, color.b);
-}
-
-function addSphereLines(out, tier, latSteps = 12, lonSteps = 26) {
-    const radius = tier.radius;
-    const color = new THREE.Color(tier.color);
-    const p = out.positions;
-    const c = out.colors;
-
-    for (let i = 1; i < latSteps; i++) {
-        const lat = (Math.PI / latSteps) * i - Math.PI / 2;
-        let prev = null;
-        for (let j = 0; j <= lonSteps; j++) {
-            const lon = (Math.PI * 2 / lonSteps) * j;
-            const point = [
-                radius * Math.cos(lat) * Math.cos(lon),
-                radius * Math.sin(lat),
-                radius * Math.cos(lat) * Math.sin(lon)
-            ];
-            if (prev) pushLine(p, c, prev, point, color);
-            prev = point;
-        }
-    }
-
-    for (let j = 0; j < lonSteps; j += 2) {
-        const lon = (Math.PI * 2 / lonSteps) * j;
-        let prev = null;
-        for (let i = 0; i <= latSteps; i++) {
-            const lat = (Math.PI / latSteps) * i - Math.PI / 2;
-            const point = [
-                radius * Math.cos(lat) * Math.cos(lon),
-                radius * Math.sin(lat),
-                radius * Math.cos(lat) * Math.sin(lon)
-            ];
-            if (prev) pushLine(p, c, prev, point, color);
-            prev = point;
-        }
-    }
-}
-
-function addCubeLines(out, tier, divisions = 4) {
-    const size = tier.radius * 1.1;
-    const half = size / 2;
-    const step = size / divisions;
-    const color = new THREE.Color(tier.color);
-    const p = out.positions;
-    const c = out.colors;
-
-    for (let face = -1; face <= 1; face += 2) {
-        const x = face * half;
-        for (let i = 0; i <= divisions; i++) {
-            const y = -half + i * step;
-            pushLine(p, c, [x, y, -half], [x, y, half], color);
-        }
-        for (let i = 0; i <= divisions; i++) {
-            const z = -half + i * step;
-            pushLine(p, c, [x, -half, z], [x, half, z], color);
-        }
-    }
-    for (let face = -1; face <= 1; face += 2) {
-        const y = face * half;
-        for (let i = 0; i <= divisions; i++) {
-            const x = -half + i * step;
-            pushLine(p, c, [x, y, -half], [x, y, half], color);
-        }
-        for (let i = 0; i <= divisions; i++) {
-            const z = -half + i * step;
-            pushLine(p, c, [-half, y, z], [half, y, z], color);
-        }
-    }
-    for (let face = -1; face <= 1; face += 2) {
-        const z = face * half;
-        for (let i = 0; i <= divisions; i++) {
-            const x = -half + i * step;
-            pushLine(p, c, [x, -half, z], [x, half, z], color);
-        }
-        for (let i = 0; i <= divisions; i++) {
-            const y = -half + i * step;
-            pushLine(p, c, [-half, y, z], [half, y, z], color);
-        }
-    }
-}
-
-function addTorusLines(out, tier) {
-    const maxR = tier.radius;
-    const majorR = maxR * 0.5;
-    const minorR = maxR * 0.5;
-    const majorSteps = 30;
-    const minorSteps = 14;
-    const color = new THREE.Color(tier.color);
-    const p = out.positions;
-    const c = out.colors;
-
-    for (let i = 0; i < majorSteps; i++) {
-        const u = (i / majorSteps) * Math.PI * 2;
-        let prev = null;
-        for (let j = 0; j <= minorSteps; j++) {
-            const v = (j / minorSteps) * Math.PI * 2;
-            const point = [
-                (majorR + minorR * Math.cos(v)) * Math.cos(u),
-                minorR * Math.sin(v),
-                (majorR + minorR * Math.cos(v)) * Math.sin(u)
-            ];
-            if (prev) pushLine(p, c, prev, point, color);
-            prev = point;
-        }
-    }
-}
-
-function addHyperbolicLines(out, tier) {
-    const baseRadius = tier.radius;
-    const uSteps = 30;
-    const vSteps = 18;
-    const color = new THREE.Color(tier.color);
-    const p = out.positions;
-    const c = out.colors;
-
-    for (let i = 0; i < vSteps; i++) {
-        const v = ((i / (vSteps - 1)) * 6.0) - 3.0;
-        const flare = 0.08 + Math.abs(v) * 0.38 + (Math.cosh(v) - 1.0) * 0.12;
-        const radius = baseRadius * flare;
-        const y = v * 42.0;
-        let prev = null;
-        for (let j = 0; j <= uSteps; j++) {
-            const u = (j / uSteps) * Math.PI * 2;
-            const point = [radius * Math.cos(u), y, radius * Math.sin(u)];
-            if (prev) pushLine(p, c, prev, point, color);
-            prev = point;
-        }
-    }
-}
-
 function buildShell(mode) {
     shellMode = mode || 'open';
 
-    // 1. Maintain existing shader material initialization if not already created
     if (!shellMaterial) {
         shellMaterial = new THREE.ShaderMaterial({
             uniforms: {
@@ -526,12 +404,14 @@ function buildShell(mode) {
                 uWarp: { value: 1 },
                 uOpacity: { value: 1 },
                 uNodes: { value: Array.from({ length: MAX_NODES }, () => new THREE.Vector3()) },
-                uNodeCount: { value: 0 }
+                uNodeCount: { value: 0 },
+                uColorSchema: { value: 0 }
             },
             vertexShader: `
                 uniform float uTime;
                 uniform float uScale;
                 uniform float uWarp;
+                uniform int uColorSchema;
                 uniform vec3 uNodes[${MAX_NODES}];
                 uniform int uNodeCount;
 
@@ -580,8 +460,6 @@ function buildShell(mode) {
         });
     }
 
-    // 2. Delegate geometry generation entirely to our ReferenceFrameManager
-    // (Assuming window.referenceFrameManager is globally accessible or passed cleanly)
     if (window.referenceFrameManager) {
         const currentScale = window.hudConfig?.worldScale || 1.0;
         window.referenceFrameManager.switchFrame(shellMode, currentScale);
@@ -676,36 +554,35 @@ function updateNodeLabels(nodes, worldScale, visibleSet, resolvedColors) {
         el.style.color = `rgba(${Math.round(c.r * 255)}, ${Math.round(c.g * 255)}, ${Math.round(c.b * 255)}, 0.95)`;
     });
 }
-
 function resolveSchemaNodeColor(node, palette, speed, isCore, outColor) {
     const baseHex = node.color || (isCore ? '#ffffff' : '#10b981');
     switch (palette) {
-        case 'qe': // 1. Quantum Entanglement (Cyan <-> Violet)
+        case 'qe':
             outColor.set(isCore ? '#38bdf8' : '#a855f7');
             break;
-        case 'ads': // 2. AdS/CFT Duality (Bulk Gold vs Boundary Violet)
+        case 'ads':
             outColor.set(isCore ? '#facc15' : '#8b5cf6');
             break;
-        case 'snr': // 3. Signal Integrity (Emerald vs Amber/Red)
+        case 'snr':
             outColor.set((node.entropy !== undefined && node.entropy < 0) ? '#ef4444' : '#10b981');
             break;
-        case 'thermal': // 4. Thermal Dissipation
+        case 'thermal':
             if (speed > 1.0 || isCore) outColor.setRGB(1.0, 0.32, 0.08);
             else outColor.setRGB(0.28, 0.52, 1.0);
             break;
-        case 'em': // 5. Electromagnetic Field
+        case 'em':
             outColor.set(isCore ? '#00f0ff' : '#3b82f6');
             break;
-        case 'doppler': // 6. Doppler Shift
+        case 'doppler':
             outColor.set((node.vx || 0) >= 0 ? '#06b6d4' : '#f43f5e');
             break;
-        case 'tension': // 7. Tensegrity Tension
+        case 'tension':
             outColor.set(node.isPinned ? '#f59e0b' : '#00ffcc');
             break;
-        case 'vacuum': // 8. Vacuum Fluctuations
+        case 'vacuum':
             outColor.set('#34d399');
             break;
-        case 'composite': // Full Multiplexed Composite
+        case 'composite':
             outColor.set(isCore ? '#ffffff' : '#c084fc');
             break;
         case 'dynamic':
@@ -724,10 +601,26 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
     nodeMesh.count = count;
     nodeGlow.count = count;
 
-    const empActive = !!overlays.emp || !!overlays.em || palette === 'em';
+    const empActive = !!(overlays.emp || overlays.em || palette === 'em');
     const thermalActive = !!overlays.thermal || palette === 'thermal';
     const waveActive = !!overlays.wave || !!overlays.qe || palette === 'qe';
     const compositeActive = palette === 'composite';
+    const activeKeys = new Set();
+
+    const cameraDistance = camera ? camera.position.distanceTo(new THREE.Vector3(0, 0, 0)) : 480;
+    const time = simulationTime || 0;
+    const dt = 0.016;
+
+    const layerStates = {
+        surfaceMesh: true,
+        subModels: true,
+        ghostMesh: true,
+        referenceShells: true,
+        tethers: true,
+        tensors: true,
+        volumetricPulses: true,
+        observerCollapse: cameraDistance < 6.0
+    };
 
     for (let i = 0; i < count; i++) {
         const node = nodes[i];
@@ -748,7 +641,7 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
 
         const nodeCol = resolveSchemaNodeColor(node, palette, speed, isCore, new THREE.Color());
         if (window.selectedNode === node) {
-            nodeCol.setHex(0xfacc15); // Active selection yellow parity with Builder Deck
+            nodeCol.setHex(0xfacc15);
         }
         resolvedColors[i] = nodeCol;
         nodeMesh.setColorAt(i, nodeCol);
@@ -774,7 +667,48 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
         dummyObject.scale.setScalar(glowRadius);
         dummyObject.updateMatrix();
         nodeGlow.setMatrixAt(i, dummyObject.matrix);
+
+        const key = node.id || node.name || `node-${i}`;
+        activeKeys.add(key);
+        let renderGroup = nodeRenderGroups.get(key);
+        if (!renderGroup) {
+            renderGroup = new THREE.Group();
+            scene.add(renderGroup);
+
+            let qftType = node.qftType;
+            if (!qftType) {
+                if (node.id === 'N-001') qftType = 'ENTANGLEMENT_PAIR';
+                else if (node.id === 'N-002' || isCore) qftType = 'GRAVITON_TENSOR';
+                else if (node.id === 'N-003') qftType = 'ELECTRON_DIRAC';
+                else qftType = 'QUARK_TRIAD';
+            }
+
+            subatomicFactory.attachRenderer(renderGroup, qftType);
+            renderGroup.scale.setScalar(7.0);
+            nodeRenderGroups.set(key, renderGroup);
+        }
+        renderGroup.position.set(x, y, z);
+        renderGroup.visible = true;
+
+        subatomicFactory.updateNode(renderGroup, time, dt, layerStates, cameraDistance, palette, nodeCol);
     }
+
+    nodeRenderGroups.forEach((group, key) => {
+        if (!activeKeys.has(key)) {
+            scene.remove(group);
+            group.traverse((child) => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            });
+            nodeRenderGroups.delete(key);
+        }
+    });
 
     nodeMesh.instanceMatrix.needsUpdate = true;
     nodeGlow.instanceMatrix.needsUpdate = true;
@@ -785,7 +719,7 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
 }
 
 // -----------------------------------------------------------------------------
-// Tethers (explicit graph edges or all-to-all fallback)
+// Tethers
 // -----------------------------------------------------------------------------
 function makeDynamicLines(maxVerts, opacity, size = 1) {
     const geometry = new THREE.BufferGeometry();
@@ -881,7 +815,6 @@ function buildPairList(nodes, edges, worldScale) {
         };
     };
 
-    // If explicit edges exist (from Builder Deck or JSON import), honor them 1:1
     if (Array.isArray(edges) && edges.length > 0) {
         const nodeMap = new Map();
         nodes.forEach((n, idx) => {
@@ -902,7 +835,6 @@ function buildPairList(nodes, edges, worldScale) {
         }
     }
 
-    // Fallback to all-to-all graph if no explicit edges resolved
     if (pairs.length === 0) {
         for (let i = 0; i < nodes.length; i++) {
             for (let j = i + 1; j < nodes.length; j++) {
@@ -1065,7 +997,7 @@ function updateTethers(pairs, time, interpMode, palette, overlays, intensity, no
 }
 
 // -----------------------------------------------------------------------------
-// GPU overlay field (atmosphere / thermal / wave / EMP / Doppler / multipath)
+// GPU Vapor Field
 // -----------------------------------------------------------------------------
 function buildVaporField() {
     const positions = new Float32Array(VAPOR_COUNT * 3);
@@ -1198,16 +1130,16 @@ function buildVaporField() {
                 }
 
                 if (uEmp > 0.5) {
-                    float pulseRadius = mod(uTime * 300.0, 580.0);
+                    float pulseRadius = mod(uTime * 220.0, 320.0);
                     for (int i = 0; i < ${MAX_NODES}; i++) {
                         if (i >= uNodeCount) break;
                         vec3 n = uNodePos[i];
-                        vec2 d = p.xy - n.xy;
+                        vec3 d = p - n;
                         float ringDist = abs(length(d) - pulseRadius);
                         if (ringDist < 14.0) {
                             float shock = pow(1.0 - ringDist / 14.0, 2.5);
-                            density += shock * 0.85;
-                            col = vec3((210.0 + shock * 45.0) / 255.0, 1.0, 1.0);
+                            density += shock * 0.45;
+                            col = vec3(0.08, 0.48, 0.58);
                         }
                     }
                 }
@@ -1331,16 +1263,15 @@ function updateVaporField(nodes, pairs, overlayFlags, intensity, time, worldScal
 // -----------------------------------------------------------------------------
 // EMP shock rings
 // -----------------------------------------------------------------------------
-function buildEMPField() {
-    const geometry = new THREE.RingGeometry(0.94, 1.0, 64);
-    geometry.rotateX(-Math.PI / 2);
+/*function buildEMPField() {
+    const geometry = new THREE.SphereGeometry(1.0, 64, 48);
 
     const material = new THREE.MeshBasicMaterial({
         color: 0xffffff,
+        wireframe: true,
         transparent: true,
-        opacity: 0.6,
-        side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending,
+        opacity: 0.04,
+        blending: THREE.NormalBlending,
         depthWrite: false,
         toneMapped: false
     });
@@ -1350,14 +1281,14 @@ function buildEMPField() {
     empMesh.frustumCulled = false;
     empMesh.count = 0;
 
-    const white = new THREE.Color(0xffffff);
+    const dullCyan = new THREE.Color(0x0e7490);
     for (let i = 0; i < MAX_EMP_NODES * EMP_RINGS_PER_NODE; i++) {
-        empMesh.setColorAt(i, white);
+        empMesh.setColorAt(i, dullCyan);
     }
     scene.add(empMesh);
-}
+}*/
 
-function updateEMP(nodes, worldScale, active, time, intensity) {
+/*function updateEMP(nodes, worldScale, active, time, intensity) {
     empMesh.visible = active;
     if (!active) return;
 
@@ -1370,16 +1301,25 @@ function updateEMP(nodes, worldScale, active, time, intensity) {
         const x = (node.position ? node.position.x : node.x || 0) * worldScale;
         const y = (node.position ? node.position.y : node.y || 0) * worldScale;
         const z = (node.position ? node.position.z : node.z || 0) * worldScale;
+        const distFromCenter = Math.sqrt(x * x + y * y + z * z);
+        const isOutOfBounds = distFromCenter > 1500 * worldScale;
 
         for (let ring = 0; ring < EMP_RINGS_PER_NODE; ring++) {
-            const phase = (time * 0.18 + ring / EMP_RINGS_PER_NODE + i * 0.11) % 1.0;
-            const radius = 25 + phase * 540;
             dummyObject.position.set(x, y, z);
-            dummyObject.scale.set(radius, 1, radius);
-            dummyObject.rotation.set(0, 0, 0);
+
+            const phase = (time * 0.20 + ring / EMP_RINGS_PER_NODE + i * 0.13) % 1.0;
+            const radius = isOutOfBounds ? 0 : (12 + phase * 260) * worldScale;
+            dummyObject.position.set(x, y, z);
+            dummyObject.scale.set(radius, radius, radius);
+            dummyObject.rotation.set(0, time * 0.12 * (ring % 2 === 0 ? 1 : -1), 0);
             dummyObject.updateMatrix();
             empMesh.setMatrixAt(index, dummyObject.matrix);
-            tempColor.setRGB(0.8, 1.0, 1.0).multiplyScalar(Math.pow(1.0 - phase, 1.7) * 0.85 * intensity);
+
+            const fadeIn = Math.min(1.0, phase * 5.0);
+            const fadeOut = Math.pow(1.0 - phase, 1.8);
+            const falloff = fadeIn * fadeOut * Math.min(1.2, Math.max(0.3, intensity));
+
+            tempColor.setRGB(0.06, 0.45, 0.56).multiplyScalar(falloff);
             empMesh.setColorAt(index, tempColor);
             index++;
         }
@@ -1387,7 +1327,7 @@ function updateEMP(nodes, worldScale, active, time, intensity) {
 
     empMesh.instanceMatrix.needsUpdate = true;
     if (empMesh.instanceColor) empMesh.instanceColor.needsUpdate = true;
-}
+}*/
 
 // -----------------------------------------------------------------------------
 // Doppler velocity streaks
@@ -1478,7 +1418,7 @@ function syncFloor(config) {
 }
 
 // -----------------------------------------------------------------------------
-// Main canvas interaction (node picking / dragging + 1:1 sync broadcast)
+// Main canvas interaction
 // -----------------------------------------------------------------------------
 function getVisibleNodes() {
     const nodes = window.nodes || [];
@@ -1609,6 +1549,8 @@ function animationLoop(timestamp = performance.now()) {
     simulationTime += dt * motionSpeed;
     config.simulationTime = simulationTime;
 
+    const overlays = config.overlays || {};
+
     if (typeof window.hudPhysicsStep === 'function') {
         window.hudPhysicsStep();
     }
@@ -1619,9 +1561,62 @@ function animationLoop(timestamp = performance.now()) {
     const nodes = getVisibleNodes();
     const edges = window.edges || [];
     const palette = config.colorPalette || 'dynamic';
-    const overlays = config.overlays || {};
     const intensity = config.overlayIntensity ?? 1.0;
     const interpolation = config.interpolationMode || 'linear';
+
+    // --- Automatic Overlay Sync & Update ---
+    const thermalActive = !!(overlays.thermal || palette === 'thermal');
+    if (thermalOverlay) {
+        if (thermalActive && !thermalOverlay.active) thermalOverlay.enable();
+        else if (!thermalActive && thermalOverlay.active) thermalOverlay.disable();
+        if (thermalOverlay.active) {
+            thermalOverlay.update(nodes, dt);
+        }
+    }
+
+    const empActive = !!(overlays.emp || overlays.em || palette === 'em');
+    if (empOverlay) {
+        if (empActive && !empOverlay.active) empOverlay.enable();
+        else if (!empActive && empOverlay.active) empOverlay.disable();
+        if (empOverlay.active) {
+            empOverlay.update(nodes, dt, motionSpeed, worldScale); // Drives wireframe mesh
+        }
+    }
+
+    // --- Synchronized Uniform Feed from EmpOverlay pulseRings (Leading Edge & Diffusion Parity) ---
+    if (window.referenceFrameManager && window.referenceFrameManager.empUniforms) {
+        window.referenceFrameManager.empUniforms.uEmpActive.value = empActive && empOverlay && empOverlay.active ? 1 : 0;
+
+        if (empActive && empOverlay && empOverlay.active && empOverlay.pulseRings) {
+            const radiiVal = window.referenceFrameManager.empUniforms.uEmpRadii.value;
+            const opacitiesVal = window.referenceFrameManager.empUniforms.uEmpOpacities.value;
+            const centersVal = window.referenceFrameManager.empUniforms.uEmpCenters.value;
+            const rings = empOverlay.pulseRings;
+
+            for (let j = 0; j < 16; j++) {
+                if (j < rings.length) {
+                    radiiVal[j] = rings[j].radius;
+                    const lifeProgress = rings[j].radius / rings[j].maxRadius;
+                    opacitiesVal[j] = Math.max(0.0, 0.35 * (1.0 - lifeProgress));
+                    centersVal[j].copy(rings[j].mesh.position);
+                } else {
+                    radiiVal[j] = 0.0;
+                    opacitiesVal[j] = 0.0;
+                }
+            }
+            window.referenceFrameManager.empUniforms.uEmpRadii.needsUpdate = true;
+            window.referenceFrameManager.empUniforms.uEmpOpacities.needsUpdate = true;
+        } else {
+            const radiiVal = window.referenceFrameManager.empUniforms.uEmpRadii.value;
+            const opacitiesVal = window.referenceFrameManager.empUniforms.uEmpOpacities.value;
+            for (let j = 0; j < 16; j++) {
+                radiiVal[j] = 0.0;
+                opacitiesVal[j] = 0.0;
+            }
+            window.referenceFrameManager.empUniforms.uEmpRadii.needsUpdate = true;
+            window.referenceFrameManager.empUniforms.uEmpOpacities.needsUpdate = true;
+        }
+    }
 
     if (shellMaterial) {
         shellMaterial.uniforms.uTime.value = simulationTime;
@@ -1646,7 +1641,6 @@ function animationLoop(timestamp = performance.now()) {
     updateNodes(nodes, worldScale, palette, overlays, intensity);
     updateTethers(pairs, simulationTime, interpolation, palette, overlays, intensity, config.noiseThresh ?? 0.05);
     updateVaporField(nodes, pairs, overlays, intensity, simulationTime, worldScale);
-    updateEMP(nodes, worldScale, !!(overlays.emp || overlays.em), simulationTime, intensity);
     updateDoppler(nodes, worldScale, !!overlays.doppler, intensity);
 
     renderer.render(scene, camera);
@@ -1654,7 +1648,7 @@ function animationLoop(timestamp = performance.now()) {
     renderGizmo();
 
     frameHandle = requestAnimationFrame(animationLoop);
-}
+}    
 
 // -----------------------------------------------------------------------------
 // Teardown
