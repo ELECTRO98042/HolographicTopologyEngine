@@ -190,6 +190,54 @@ export function initHUDRenderer(options = {}) {
     raycaster = new THREE.Raycaster();
 
     buildNodeMeshes();
+    // Create particle buffer geometry for point sprites
+    const glowGeometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(MAX_NODE_INSTANCES * 3);
+    glowGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+    const glowMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            uColor: { value: new THREE.Color(0xffffff) },
+            uIntensity: { value: 1.0 }
+        },
+        vertexShader: `
+            attribute vec3 instanceColor;
+            attribute float instanceSize;
+            varying vec3 vColor;
+            void main() {
+                vColor = instanceColor;
+                vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+                gl_Position = projectionMatrix * mvPosition;
+                // Scale point size based on distance and individual node radius/speed
+                gl_PointSize = instanceSize * (300.0 / -mvPosition.z);
+            }
+        `,
+        fragmentShader: `
+            varying vec3 vColor;
+            void main() {
+                float dist = distance(gl_PointCoord, vec2(0.5));
+                if (dist > 0.5) discard;
+                
+                // True radial gradient: 45% luminous core fading smoothly to 1% at outer edge
+                float falloff = smoothstep(0.5, 0.0, dist);
+                float alpha = mix(0.01, 0.45, falloff);
+                
+                gl_FragColor = vec4(vColor, alpha);
+            }
+        `,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false
+    });
+
+    // Add custom attributes for instanced color and size per point
+    glowGeometry.setAttribute('instanceColor', new THREE.InstancedBufferAttribute(new Float32Array(MAX_NODE_INSTANCES * 3), 3));
+    glowGeometry.setAttribute('instanceSize', new THREE.InstancedBufferAttribute(new Float32Array(MAX_NODE_INSTANCES), 1));
+
+    nodeGlow = new THREE.Points(glowGeometry, glowMaterial);
+    scene.add(nodeGlow);
+
     buildTetherMeshes();
     buildVaporField();
     // buildEMPField();
@@ -465,7 +513,26 @@ function buildShell(mode) {
         window.referenceFrameManager.switchFrame(shellMode, currentScale);
     }
 }
+function createRadialGlowTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
 
+    const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+    // Inner luminous core (15-20% opacity) fading smoothly to 1% at the outer boundary
+    gradient.addColorStop(0.0, 'rgba(255, 255, 255, 0.95)');
+    gradient.addColorStop(0.25, 'rgba(255, 255, 255, 0.40)');
+    gradient.addColorStop(0.7, 'rgba(255, 255, 255, 0.12)');
+    gradient.addColorStop(1.0, 'rgba(255, 255, 255, 0.01)');
+
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 128, 128);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+}
 // -----------------------------------------------------------------------------
 // Nodes + labels
 // -----------------------------------------------------------------------------
@@ -481,14 +548,19 @@ function buildNodeMeshes() {
     nodeMesh.frustumCulled = false;
     nodeMesh.count = 0;
 
-    const glowGeometry = new THREE.SphereGeometry(1, 12, 10);
+    const glowGeometry = new THREE.SphereGeometry(1, 16, 12);
+    const glowTexture = createRadialGlowTexture();
+
     const glowMaterial = new THREE.MeshBasicMaterial({
+        map: glowTexture,
         transparent: true,
-        opacity: 0.24,
+        opacity: 0.85,
         depthWrite: false,
         blending: THREE.AdditiveBlending,
-        toneMapped: false
+        toneMapped: false,
+        side: THREE.DoubleSide
     });
+
 
     nodeGlow = new THREE.InstancedMesh(glowGeometry, glowMaterial, MAX_NODE_INSTANCES);
     nodeGlow.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -599,7 +671,6 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
     const resolvedColors = new Array(count);
 
     nodeMesh.count = count;
-    nodeGlow.count = count;
 
     const empActive = !!(overlays.emp || overlays.em || palette === 'em');
     const thermalActive = !!overlays.thermal || palette === 'thermal';
@@ -622,6 +693,11 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
         observerCollapse: cameraDistance < 6.0
     };
 
+    // Fetch buffer attribute references once before the loop
+    const positionsAttr = nodeGlow.geometry.attributes.position;
+    const colorsAttr = nodeGlow.geometry.attributes.instanceColor;
+    const sizesAttr = nodeGlow.geometry.attributes.instanceSize;
+
     for (let i = 0; i < count; i++) {
         const node = nodes[i];
         const isCore = node.tier === 'BULK_CORE' || node.isCore;
@@ -633,6 +709,7 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
         const y = (node.position ? node.position.y : node.y || 0) * worldScale;
         const z = (node.position ? node.position.z : node.z || 0) * worldScale;
 
+        // 1. Update solid node mesh matrix (unchanged)
         dummyObject.position.set(x, y, z);
         dummyObject.scale.setScalar(radius);
         dummyObject.rotation.set(0, 0, 0);
@@ -646,6 +723,9 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
         resolvedColors[i] = nodeCol;
         nodeMesh.setColorAt(i, nodeCol);
 
+        // 2. Set point sprite position directly
+        positionsAttr.setXYZ(i, x, y, z);
+
         let glowRadius = radius * 2.5;
         tempColor.copy(nodeCol);
 
@@ -653,8 +733,25 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
             tempColor.setRGB(0.55, 0.98, 1.0);
             glowRadius = radius * 3.6;
         } else if (thermalActive) {
-            tempColor.setRGB(1.0, 0.32, 0.08);
-            glowRadius = radius * (isCore ? 5.2 : 3.8);
+            // =========================================================================
+            // THREE-TIER THERMAL SCHEMA (Amplitude-Scaled Radiance)
+            // =========================================================================
+            if (speed > 1.8) {
+                // HOT: Bright sky-blue to white radiance
+                tempColor.setRGB(0.85, 0.95, 1.0);
+                glowRadius = radius * 5.5;
+            } else if (speed > 0.7) {
+                // MEDIUM: Yellow to orange transition
+                tempColor.setRGB(1.0, 0.65, 0.15);
+                glowRadius = radius * 4.2;
+            } else {
+                // LOW: Red to red-brown gradient
+                tempColor.setRGB(0.65, 0.20, 0.10);
+                glowRadius = radius * 3.2;
+            }
+
+            // Clean scalar intensity without compounding distortion
+            tempColor.multiplyScalar(Math.max(0.5, intensity));
         } else if (waveActive) {
             tempColor.setRGB(0.0, 1.0, 0.94);
             glowRadius = radius * 3.2;
@@ -662,11 +759,13 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
             glowRadius = radius * 3.8;
         }
 
-        tempColor.multiplyScalar(0.55 * Math.max(0.25, intensity));
-        nodeGlow.setColorAt(i, tempColor);
-        dummyObject.scale.setScalar(glowRadius);
-        dummyObject.updateMatrix();
-        nodeGlow.setMatrixAt(i, dummyObject.matrix);
+        if (!thermalActive) {
+            tempColor.multiplyScalar(0.55 * Math.max(0.25, intensity));
+        }
+
+        // 3. Assign color and point size to the point sprite attribute buffers
+        colorsAttr.setXYZ(i, tempColor.r, tempColor.g, tempColor.b);
+        sizesAttr.setX(i, glowRadius * 14.0); // Scale multiplier for point sprite pixel sizing
 
         const key = node.id || node.name || `node-${i}`;
         activeKeys.add(key);
@@ -710,14 +809,20 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
         }
     });
 
+    // Update matrix flags for standard instanced node mesh
     nodeMesh.instanceMatrix.needsUpdate = true;
-    nodeGlow.instanceMatrix.needsUpdate = true;
     if (nodeMesh.instanceColor) nodeMesh.instanceColor.needsUpdate = true;
-    if (nodeGlow.instanceColor) nodeGlow.instanceColor.needsUpdate = true;
+
+    // Update geometry draw range for points if count changes
+    nodeGlow.geometry.setDrawRange(0, count);
+
+    // Point sprite buffer updates (removed invalid instanceMatrix calls)
+    nodeGlow.geometry.attributes.position.needsUpdate = true;
+    nodeGlow.geometry.attributes.instanceColor.needsUpdate = true;
+    nodeGlow.geometry.attributes.instanceSize.needsUpdate = true;
 
     updateNodeLabels(nodes, worldScale, visibleSet, resolvedColors);
 }
-
 // -----------------------------------------------------------------------------
 // Tethers
 // -----------------------------------------------------------------------------
