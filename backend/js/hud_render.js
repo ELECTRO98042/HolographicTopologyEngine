@@ -11,6 +11,7 @@ import { ReferenceFrameManager } from '/physics/reference_frames.js';
 import { SubatomicNodeFactory } from '/physics/rendermath/index.js';
 import { ThermalOverlay } from '/physics/visuals/thermal_overlay.js';
 import { EmpOverlay } from '/physics/visuals/emp_overlay.js';
+import { QETetherManager } from '/physics/visuals/qe_tether_manager.js';
 
 const subatomicFactory = new SubatomicNodeFactory();
 const nodeRenderGroups = new Map();
@@ -104,6 +105,8 @@ let simulationTime = 0;
 let lastTimestamp = performance.now();
 let frameHandle = null;
 
+let qeTetherManager = null;
+
 const cameraState = {
     rotX: 0.3,
     rotY: 0.0,
@@ -131,6 +134,8 @@ export function initHUDRenderer(options = {}) {
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x05050a);
     scene.fog = new THREE.FogExp2(0x05050a, 0.00055);
+
+    qeTetherManager = new QETetherManager(scene);
 
     window.referenceFrameManager = new ReferenceFrameManager(scene);
     window.referenceFrameManager.switchFrame('open', 1.0);
@@ -664,7 +669,7 @@ function resolveSchemaNodeColor(node, palette, speed, isCore, outColor) {
     }
     return outColor;
 }
-
+// Node & Point Sprite Color Assignment (updateNodes): Maps node positions, sizes, and point-sprite aura glow colors (nodeGlow).
 function updateNodes(nodes, worldScale, palette, overlays, intensity) {
     const count = Math.min(nodes.length, MAX_NODE_INSTANCES);
     const visibleSet = new Set();
@@ -674,7 +679,8 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
 
     const empActive = !!(overlays.emp || overlays.em || palette === 'em');
     const thermalActive = !!overlays.thermal || palette === 'thermal';
-    const waveActive = !!overlays.wave || !!overlays.qe || palette === 'qe';
+    const waveActive = !!overlays.wave; // <--- Add this back
+    const qeActive = !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe');
     const compositeActive = palette === 'composite';
     const activeKeys = new Set();
 
@@ -752,6 +758,9 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
 
             // Clean scalar intensity without compounding distortion
             tempColor.multiplyScalar(Math.max(0.5, intensity));
+        } else if (qeActive || palette === 'qe') {
+            tempColor.setHex(0xa855f7); // Or 0x7b2cbf for deep violet
+            glowRadius = radius * 3.2;
         } else if (waveActive) {
             tempColor.setRGB(0.0, 1.0, 0.94);
             glowRadius = radius * 3.2;
@@ -890,6 +899,7 @@ function buildTetherMeshes() {
 }
 
 function buildPairList(nodes, edges, worldScale) {
+    window.buildPairList = buildPairList;
     const pairs = [];
 
     const makePair = (a, b) => {
@@ -974,7 +984,7 @@ function updateTethers(pairs, time, interpMode, palette, overlays, intensity, no
     const highTensionCol = new THREE.Color(0xff8c00);
     const color = new THREE.Color();
 
-    if (palette === 'qe') { primaryCol.set(0xa855f7); highTensionCol.set(0x38bdf8); }
+    if (palette === 'qe') { primaryCol.set(0xa855f7); highTensionCol.set(0xc77dff); }
     else if (palette === 'ads') { primaryCol.set(0x8b5cf6); highTensionCol.set(0xfacc15); }
     else if (palette === 'snr') { primaryCol.set(0x10b981); highTensionCol.set(0xef4444); }
     else if (palette === 'thermal') { primaryCol.set(0x3b82f6); highTensionCol.set(0xf97316); }
@@ -997,9 +1007,10 @@ function updateTethers(pairs, time, interpMode, palette, overlays, intensity, no
         const pair = pairs[p];
         const { ax, ay, az, bx, by, bz, dx, dy, dz, dist, tension } = pair;
         if (dist < 0.001) continue;
-
+        // Tether Gradient & Style Routing (updateTethers): Line geometry, tension colors, aura passes, and signal particle flow along node connections.
         color.copy(tension > 0.55 ? highTensionCol : primaryCol);
 
+        // GPU Vapor Field Shaders (buildVaporField & updateVaporField): Volumetric background haze, atmospheric particle density, and dynamic glow passes.
         if (stepMode) {
             const steps = 8;
             for (let s = 0; s < steps; s++) {
@@ -1104,6 +1115,7 @@ function updateTethers(pairs, time, interpMode, palette, overlays, intensity, no
 // -----------------------------------------------------------------------------
 // GPU Vapor Field
 // -----------------------------------------------------------------------------
+
 function buildVaporField() {
     const positions = new Float32Array(VAPOR_COUNT * 3);
     for (let i = 0; i < VAPOR_COUNT; i++) {
@@ -1126,6 +1138,7 @@ function buildVaporField() {
             uEmp: { value: 0 },
             uDoppler: { value: 0 },
             uMultipath: { value: 0 },
+            uQE: { value: 0 },
             uNodePos: { value: fieldNodePos },
             uNodeVel: { value: fieldNodeVel },
             uNodeHot: { value: fieldNodeHot },
@@ -1134,6 +1147,7 @@ function buildVaporField() {
             uTetherCount: { value: 0 }
         },
         vertexShader: `
+            uniform float uQE;
             uniform float uTime;
             uniform float uIntensity;
             uniform float uPixelRatio;
@@ -1157,6 +1171,11 @@ function buildVaporField() {
                 vec3 p = position;
                 float density = 0.05;
                 vec3 col = vec3(0.70, 0.78, 0.90);
+                vec3 col = vec3(0.70, 0.78, 0.90);
+
+                if (uQEMode > 0.5) {
+                    col = vec3(0.61, 0.30, 0.87); // Luminous QE Purple (matching #9d4edd)
+                }
 
                 if (uAtmos > 0.5) {
                     float haze1 = sin(p.x * 0.015 + uTime * 0.8) * cos(p.y * 0.015 - uTime * 0.6) * 0.5 + 0.5;
@@ -1288,7 +1307,7 @@ function buildVaporField() {
                 vAlpha = clamp(density * uIntensity, 0.02, 0.68);
 
                 vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
-                gl_PointSize = clamp(uPixelRatio * 700.0 / max(1.0, -mvPosition.z) * 1.6, 1.0, 5.0);
+                gl_PointSize = clamp(uPixelRatio * 700.0 / max(1.0, -mvPosition.z) * 1.6, 1.0, 2.5);
                 gl_Position = projectionMatrix * mvPosition;
             }
         `,
@@ -1317,13 +1336,13 @@ function buildVaporField() {
 function updateVaporField(nodes, pairs, overlayFlags, intensity, time, worldScale = 1) {
     const atmosActive = !!overlayFlags.atmos || !!overlayFlags.vacuum;
     const thermalActive = !!overlayFlags.thermal;
-    const waveActive = !!overlayFlags.wave || !!overlayFlags.qe;
+    const waveActive = !!overlayFlags.wave;
     const empActive = !!overlayFlags.emp || !!overlayFlags.em;
     const dopplerActive = !!overlayFlags.doppler;
     const multipathActive = !!overlayFlags.multipath || !!overlayFlags.snr;
-
+    const qeActive = !!overlayFlags.qe || !!overlayFlags.quantumEntanglement; // Declared once here cleanly
     const allOff = !atmosActive && !thermalActive && !waveActive
-        && !empActive && !dopplerActive && !multipathActive;
+        && !empActive && !dopplerActive && !multipathActive && !qeActive;
 
     vaporPoints.visible = !allOff;
     if (allOff) return;
@@ -1361,8 +1380,10 @@ function updateVaporField(nodes, pairs, overlayFlags, intensity, time, worldScal
     u.uEmp.value = empActive ? 1 : 0;
     u.uDoppler.value = dopplerActive ? 1 : 0;
     u.uMultipath.value = multipathActive ? 1 : 0;
+    u.uQE.value = qeActive ? 1 : 0;
     u.uNodeCount.value = nodeCount;
     u.uTetherCount.value = tetherCount;
+    u.uNodeCount.value = nodeCount;
 }
 
 // -----------------------------------------------------------------------------
@@ -1641,8 +1662,9 @@ function attachMainCanvasEvents(canvas) {
 }
 
 // -----------------------------------------------------------------------------
-// Animation loop
+// Animation loopGlobal delta timing, physics steps, overlay state unpacking (qeActive, thermalActive, empActive), and pushing active values down to material uniforms.
 // -----------------------------------------------------------------------------
+const clock = new THREE.Clock();
 function animationLoop(timestamp = performance.now()) {
     if (!renderer) return;
 
@@ -1666,8 +1688,12 @@ function animationLoop(timestamp = performance.now()) {
     const nodes = getVisibleNodes();
     const edges = window.edges || [];
     const palette = config.colorPalette || 'dynamic';
+    //const palette = config.colorPalette || 'qe';
     const intensity = config.overlayIntensity ?? 1.0;
     const interpolation = config.interpolationMode || 'linear';
+    const qeActive = !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe');
+    //const qeActive = !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe' || true); // Force true to verify render pass
+    
 
     // --- Automatic Overlay Sync & Update ---
     const thermalActive = !!(overlays.thermal || palette === 'thermal');
@@ -1747,6 +1773,9 @@ function animationLoop(timestamp = performance.now()) {
     updateTethers(pairs, simulationTime, interpolation, palette, overlays, intensity, config.noiseThresh ?? 0.05);
     updateVaporField(nodes, pairs, overlays, intensity, simulationTime, worldScale);
     updateDoppler(nodes, worldScale, !!overlays.doppler, intensity);
+
+    qeTetherManager.update(pairs, simulationTime, qeActive);
+    window.qeTetherManager = qeTetherManager; // Expose globally for console debugging
 
     renderer.render(scene, camera);
     if (labelRenderer) labelRenderer.render(scene, camera);
