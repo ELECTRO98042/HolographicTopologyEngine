@@ -11,12 +11,12 @@ export class SphericalTopology {
 
         // 1. 6 Concentric Spheroidal Shells (White, Yellow, Orange, Red, Purple, Blue)
         const shellConfig = [
-            { radius: 40, color: 0xffffff, opacity: 0.03, stretchY: 1.4 },
-            { radius: 80, color: 0xfacc15, opacity: 0.04, stretchY: 1.35 },
-            { radius: 120, color: 0xf97316, opacity: 0.05, stretchY: 1.3 },
-            { radius: 165, color: 0xef4444, opacity: 0.07, stretchY: 1.25 },
-            { radius: 215, color: 0xa855f7, opacity: 0.09, stretchY: 1.2 },
-            { radius: 275, color: 0x3b82f6, opacity: 0.08, stretchY: 1.15 }
+            { radius: 40, color: 0xffffff, opacity: 0.03, stretchY: 1.0 },
+            { radius: 80, color: 0xfacc15, opacity: 0.04, stretchY: 1.0 },
+            { radius: 120, color: 0xf97316, opacity: 0.05, stretchY: 1.0 },
+            { radius: 165, color: 0xef4444, opacity: 0.07, stretchY: 1.0 },
+            { radius: 215, color: 0xa855f7, opacity: 0.09, stretchY: 1.0 },
+            { radius: 275, color: 0x3b82f6, opacity: 0.08, stretchY: 1.0 }
         ];
 
         shellConfig.forEach((cfg, index) => {
@@ -99,7 +99,7 @@ export class SphericalTopology {
             const theta = Math.sqrt(count * Math.PI) * phi;
             const r = 130;
             node.targetX = r * Math.cos(theta) * Math.sin(phi);
-            node.targetY = r * Math.sin(theta) * Math.sin(phi) * 1.25;
+            node.targetY = r * Math.sin(theta) * Math.sin(phi);
             node.targetZ = r * Math.cos(phi);
         });
     }

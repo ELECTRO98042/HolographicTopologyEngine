@@ -10,12 +10,6 @@ export class OpenSpaceTopology {
         group.name = 'manifold_open';
 
         // 6 Concentric Spin Network Shells mapped from inner core to outer boundary:
-        // 1. White (Innermost core)
-        // 2. Yellow
-        // 3. Orange
-        // 4. Red
-        // 5. Purple
-        // 6. Blue (Outermost boundary)
         const shellConfig = [
             { radius: 35, color: 0xffffff, opacity: 0.02 }, // White (Innermost)
             { radius: 70, color: 0xfacc15, opacity: 0.03 }, // Yellow
@@ -41,31 +35,6 @@ export class OpenSpaceTopology {
             group.add(shellMesh);
         });
 
-        // 2. Orthogonal World-Space Floor Grid
-        const floorGroup = new THREE.Group();
-        floorGroup.name = 'floor_grid';
-        const span = 280 * scale;
-        const floorY = -90 * scale;
-
-        const gridMaterial = new THREE.LineBasicMaterial({
-            color: 0x00ffcc,
-            transparent: true,
-            opacity: 0.12,
-            blending: THREE.AdditiveBlending
-        });
-
-        const gridSteps = 12;
-        for (let i = -gridSteps; i <= gridSteps; i++) {
-            const coord = (i / gridSteps) * span;
-
-            const pts1 = [new THREE.Vector3(coord, floorY, -span), new THREE.Vector3(coord, floorY, span)];
-            floorGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts1), gridMaterial));
-
-            const pts2 = [new THREE.Vector3(-span, floorY, coord), new THREE.Vector3(span, floorY, coord)];
-            floorGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts2), gridMaterial));
-        }
-
-        group.add(floorGroup);
         return group;
     }
 

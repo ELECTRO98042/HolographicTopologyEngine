@@ -12,6 +12,7 @@ import { SubatomicNodeFactory } from '/physics/rendermath/index.js';
 import { ThermalOverlay } from '/physics/visuals/thermal_overlay.js';
 import { EmpOverlay } from '/physics/visuals/emp_overlay.js';
 import { QETetherManager } from '/physics/visuals/qe_tether_manager.js';
+import { AdSOverlay } from '/physics/visuals/ads_overlay.js';
 
 const subatomicFactory = new SubatomicNodeFactory();
 const nodeRenderGroups = new Map();
@@ -125,6 +126,7 @@ const tempColor = new THREE.Color();
 // -----------------------------------------------------------------------------
 // Initialisation
 // -----------------------------------------------------------------------------
+let adsOverlay = null;
 export function initHUDRenderer(options = {}) {
     if (initialized) return getAPI();
 
@@ -135,11 +137,11 @@ export function initHUDRenderer(options = {}) {
     scene.background = new THREE.Color(0x05050a);
     scene.fog = new THREE.FogExp2(0x05050a, 0.00055);
 
-    qeTetherManager = new QETetherManager(scene);
-
     window.referenceFrameManager = new ReferenceFrameManager(scene);
     window.referenceFrameManager.switchFrame('open', 1.0);
 
+    qeTetherManager = new QETetherManager(scene);
+    adsOverlay = new AdSOverlay(scene, window.referenceFrameManager, '#deck-body-content');
     thermalOverlay = new ThermalOverlay(scene, window.referenceFrameManager, '#deck-body-content');
     empOverlay = new EmpOverlay(scene, window.referenceFrameManager, '#deck-body-content');
 
@@ -1693,10 +1695,13 @@ function animationLoop(timestamp = performance.now()) {
     const interpolation = config.interpolationMode || 'linear';
     const qeActive = !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe');
     //const qeActive = !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe' || true); // Force true to verify render pass
-    
+    // Ensure dynamic mode or other standard palettes explicitly clear stale ads overlays if not selected
+    const isDynamicDefault = (palette === 'dynamic' || palette === '' || !palette);
+    const adsActive = !!(overlays.ads || palette === 'ads' || palette === 'ads-cft') && !isDynamicDefault;
+    const thermalActive = !!(overlays.thermal || palette === 'thermal');
+    const empActive = !!(overlays.emp || overlays.em || palette === 'em');
 
     // --- Automatic Overlay Sync & Update ---
-    const thermalActive = !!(overlays.thermal || palette === 'thermal');
     if (thermalOverlay) {
         if (thermalActive && !thermalOverlay.active) thermalOverlay.enable();
         else if (!thermalActive && thermalOverlay.active) thermalOverlay.disable();
@@ -1704,13 +1709,20 @@ function animationLoop(timestamp = performance.now()) {
             thermalOverlay.update(nodes, dt);
         }
     }
-
-    const empActive = !!(overlays.emp || overlays.em || palette === 'em');
+  
     if (empOverlay) {
         if (empActive && !empOverlay.active) empOverlay.enable();
         else if (!empActive && empOverlay.active) empOverlay.disable();
         if (empOverlay.active) {
             empOverlay.update(nodes, dt, motionSpeed, worldScale); // Drives wireframe mesh
+        }
+    }
+
+    if (adsOverlay) {
+        if (adsActive && !adsOverlay.active) adsOverlay.enable();
+        else if (!adsActive && adsOverlay.active) adsOverlay.disable();
+        if (adsOverlay.active) {
+            adsOverlay.update(nodes, simulationTime, intensity, worldScale);
         }
     }
 

@@ -525,21 +525,29 @@
             }
 
         // Interference Overlays Toggle Buttons
-        document.querySelectorAll('.overlay-toggle').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const targetBtn = e.currentTarget;
-                const key = targetBtn.getAttribute('data-overlay');
-                const isActive = targetBtn.classList.toggle('active');
-                activeOverlays[key] = isActive;
+            document.querySelectorAll('.overlay-toggle').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const targetBtn = e.currentTarget;
+                    const key = targetBtn.getAttribute('data-overlay');
+                    const isActive = targetBtn.classList.toggle('active');
+                    activeOverlays[key] = isActive;
 
-                if (key === 'emp') activeOverlays.em = isActive;
-                if (key === 'wave') activeOverlays.qe = isActive;
-                if (key === 'atmos') activeOverlays.vacuum = isActive;
-                if (key === 'multipath') activeOverlays.snr = isActive;
+                    if (key === 'emp') activeOverlays.em = isActive;
+                    if (key === 'wave') activeOverlays.qe = isActive;
+                    if (key === 'atmos') activeOverlays.vacuum = isActive;
+                    if (key === 'multipath') activeOverlays.snr = isActive;
 
-                hudViewport.setOverlays({ ...activeOverlays });
+                    // --- SPECIFIC PLACEMENT FOR THERMAL OVERLAY TOGGLE ---
+                    if (key === 'thermal') {
+                        if (typeof window.toggleThermalOverlay === 'function') {
+                            window.toggleThermalOverlay(isActive);
+                        }
+                    }
+                    // ----------------------------------------------------
+
+                    hudViewport.setOverlays({ ...activeOverlays });
+                });
             });
-        });
 
         // Stream Filter & Interpolation Mode Dropdowns
         const streamFilterSelect = document.getElementById('stream-filter-select');
