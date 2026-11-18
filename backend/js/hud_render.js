@@ -13,6 +13,7 @@ import { ThermalOverlay } from '/physics/visuals/thermal_overlay.js';
 import { EmpOverlay } from '/physics/visuals/emp_overlay.js';
 import { QETetherManager } from '/physics/visuals/qe_tether_manager.js';
 import { AdSOverlay } from '/physics/visuals/ads_overlay.js';
+import { SNROverlay } from '../physics/visuals/snr_overlay.js';
 
 const subatomicFactory = new SubatomicNodeFactory();
 const nodeRenderGroups = new Map();
@@ -87,6 +88,8 @@ const MAX_EMP_NODES = 8;
 
 let thermalOverlay = null;
 let empOverlay = null;
+let qeTetherManager = null;
+let snrOverlay = null;
 
 let dopplerGeometry = null;
 let dopplerLines = null;
@@ -105,8 +108,6 @@ let gizmoLastY = 0;
 let simulationTime = 0;
 let lastTimestamp = performance.now();
 let frameHandle = null;
-
-let qeTetherManager = null;
 
 const cameraState = {
     rotX: 0.3,
@@ -144,6 +145,8 @@ export function initHUDRenderer(options = {}) {
     adsOverlay = new AdSOverlay(scene, window.referenceFrameManager, '#deck-body-content');
     thermalOverlay = new ThermalOverlay(scene, window.referenceFrameManager, '#deck-body-content');
     empOverlay = new EmpOverlay(scene, window.referenceFrameManager, '#deck-body-content');
+    snrOverlay = new SNROverlay(scene, window.referenceFrameManager, '#deck-body-content');
+    window.snrOverlay = snrOverlay;
 
     window.toggleThermalOverlay = function (active) {
         if (!thermalOverlay) return;
@@ -273,7 +276,16 @@ export function initHUDRenderer(options = {}) {
 
 export function setColorPalette(schema) {
     if (!window.hudConfig) window.hudConfig = {};
-    window.hudConfig.colorPalette = schema || 'dynamic';
+    const targetSchema = schema || 'dynamic';
+    window.hudConfig.colorPalette = targetSchema;
+
+    // Sanitize and clear stale overlay flags when returning to dynamic
+    if (!window.hudConfig.overlays) window.hudConfig.overlays = {};
+    if (targetSchema === 'dynamic') {
+        window.hudConfig.overlays.qe = false;
+        window.hudConfig.overlays.quantumEntanglement = false;
+        window.hudConfig.overlays.ads = false;
+    }
 
     if (shellMaterial && shellMaterial.uniforms && shellMaterial.uniforms.uColorSchema) {
         const paletteModes = {
@@ -281,7 +293,7 @@ export function setColorPalette(schema) {
             'thermal': 4, 'em': 5, 'doppler': 6, 'tension': 7,
             'vacuum': 8, 'composite': 9
         };
-        shellMaterial.uniforms.uColorSchema.value = paletteModes[schema] !== undefined ? paletteModes[schema] : 0;
+        shellMaterial.uniforms.uColorSchema.value = paletteModes[targetSchema] !== undefined ? paletteModes[targetSchema] : 0;
         shellMaterial.uniforms.uColorSchema.needsUpdate = true;
     }
 }
@@ -493,7 +505,20 @@ function buildShell(mode) {
                     }
 
                     vHighlight = highlight;
-                    vColor = color;
+
+                    // --- Dynamic Schema Color Routing ---
+                    vec3 col = color; // fallback to geometry base
+                    if (uColorSchema == 1) {
+                        col = vec3(0.61, 0.30, 0.87); // QE Purple
+                    } else if (uColorSchema == 2) {
+                        col = vec3(0.54, 0.36, 0.96); // AdS Violet
+                    } else if (uColorSchema == 3) {
+                        col = vec3(0.06, 0.72, 0.50); // SNR Emerald
+                    } else {
+                        col = vec3(0.08, 0.50, 0.75); // Clean Default / Dynamic Blue-Cyan
+                    }
+
+                    vColor = col;
                     gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
                 }
             `,
@@ -794,7 +819,7 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
             }
 
             subatomicFactory.attachRenderer(renderGroup, qftType);
-            renderGroup.scale.setScalar(7.0);
+            renderGroup.scale.setScalar(7.0 * worldScale);
             nodeRenderGroups.set(key, renderGroup);
         }
         renderGroup.position.set(x, y, z);
@@ -1141,6 +1166,7 @@ function buildVaporField() {
             uDoppler: { value: 0 },
             uMultipath: { value: 0 },
             uQE: { value: 0 },
+            uQEMode: { value: 0 },
             uNodePos: { value: fieldNodePos },
             uNodeVel: { value: fieldNodeVel },
             uNodeHot: { value: fieldNodeHot },
@@ -1150,6 +1176,7 @@ function buildVaporField() {
         },
         vertexShader: `
             uniform float uQE;
+            uniform float uQEMode;
             uniform float uTime;
             uniform float uIntensity;
             uniform float uPixelRatio;
@@ -1172,7 +1199,6 @@ function buildVaporField() {
             void main() {
                 vec3 p = position;
                 float density = 0.05;
-                vec3 col = vec3(0.70, 0.78, 0.90);
                 vec3 col = vec3(0.70, 0.78, 0.90);
 
                 if (uQEMode > 0.5) {
@@ -1690,14 +1716,15 @@ function animationLoop(timestamp = performance.now()) {
     const nodes = getVisibleNodes();
     const edges = window.edges || [];
     const palette = config.colorPalette || 'dynamic';
-    //const palette = config.colorPalette || 'qe';
     const intensity = config.overlayIntensity ?? 1.0;
     const interpolation = config.interpolationMode || 'linear';
-    const qeActive = !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe');
-    //const qeActive = !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe' || true); // Force true to verify render pass
-    // Ensure dynamic mode or other standard palettes explicitly clear stale ads overlays if not selected
+
+    // Ensure dynamic mode or other standard palettes explicitly clear stale overlays if not selected
     const isDynamicDefault = (palette === 'dynamic' || palette === '' || !palette);
-    const adsActive = !!(overlays.ads || palette === 'ads' || palette === 'ads-cft') && !isDynamicDefault;
+
+    // Strictly gate qeActive and adsActive so they can NEVER render under Dynamic (Default)
+    const qeActive = !isDynamicDefault && !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe');
+    const adsActive = !isDynamicDefault && !!(overlays.ads || palette === 'ads' || palette === 'ads-cft');
     const thermalActive = !!(overlays.thermal || palette === 'thermal');
     const empActive = !!(overlays.emp || overlays.em || palette === 'em');
 
@@ -1723,6 +1750,17 @@ function animationLoop(timestamp = performance.now()) {
         else if (!adsActive && adsOverlay.active) adsOverlay.disable();
         if (adsOverlay.active) {
             adsOverlay.update(nodes, simulationTime, intensity, worldScale);
+        }
+    }
+
+    const noiseThreshold = config.noiseThreshold ?? 0.15;
+    // Strictly decouple noiseThreshold from activation state
+    const snrActive = !!(overlays.snr || palette === 'snr');
+    if (snrOverlay) {
+        if (snrActive && !snrOverlay.active) snrOverlay.enable();
+        else if (!snrActive && snrOverlay.active) snrOverlay.disable();
+        if (snrOverlay.active) {
+            snrOverlay.update(edges, nodes, simulationTime, noiseThreshold, worldScale);
         }
     }
 
@@ -1786,7 +1824,9 @@ function animationLoop(timestamp = performance.now()) {
     updateVaporField(nodes, pairs, overlays, intensity, simulationTime, worldScale);
     updateDoppler(nodes, worldScale, !!overlays.doppler, intensity);
 
-    qeTetherManager.update(pairs, simulationTime, qeActive);
+    if (qeTetherManager) {
+        qeTetherManager.update(pairs, simulationTime, qeActive);
+    }
     window.qeTetherManager = qeTetherManager; // Expose globally for console debugging
 
     renderer.render(scene, camera);
