@@ -3,6 +3,8 @@ import * as THREE from '/js/vendor/graphics/three.js';
 export class ToroidalTopology {
     constructor() {
         this.name = 'toroidal';
+        this.outerMajorR = 275;
+        this.outerTubeR = 65;
     }
 
     createMesh(scale = 1.0) {
@@ -75,7 +77,114 @@ export class ToroidalTopology {
         });
     }
 
-    enforceConstraints(nodePositions) {
+    _tubeOffset(x, y, z, majorR) {
+        const rho = Math.hypot(x, z);
+        let cx = majorR;
+        let cz = 0;
+        if (rho > 1e-4) {
+            cx = (x / rho) * majorR;
+            cz = (z / rho) * majorR;
+        }
+        const dx = x - cx;
+        const dy = y;
+        const dz = z - cz;
+        const dist = Math.hypot(dx, dy, dz);
+        return { cx, cz, dx, dy, dz, dist };
+    }
+
+    applyBoundaryForces(nodes, dt = 0.016, scale = 1.0, time = 0) {
+        if (!Array.isArray(nodes) || nodes.length === 0) return;
+
+        const s = Math.max(0.25, scale);
+        const majorR = (this.outerMajorR || 275) * s;
+        const maxTubeR = (this.outerTubeR || 65) * s;
+        const softTubeR = maxTubeR * 0.85;
+        const span = Math.max(1.0, maxTubeR - softTubeR);
+
+        for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i];
+            if (!node || node.isPinned || node === window.selectedNode) continue;
+
+            const x = node.position ? node.position.x : (node.x ?? 0);
+            const y = node.position ? node.position.y : (node.y ?? 0);
+            const z = node.position ? node.position.z : (node.z ?? 0);
+
+            let fx = node.fx || 0;
+            let fy = node.fy || 0;
+            let fz = node.fz || 0;
+
+            const { dx, dy, dz, dist } = this._tubeOffset(x, y, z, majorR);
+            if (dist > softTubeR && dist > 1e-4) {
+                const nx = dx / dist;
+                const ny = dy / dist;
+                const nz = dz / dist;
+                const t = (dist - softTubeR) / span;
+                const inward = Math.min(140.0, 12.0 * t + 65.0 * t * t);
+                fx -= nx * inward;
+                fy -= ny * inward;
+                fz -= nz * inward;
+            }
+
+            // Gentle 3D off-axis drift so unpinned nodes stay active inside the toroidal volume
+            const phase = i * 2.094 + time * 0.35;
+            fx += Math.cos(phase) * 2.5;
+            fy += Math.sin(phase * 0.8) * 2.0;
+            fz += Math.sin(phase) * 2.5;
+
+            node.fx = fx;
+            node.fy = fy;
+            node.fz = fz;
+        }
+    }
+
+    enforceConstraints(nodePositions, scale = 1.0) {
+        if (!Array.isArray(nodePositions) || nodePositions.length === 0) return nodePositions;
+
+        const s = Math.max(0.25, scale);
+        const majorR = (this.outerMajorR || 275) * s;
+        const maxTubeR = (this.outerTubeR || 65) * s;
+
+        for (let i = 0; i < nodePositions.length; i++) {
+            const node = nodePositions[i];
+            if (!node) continue;
+
+            let x = node.position ? node.position.x : (node.x ?? 0);
+            let y = node.position ? node.position.y : (node.y ?? 0);
+            let z = node.position ? node.position.z : (node.z ?? 0);
+
+            if (!Number.isFinite(x)) x = 0;
+            if (!Number.isFinite(y)) y = 0;
+            if (!Number.isFinite(z)) z = 0;
+
+            const { cx, cz, dx, dy, dz, dist } = this._tubeOffset(x, y, z, majorR);
+            if (dist > maxTubeR && dist > 1e-4) {
+                const nx = dx / dist;
+                const ny = dy / dist;
+                const nz = dz / dist;
+
+                x = cx + nx * maxTubeR;
+                y = ny * maxTubeR;
+                z = cz + nz * maxTubeR;
+
+                const vx = node.vx || 0;
+                const vy = node.vy || 0;
+                const vz = node.vz || 0;
+                const vRad = vx * nx + vy * ny + vz * nz;
+                if (vRad > 0) {
+                    node.vx = (vx - nx * vRad) * 0.9;
+                    node.vy = (vy - ny * vRad) * 0.9;
+                    node.vz = (vz - nz * vRad) * 0.9;
+                }
+            }
+
+            node.x = x;
+            node.y = y;
+            node.z = z;
+            if (node.position && typeof node.position.set === 'function') {
+                node.position.set(x, y, z);
+            }
+        }
+
         return nodePositions;
     }
 }

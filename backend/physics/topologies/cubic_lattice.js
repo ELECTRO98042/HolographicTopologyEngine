@@ -75,6 +75,51 @@ export class CubicLatticeTopology {
             node.targetZ = z;
         });
     }
+    
+    applyBoundaryForces(nodes, dt = 0.016, scale = 1.0, time = 0) {
+        if (!Array.isArray(nodes) || nodes.length === 0) return;
+
+        const halfExtent = this.halfExtent || 180;
+        const maxE = halfExtent * Math.max(0.25, scale);
+        const softE = maxE * 0.85;
+        const span = Math.max(1.0, maxE - softE);
+
+        for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i];
+            if (!node || node.isPinned || node === window.selectedNode) continue;
+
+            const x = node.position ? node.position.x : (node.x ?? 0);
+            const y = node.position ? node.position.y : (node.y ?? 0);
+            const z = node.position ? node.position.z : (node.z ?? 0);
+
+            let fx = node.fx || 0;
+            let fy = node.fy || 0;
+            let fz = node.fz || 0;
+
+            if (Math.abs(x) > softE) {
+                const t = (Math.abs(x) - softE) / span;
+                fx -= Math.sign(x) * Math.min(140.0, 12.0 * t + 65.0 * t * t);
+            }
+            if (Math.abs(y) > softE) {
+                const t = (Math.abs(y) - softE) / span;
+                fy -= Math.sign(y) * Math.min(140.0, 12.0 * t + 65.0 * t * t);
+            }
+            if (Math.abs(z) > softE) {
+                const t = (Math.abs(z) - softE) / span;
+                fz -= Math.sign(z) * Math.min(140.0, 12.0 * t + 65.0 * t * t);
+            }
+
+            // Gentle 3D off-axis drift so unpinned nodes stay active inside the cubic frame
+            const phase = i * 2.094 + time * 0.35;
+            fx += Math.cos(phase) * 2.5;
+            fy += Math.sin(phase * 0.8) * 2.5;
+            fz += Math.sin(phase * 1.2) * 2.5;
+
+            node.fx = fx;
+            node.fy = fy;
+            node.fz = fz;
+        }
+    }
 
     enforceConstraints(nodePositions) {
         return nodePositions;

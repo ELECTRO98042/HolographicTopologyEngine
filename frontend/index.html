@@ -711,46 +711,65 @@
                 const radius = 120.0;
                 window.nodes.forEach((node, i) => {
                     if (mode === 'spheroid') {
-                        const phi = Math.acos(1 - (2 * (i + 0.5)) / window.nodes.length);
-                        const theta = Math.PI * (1 + Math.sqrt(5)) * i;
-                        node.x = radius * Math.sin(phi) * Math.cos(theta);
-                        node.y = radius * Math.cos(phi);
-                        node.z = radius * Math.sin(phi) * Math.sin(theta);
-                    } else if (mode === 'cubed' || mode === 'cubic') {
-                        const half = radius * 0.6;
-                        const c = i % 3;
-                        node.x = (c === 0 ? (i % 2 === 0 ? half : -half) : (Math.random() - 0.5) * half);
-                        node.y = (c === 1 ? (i % 2 === 0 ? half : -half) : (Math.random() - 0.5) * half);
-                        node.z = (c === 2 ? (i % 2 === 0 ? half : -half) : (Math.random() - 0.5) * half);
-                    } else if (mode === 'toroidal') {
-                        const R = radius * 0.8;
-                        const r = radius * 0.3;
-                        const u = (i / window.nodes.length) * Math.PI * 2;
-                        const v = i * 2.4;
-                        node.x = (R + r * Math.cos(v)) * Math.cos(u);
-                        node.y = r * Math.sin(v);
-                        node.z = (R + r * Math.cos(v)) * Math.sin(u);
-                    } else if (mode === 'hyperbolic') {
-                        const u = ((i / window.nodes.length) - 0.5) * 4.0;
-                        const v = (i * 1.5) % (Math.PI * 2);
-                        const flare = Math.cosh(u);
-                        node.x = radius * 0.5 * flare * Math.cos(v);
-                        node.y = u * 45.0;
-                        node.z = radius * 0.5 * flare * Math.sin(v);
-                    } else if (mode === 'open') {
-                        const angleStep = (Math.PI * 2) / Math.max(1, window.nodes.length - 1);
-                        if (node.isCore || node.tier === 'BULK_CORE') {
-                            node.x = 0; node.y = 0; node.z = 0;
-                        } else {
-                            const idx = i % Math.max(1, window.nodes.length - 1);
-                            node.x = Math.cos(idx * angleStep) * 60;
-                            node.y = 0;
-                            node.z = Math.sin(idx * angleStep) * 60;
+                        if (node !== window.selectedNode) {
+                            node.isPinned = false;
                         }
-                    } else {
-                        console.warn(`[TopologyMode] UNKNOWN mode received: "${mode}". Defaulting node positions to origin.`);
+                        // Physics-driven: let SphericalTopology boundary forces & constraints guide nodes
+                        if (node.position && typeof node.position.set === 'function') {
+                            node.position.set(node.x || 0, node.y || 0, node.z || 0);
+                        }
+                    } else if (mode === 'cubed' || mode === 'cubic') {
+                        // Physics-driven: let CubicLatticeTopology boundary forces & constraints guide nodes
+                        if (node !== window.selectedNode) {
+                            node.isPinned = false;
+                        }
+                        if (node.position && typeof node.position.set === 'function') {
+                            node.position.set(node.x || 0, node.y || 0, node.z || 0);
+                        }
+                    } else if (mode === 'toroidal') {
+                        // Physics-driven: let ToroidalTopology boundary forces & constraints guide nodes
+                        if (node !== window.selectedNode) {
+                            node.isPinned = false;
+                        }
+                        if (node.position && typeof node.position.set === 'function') {
+                            node.position.set(node.x || 0, node.y || 0, node.z || 0);
+                        }
+                    } else if (mode === 'hyperbolic') {
+                        // Physics-driven: let HyperbolicTopology boundary forces & constraints guide nodes
+                        if (node !== window.selectedNode) {
+                            node.isPinned = false;
+                        }
+                        if (node.position && typeof node.position.set === 'function') {
+                            node.position.set(node.x || 0, node.y || 0, node.z || 0);
+                        }
+                    } else if (mode === 'open') {
+                        const nonCoreNodes = window.nodes.filter(n => !(n.isCore || n.tier === 'BULK_CORE'));
+                        const ringCount = Math.max(1, nonCoreNodes.length);
+                        const angleStep = (Math.PI * 2) / ringCount;
+                        let nonCoreIdx = 0;
+
+                        window.nodes.forEach((node) => {
+                            if (node.isCore || node.tier === 'BULK_CORE') {
+                                node.x = 0;
+                                node.y = 0;
+                                node.z = 0;
+                            } else {
+                                const angle = nonCoreIdx * angleStep;
+                                const yOffset = (nonCoreIdx % 2 === 0 ? 1 : -1) * 24;
+                                node.x = Math.cos(angle) * 65;
+                                node.y = yOffset;
+                                node.z = Math.sin(angle) * 65;
+                                nonCoreIdx++;
+                            }
+                            if (node.position && typeof node.position.set === 'function') {
+                                node.position.set(node.x, node.y, node.z);
+                            }
+                            node.vx = 0;
+                            node.vy = 0;
+                            node.vz = 0;
+                            node.isPinned = false;
+                        });
                     }
-                    node.isPinned = true;
                 });
 
                 setRenderMode(normalizedMode);
@@ -772,33 +791,42 @@
 
         // Tensegrity equilibrium update step
         window.hudPhysicsStep = function () {
-            if (!window.nodes) return;
-            const dt = 0.016;
-            const damping = 0.90;
+                if (!window.nodes) return;
+                const dt = 0.016;
+                const damping = 0.90;
 
-            window.nodes.forEach((node) => {
-                if (node.vx === undefined) { node.vx = 0; node.vy = 0; node.vz = 0; }
-                if (node.isPinned || node === window.selectedNode) {
-                    node.fx = 0; node.fy = 0; node.fz = 0;
-                    return;
-                }
-                node.fx = 0; node.fy = 0; node.fz = 0;
+                window.nodes.forEach((node) => {
+                    if (node.vx === undefined) { node.vx = 0; node.vy = 0; node.vz = 0; }
+                    if (node.fx === undefined) node.fx = 0;
+                    if (node.fy === undefined) node.fy = 0;
+                    if (node.fz === undefined) node.fz = 0;
 
-                if (node.targetX !== undefined) {
-                    node.fx += (node.targetX - node.x) * 8.0;
-                    node.fy += (node.targetY - node.y) * 8.0;
-                    node.fz += (node.targetZ - node.z) * 8.0;
-                }
+                    if (node.isPinned || node === window.selectedNode) {
+                        node.fx = 0; node.fy = 0; node.fz = 0;
+                        return;
+                    }
 
-                node.vx = (node.vx + (node.fx / (node.mass || 1.0)) * dt) * damping;
-                node.vy = (node.vy + (node.fy / (node.mass || 1.0)) * dt) * damping;
-                node.vz = (node.vz + (node.fz / (node.mass || 1.0)) * dt) * damping;
+                    if (node.targetX !== undefined) {
+                        node.fx += (node.targetX - node.x) * 8.0;
+                        node.fy += (node.targetY - node.y) * 8.0;
+                        node.fz += (node.targetZ - node.z) * 8.0;
+                    }
 
-                node.x += node.vx * dt;
-                node.y += node.vy * dt;
-                node.z += node.vz * dt;
-            });
-        };
+                    const mass = node.mass || 1.0;
+                    node.vx = (node.vx + (node.fx / mass) * dt) * damping;
+                    node.vy = (node.vy + (node.fy / mass) * dt) * damping;
+                    node.vz = (node.vz + (node.fz / mass) * dt) * damping;
+
+                    node.x += node.vx * dt;
+                    node.y += node.vy * dt;
+                    node.z += node.vz * dt;
+
+                    // Clear accumulated frame forces after integration
+                    node.fx = 0;
+                    node.fy = 0;
+                    node.fz = 0;
+                });
+            };
 
         // Sliders binding
         const bindSlider = (id, valId, unit = '') => {

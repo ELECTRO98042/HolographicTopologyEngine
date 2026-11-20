@@ -3,6 +3,7 @@ import * as THREE from '/js/vendor/graphics/three.js';
 export class SphericalTopology {
     constructor() {
         this.name = 'spheroid';
+        this.outerRadius = 275;
     }
 
     createMesh(scale = 1.0) {
@@ -45,11 +46,11 @@ export class SphericalTopology {
         });
 
         const maxR = 275 * scale;
-        const stretchY = 1.15;
-        const numMeridians = 8;
+        const stretchY = 1.0;
+        const numMeridians = 16;
 
         for (let i = 0; i < numMeridians; i++) {
-            const theta = (i * Math.PI) / numMeridians;
+            const theta = (i * 2 * Math.PI) / numMeridians;
             const points = [];
             const segments = 40;
             for (let j = 0; j <= segments; j++) {
@@ -72,7 +73,7 @@ export class SphericalTopology {
             blending: THREE.AdditiveBlending
         });
 
-        const numParallels = 6;
+        const numParallels = 12;
         for (let p = 1; p < numParallels; p++) {
             const phi = (p / numParallels) * Math.PI - Math.PI / 2;
             const y = maxR * stretchY * Math.sin(phi);
@@ -104,7 +105,97 @@ export class SphericalTopology {
         });
     }
 
-    enforceConstraints(nodePositions) {
+    applyBoundaryForces(nodes, dt = 0.016, scale = 1.0, time = 0) {
+        if (!Array.isArray(nodes) || nodes.length === 0) return;
+
+        const maxR = this.outerRadius * Math.max(0.25, scale);
+        const softR = maxR * 0.85;
+
+        for (let i = 0; i < nodes.length; i++) {
+            const node = nodes[i];
+            if (!node || node.isPinned || node === window.selectedNode) continue;
+
+            const x = node.position ? node.position.x : (node.x ?? 0);
+            const y = node.position ? node.position.y : (node.y ?? 0);
+            const z = node.position ? node.position.z : (node.z ?? 0);
+
+            let fx = node.fx || 0;
+            let fy = node.fy || 0;
+            let fz = node.fz || 0;
+
+            const r = Math.hypot(x, y, z);
+            if (r > softR && r > 1e-4) {
+                const nx = x / r;
+                const ny = y / r;
+                const nz = z / r;
+                const span = Math.max(1.0, maxR - softR);
+                const t = (r - softR) / span;
+                const inwardForce = Math.min(140.0, (12.0 * t + 65.0 * t * t));
+
+                fx -= nx * inwardForce;
+                fy -= ny * inwardForce;
+                fz -= nz * inwardForce;
+            }
+
+            // Gentle tangential swirl around Y to prevent static radial stalling
+            const phase = i * 2.094 + time * 0.35;
+            fx += Math.cos(phase) * 2.5;
+            fy += Math.sin(phase * 0.7) * 2.0;
+            fz += Math.sin(phase) * 2.5;
+
+            node.fx = fx;
+            node.fy = fy;
+            node.fz = fz;
+        }
+    }
+
+    enforceConstraints(nodePositions, scale = 1.0) {
+        if (!Array.isArray(nodePositions) || nodePositions.length === 0) return nodePositions;
+
+        const maxR = this.outerRadius * Math.max(0.25, scale);
+
+        for (let i = 0; i < nodePositions.length; i++) {
+            const node = nodePositions[i];
+            if (!node) continue;
+
+            let x = node.position ? node.position.x : (node.x ?? 0);
+            let y = node.position ? node.position.y : (node.y ?? 0);
+            let z = node.position ? node.position.z : (node.z ?? 0);
+
+            if (!Number.isFinite(x)) x = 0;
+            if (!Number.isFinite(y)) y = 0;
+            if (!Number.isFinite(z)) z = 0;
+
+            const r = Math.hypot(x, y, z);
+            if (r > maxR && r > 1e-4) {
+                const nx = x / r;
+                const ny = y / r;
+                const nz = z / r;
+
+                x = nx * maxR;
+                y = ny * maxR;
+                z = nz * maxR;
+
+                // Remove outward radial velocity while keeping tangential motion along the sphere
+                const vx = node.vx || 0;
+                const vy = node.vy || 0;
+                const vz = node.vz || 0;
+                const vRadial = vx * nx + vy * ny + vz * nz;
+                if (vRadial > 0) {
+                    node.vx = (vx - nx * vRadial) * 0.9;
+                    node.vy = (vy - ny * vRadial) * 0.9;
+                    node.vz = (vz - nz * vRadial) * 0.9;
+                }
+            }
+
+            node.x = x;
+            node.y = y;
+            node.z = z;
+            if (node.position && typeof node.position.set === 'function') {
+                node.position.set(x, y, z);
+            }
+        }
+
         return nodePositions;
     }
 }
