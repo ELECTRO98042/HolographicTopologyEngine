@@ -34,6 +34,19 @@ export class ReferenceFrameManager {
             uEmpOpacities: { value: new Float32Array(16) }, // Added opacity tracking per ring
             uEmpActive: { value: 0 }
         };
+        this.dopplerUniforms = {
+            uDopplerActive: { value: 0 },
+            uDopplerShiftAvg: { value: 1.0 },
+            uDopplerTime: { value: 0 },
+            uBeamOrigins: { value: Array.from({ length: 8 }, () => new THREE.Vector3()) },
+            uBeamDirs: { value: Array.from({ length: 8 }, () => new THREE.Vector3(0, 0, 1)) },
+            uBeamPolarities: { value: new Float32Array(8) },
+            uBeamSpreads: { value: new Float32Array(8).fill(0.25) },
+            uBeamLengths: { value: new Float32Array(8) },
+            uBeamCount: { value: 0 },
+            uRefStrength: { value: 0.68 },   // [↑] Deeper frame tint     | [↓] Lighter frame tint
+            uRefAlphaBoost: { value: 0.28 }  // [↑] Brighter frame lines  | [↓] Softer line boost
+        };
     }
 
     setMode(mode, nodes) {
@@ -166,10 +179,23 @@ export class ReferenceFrameManager {
                                 child.material.onBeforeCompile = (shader) => {
                                     shader.uniforms.uEmpCenters = this.empUniforms.uEmpCenters;
                                     shader.uniforms.uEmpRadii = this.empUniforms.uEmpRadii;
+                                    shader.uniforms.uEmpOpacities = this.empUniforms.uEmpOpacities; // Added: connects ring opacity to frame shader
                                     shader.uniforms.uEmpActive = this.empUniforms.uEmpActive;
                                     shader.uniforms.uThermalCenters = this.thermalUniforms.uThermalCenters;
                                     shader.uniforms.uThermalHeats = this.thermalUniforms.uThermalHeats;
                                     shader.uniforms.uThermalActive = this.thermalUniforms.uThermalActive;
+                                    shader.uniforms.uDopplerActive = this.dopplerUniforms.uDopplerActive;
+                                    shader.uniforms.uDopplerShiftAvg = this.dopplerUniforms.uDopplerShiftAvg;
+                                    shader.uniforms.uDopplerTime = this.dopplerUniforms.uDopplerTime;
+                                    shader.uniforms.uBeamOrigins = this.dopplerUniforms.uBeamOrigins;
+                                    shader.uniforms.uBeamDirs = this.dopplerUniforms.uBeamDirs;
+                                    shader.uniforms.uBeamPolarities = this.dopplerUniforms.uBeamPolarities;
+                                    shader.uniforms.uBeamSpreads = this.dopplerUniforms.uBeamSpreads;
+                                    shader.uniforms.uBeamLengths = this.dopplerUniforms.uBeamLengths;
+                                    shader.uniforms.uBeamCount = this.dopplerUniforms.uBeamCount;
+                                    shader.uniforms.uRefStrength = this.dopplerUniforms.uRefStrength;
+                                    shader.uniforms.uRefAlphaBoost = this.dopplerUniforms.uRefAlphaBoost;
+
 
                                     shader.vertexShader = shader.vertexShader.replace(
                                         '#include <common>',
@@ -198,6 +224,17 @@ export class ReferenceFrameManager {
                                         uniform vec3 uThermalCenters[16];
                                         uniform float uThermalHeats[16];
                                         uniform int uThermalActive;
+                                        uniform int uDopplerActive;
+                                        uniform float uDopplerShiftAvg;
+                                        uniform float uDopplerTime;
+                                        uniform vec3 uBeamOrigins[8];
+                                        uniform vec3 uBeamDirs[8];
+                                        uniform float uBeamPolarities[8];
+                                        uniform float uBeamSpreads[8];
+                                        uniform float uBeamLengths[8];
+                                        uniform int uBeamCount;
+                                        uniform float uRefStrength;
+                                        uniform float uRefAlphaBoost;
                                         `
                                     );
 
@@ -207,15 +244,25 @@ export class ReferenceFrameManager {
                                         #include <dithering_fragment>
 
                                         if (uEmpActive > 0) {
-                                            for(int i = 0; i < 16; i++) {
+                                            for (int i = 0; i < 16; i++) {
                                                 float radius = uEmpRadii[i];
-                                                if (radius > 0.0) {
+                                                float ringOpacity = uEmpOpacities[i];
+
+                                                if (radius > 0.0 && ringOpacity > 0.001) {
                                                     float dist = distance(vWorldPosition, uEmpCenters[i]);
+                                                    // [↑] Wider shockwave band on frame | [↓] Sharper wavefront ring
+                                                    float bandWidth = 10.0;
                                                     float ringDist = abs(dist - radius);
-                                                    if (ringDist < 5.0) {
-                                                        float shock = pow(1.0 - ringDist / 5.0, 2.0);
-                                                        gl_FragColor.rgb += gl_FragColor.rgb * (shock * 0.06);
-                                                        gl_FragColor.a = min(1.0, gl_FragColor.a + shock * 0.06);
+
+                                                    if (ringDist < bandWidth) {
+                                                        float shock = pow(1.0 - ringDist / bandWidth, 1.8);
+                                                        // [↑] Brighter EMP frame reflection | [↓] Subtler frame highlight (~12% trim from 2.2 -> 1.92)
+                                                        float empRefGain = 1.92;
+                                                        float intensity = shock * ringOpacity * empRefGain;
+
+                                                        gl_FragColor.rgb += vec3(0.0, 0.94, 1.0) * intensity;
+                                                        // [↑] Stronger alpha lift on frame lines | [↓] Softer line alpha contribution (~12% trim from 0.65 -> 0.57)
+                                                        gl_FragColor.a = min(1.0, gl_FragColor.a + intensity * 0.57);
                                                     }
                                                 }
                                             }
@@ -229,6 +276,36 @@ export class ReferenceFrameManager {
                                                     float dissipation = exp(-dist * 0.015) * heat;
                                                     gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0, 0.45, 0.1), dissipation * 0.6);
                                                     gl_FragColor.a = min(1.0, gl_FragColor.a + dissipation * 0.4);
+                                                }
+                                            }
+                                        }
+                                        if (uDopplerActive > 0) {
+                                            for (int b = 0; b < 8; b++) {
+                                                if (b >= uBeamCount) break;
+                                                vec3 toFrag = vWorldPosition - uBeamOrigins[b];
+                                                float along = dot(toFrag, uBeamDirs[b]);
+                                                // [↑] Raise floor to reach further along beam | [↓] Lower floor to keep reflection tighter to source
+                                                float maxReach = max(uBeamLengths[b], 320.0);
+                                                if (along > 0.0 && along < maxReach) {
+                                                    // [↑] Wider cone footprint on mesh | [↓] Tighter beam path tied closer to node trajectory
+                                                    float coneRadius = 6.0 + along * (uBeamSpreads[b] * 1.05);
+                                                    vec3 closestOnAxis = uBeamOrigins[b] + uBeamDirs[b] * along;
+                                                    float radialDist = distance(vWorldPosition, closestOnAxis);
+
+                                                    if (radialDist < coneRadius) {
+                                                        // Higher exponents keep highlight tighter near node & along beam centerline
+                                                        float radialSoft = pow(clamp(1.0 - radialDist / coneRadius, 0.0, 1.0), 1.45);
+                                                        float axialDiffusion = pow(clamp(1.0 - along / maxReach, 0.0, 1.0), 1.35);
+                                                        float sweep = 0.84 + 0.16 * sin(along * 0.045 - uDopplerTime * 4.0);
+
+                                                        float reflection = radialSoft * axialDiffusion * sweep;
+                                                        vec3 beaconCol = uBeamPolarities[b] >= 0.0
+                                                            ? vec3(0.02, 0.78, 0.90) // Teal (#06b6d4)
+                                                            : vec3(0.98, 0.25, 0.38); // Red  (#f43f5e)
+
+                                                        gl_FragColor.rgb = mix(gl_FragColor.rgb, beaconCol, clamp(reflection * uRefStrength, 0.0, 0.85));
+                                                        gl_FragColor.a = min(1.0, gl_FragColor.a + reflection * uRefAlphaBoost);
+                                                    }
                                                 }
                                             }
                                         }

@@ -14,6 +14,8 @@ import { EmpOverlay } from '/physics/visuals/emp_overlay.js';
 import { QETetherManager } from '/physics/visuals/qe_tether_manager.js';
 import { AdSOverlay } from '/physics/visuals/ads_overlay.js';
 import { SNROverlay } from '../physics/visuals/snr_overlay.js';
+import { OpenSpaceOverlay } from '/physics/visuals/open_space_overlay.js';
+import { DopplerShiftOverlay } from '/physics/visuals/doppler_shift_overlay.js';
 
 const subatomicFactory = new SubatomicNodeFactory();
 const nodeRenderGroups = new Map();
@@ -31,7 +33,8 @@ const MAX_NODE_INSTANCES = 2048;
 
 const REST_DIST = 90.0;
 const FLOOR_Y = -80.0;
-const BASE_SPAN = 250.0;
+const BASE_SPAN = 500.0;
+const PAIR_INTERACTION_RADIUS = 240.0;
 
 // -----------------------------------------------------------------------------
 // Module state
@@ -82,7 +85,6 @@ let vaporPoints = null;
 let vaporMaterial = null;
 const VAPOR_COUNT = 12000;
 
-let empMesh = null;
 const EMP_RINGS_PER_NODE = 2;
 const MAX_EMP_NODES = 8;
 
@@ -90,6 +92,8 @@ let thermalOverlay = null;
 let empOverlay = null;
 let qeTetherManager = null;
 let snrOverlay = null;
+let openSpaceOverlay = null;
+let dopplerShiftOverlay = null;
 
 let dopplerGeometry = null;
 let dopplerLines = null;
@@ -146,8 +150,11 @@ export function initHUDRenderer(options = {}) {
     thermalOverlay = new ThermalOverlay(scene, window.referenceFrameManager, '#deck-body-content');
     empOverlay = new EmpOverlay(scene, window.referenceFrameManager, '#deck-body-content');
     snrOverlay = new SNROverlay(scene, window.referenceFrameManager, '#deck-body-content');
+    openSpaceOverlay = new OpenSpaceOverlay(scene, window.referenceFrameManager, '#deck-body-content');
+    dopplerShiftOverlay = new DopplerShiftOverlay(scene, window.referenceFrameManager, '#deck-body-content');
+    
     window.snrOverlay = snrOverlay;
-
+    window.dopplerShiftOverlay = dopplerShiftOverlay;
     window.toggleThermalOverlay = function (active) {
         if (!thermalOverlay) return;
         if (active) {
@@ -296,6 +303,14 @@ export function setColorPalette(schema) {
         shellMaterial.uniforms.uColorSchema.value = paletteModes[targetSchema] !== undefined ? paletteModes[targetSchema] : 0;
         shellMaterial.uniforms.uColorSchema.needsUpdate = true;
     }
+    if (targetSchema === 'dynamic') {
+        window.hudConfig.overlays.qe = false;
+        window.hudConfig.overlays.quantumEntanglement = false;
+        window.hudConfig.overlays.ads = false;
+        window.hudConfig.overlays.doppler = false;
+    } else if (targetSchema === 'doppler') {
+        window.hudConfig.overlays.doppler = true;
+    }
 }
 
 export function setOverlays(overlays) {
@@ -358,6 +373,17 @@ export function resetRenderCamera() {
 export function setRenderMode(mode) {
     const nextMode = mode || 'open';
     window.hudMode = nextMode;
+
+    const nodes = getVisibleNodes();
+
+    if (nextMode === 'open') {
+        if (openSpaceOverlay) {
+            openSpaceOverlay.enable();
+            openSpaceOverlay.captureBaseline(nodes);
+        }
+    } else {
+        if (openSpaceOverlay) openSpaceOverlay.disable();
+    }
 
     if (window.referenceFrameManager && window.referenceFrameManager.activeFrameType === nextMode) {
         window.referenceFrameManager.setScale(window.hudConfig?.worldScale || 1.0);
@@ -925,9 +951,17 @@ function buildTetherMeshes() {
     scene.add(monoPoints);
 }
 
+
 function buildPairList(nodes, edges, worldScale) {
     window.buildPairList = buildPairList;
     const pairs = [];
+    const seenKeys = new Set();
+
+    const pairKey = (a, b) => {
+        const ka = a.id || a.name || a;
+        const kb = b.id || b.name || b;
+        return ka < kb ? `${ka}::${kb}` : `${kb}::${ka}`;
+    };
 
     const makePair = (a, b) => {
         const axRaw = a.position ? a.position.x : (a.x || 0);
@@ -951,6 +985,7 @@ function buildPairList(nodes, edges, worldScale) {
         const rawDist = Math.sqrt((bxRaw - axRaw) ** 2 + (byRaw - ayRaw) ** 2 + (bzRaw - azRaw) ** 2);
 
         return {
+            a, b, nodeA: a, nodeB: b,
             ax, ay, az, bx, by, bz,
             dx, dy, dz, dist, rawDist,
             tension: Math.min(1.0, Math.abs(rawDist - REST_DIST) / REST_DIST)
@@ -972,15 +1007,38 @@ function buildPairList(nodes, edges, worldScale) {
             const a = nodeMap.get(String(srcKey)) || (typeof srcKey === 'number' ? nodes[srcKey] : null);
             const b = nodeMap.get(String(tgtKey)) || (typeof tgtKey === 'number' ? nodes[tgtKey] : null);
             if (a && b && a !== b) {
-                pairs.push(makePair(a, b));
+                const key = pairKey(a, b);
+                if (!seenKeys.has(key)) {
+                    seenKeys.add(key);
+                    pairs.push(makePair(a, b));
+                }
             }
         }
     }
 
-    if (pairs.length === 0) {
-        for (let i = 0; i < nodes.length; i++) {
-            for (let j = i + 1; j < nodes.length; j++) {
-                pairs.push(makePair(nodes[i], nodes[j]));
+    // Surface proximity-coupled interactions when edges are sparse or omitted
+    if (nodes.length > 1 && pairs.length < MAX_PAIRS) {
+        const maxRawDist = edges && edges.length > 0 ? PAIR_INTERACTION_RADIUS : Infinity;
+        for (let i = 0; i < nodes.length && pairs.length < MAX_PAIRS; i++) {
+            const a = nodes[i];
+            const axRaw = a.position ? a.position.x : (a.x || 0);
+            const ayRaw = a.position ? a.position.y : (a.y || 0);
+            const azRaw = a.position ? a.position.z : (a.z || 0);
+
+            for (let j = i + 1; j < nodes.length && pairs.length < MAX_PAIRS; j++) {
+                const b = nodes[j];
+                const key = pairKey(a, b);
+                if (seenKeys.has(key)) continue;
+
+                const bxRaw = b.position ? b.position.x : (b.x || 0);
+                const byRaw = b.position ? b.position.y : (b.y || 0);
+                const bzRaw = b.position ? b.position.z : (b.z || 0);
+                const rawDist = Math.hypot(bxRaw - axRaw, byRaw - ayRaw, bzRaw - azRaw);
+
+                if (rawDist <= maxRawDist) {
+                    seenKeys.add(key);
+                    pairs.push(makePair(a, b));
+                }
             }
         }
     }
@@ -1113,14 +1171,14 @@ function updateTethers(pairs, time, interpMode, palette, overlays, intensity, no
     tetherGeometry.setDrawRange(0, vi);
     tetherGeometry.attributes.position.needsUpdate = true;
     tetherGeometry.attributes.color.needsUpdate = true;
-    tetherLines.material.opacity = 0.66 * Math.max(0.2, intensity);
+    tetherLines.material.opacity = 0.52 * Math.max(0.2, intensity); // [↑] Brighter tethers | [↓] Cleaner node legibility
 
     auraLines.visible = auraActive;
     if (auraActive) {
         auraGeometry.setDrawRange(0, ai);
         auraGeometry.attributes.position.needsUpdate = true;
         auraGeometry.attributes.color.needsUpdate = true;
-        auraLines.material.opacity = 0.30 * Math.max(0.2, intensity) * noiseAttenuation;
+        auraLines.material.opacity = 0.18 * Math.max(0.2, intensity) * noiseAttenuation; // [↑] Stronger QE/AdS aura | [↓] Less violet haze
     }
 
     ghostLines.visible = multipathActive;
@@ -1332,7 +1390,7 @@ function buildVaporField() {
                 }
 
                 vColor = col;
-                vAlpha = clamp(density * uIntensity, 0.02, 0.68);
+                vAlpha = clamp(density * uIntensity * 0.55, 0.015, 0.36); // [↑] Denser vapor haze | [↓] Softer atmospheric veil
 
                 vec4 mvPosition = modelViewMatrix * vec4(p, 1.0);
                 gl_PointSize = clamp(uPixelRatio * 700.0 / max(1.0, -mvPosition.z) * 1.6, 1.0, 2.5);
@@ -1415,75 +1473,6 @@ function updateVaporField(nodes, pairs, overlayFlags, intensity, time, worldScal
 }
 
 // -----------------------------------------------------------------------------
-// EMP shock rings
-// -----------------------------------------------------------------------------
-/*function buildEMPField() {
-    const geometry = new THREE.SphereGeometry(1.0, 64, 48);
-
-    const material = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        wireframe: true,
-        transparent: true,
-        opacity: 0.04,
-        blending: THREE.NormalBlending,
-        depthWrite: false,
-        toneMapped: false
-    });
-
-    empMesh = new THREE.InstancedMesh(geometry, material, MAX_EMP_NODES * EMP_RINGS_PER_NODE);
-    empMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    empMesh.frustumCulled = false;
-    empMesh.count = 0;
-
-    const dullCyan = new THREE.Color(0x0e7490);
-    for (let i = 0; i < MAX_EMP_NODES * EMP_RINGS_PER_NODE; i++) {
-        empMesh.setColorAt(i, dullCyan);
-    }
-    scene.add(empMesh);
-}*/
-
-/*function updateEMP(nodes, worldScale, active, time, intensity) {
-    empMesh.visible = active;
-    if (!active) return;
-
-    const count = Math.min(nodes.length, MAX_EMP_NODES);
-    empMesh.count = count * EMP_RINGS_PER_NODE;
-    let index = 0;
-
-    for (let i = 0; i < count; i++) {
-        const node = nodes[i];
-        const x = (node.position ? node.position.x : node.x || 0) * worldScale;
-        const y = (node.position ? node.position.y : node.y || 0) * worldScale;
-        const z = (node.position ? node.position.z : node.z || 0) * worldScale;
-        const distFromCenter = Math.sqrt(x * x + y * y + z * z);
-        const isOutOfBounds = distFromCenter > 1500 * worldScale;
-
-        for (let ring = 0; ring < EMP_RINGS_PER_NODE; ring++) {
-            dummyObject.position.set(x, y, z);
-
-            const phase = (time * 0.20 + ring / EMP_RINGS_PER_NODE + i * 0.13) % 1.0;
-            const radius = isOutOfBounds ? 0 : (12 + phase * 260) * worldScale;
-            dummyObject.position.set(x, y, z);
-            dummyObject.scale.set(radius, radius, radius);
-            dummyObject.rotation.set(0, time * 0.12 * (ring % 2 === 0 ? 1 : -1), 0);
-            dummyObject.updateMatrix();
-            empMesh.setMatrixAt(index, dummyObject.matrix);
-
-            const fadeIn = Math.min(1.0, phase * 5.0);
-            const fadeOut = Math.pow(1.0 - phase, 1.8);
-            const falloff = fadeIn * fadeOut * Math.min(1.2, Math.max(0.3, intensity));
-
-            tempColor.setRGB(0.06, 0.45, 0.56).multiplyScalar(falloff);
-            empMesh.setColorAt(index, tempColor);
-            index++;
-        }
-    }
-
-    empMesh.instanceMatrix.needsUpdate = true;
-    if (empMesh.instanceColor) empMesh.instanceColor.needsUpdate = true;
-}*/
-
-// -----------------------------------------------------------------------------
 // Doppler velocity streaks
 // -----------------------------------------------------------------------------
 function buildDopplerField() {
@@ -1546,7 +1535,7 @@ function updateDoppler(nodes, worldScale, active, intensity) {
 // -----------------------------------------------------------------------------
 function syncFloor(config) {
     const worldScale = config.worldScale ?? 1;
-    const divisions = Math.max(4, Math.round((config.gridDensity ?? 10) * 2));
+    const divisions = Math.max(6, Math.round((config.gridDensity ?? 10) * 2));
     const key = `${worldScale.toFixed(2)}|${divisions}`;
 
     if (key !== floorKey) {
@@ -1556,10 +1545,10 @@ function syncFloor(config) {
             floorGrid.material.dispose();
         }
 
-        floorGrid = new THREE.GridHelper(BASE_SPAN * 2 * worldScale, divisions, 0x00ffcc, 0x003333);
+        floorGrid = new THREE.GridHelper(BASE_SPAN * 2 * worldScale, divisions, 0x00ffcc, 0x004444);
         floorGrid.position.y = FLOOR_Y;
         floorGrid.material.transparent = true;
-        floorGrid.material.opacity = 0.25;
+        floorGrid.material.opacity = 0.45; // Brightened for clarity
         floorGrid.material.depthWrite = false;
         floorGrid.material.blending = THREE.AdditiveBlending;
         floorGrid.material.toneMapped = false;
@@ -1706,13 +1695,25 @@ function animationLoop(timestamp = performance.now()) {
 
     const overlays = config.overlays || {};
 
-    if (typeof window.hudPhysicsStep === 'function') {
-        window.hudPhysicsStep();
+    const activeFrame = window.referenceFrameManager?.activeFrameType || window.hudMode || 'open';
+    const activeTopo = window.referenceFrameManager?.topologies?.[activeFrame];
+    const liveNodes = window.nodes || [];
+    const worldScale = config.worldScale ?? 1.0;
+
+    if (activeTopo && liveNodes.length > 0) {
+        if (typeof activeTopo.applyBoundaryForces === 'function') {
+            activeTopo.applyBoundaryForces(liveNodes, dt, worldScale, simulationTime);
+        }
+        if (typeof window.hudPhysicsStep === 'function') {
+            window.hudPhysicsStep();
+        }
+        if (typeof activeTopo.enforceConstraints === 'function') {
+            activeTopo.enforceConstraints(liveNodes, worldScale);
+        }
     }
 
     updateCamera();
 
-    const worldScale = config.worldScale ?? 1.0;
     const nodes = getVisibleNodes();
     const edges = window.edges || [];
     const palette = config.colorPalette || 'dynamic';
@@ -1727,6 +1728,7 @@ function animationLoop(timestamp = performance.now()) {
     const adsActive = !isDynamicDefault && !!(overlays.ads || palette === 'ads' || palette === 'ads-cft');
     const thermalActive = !!(overlays.thermal || palette === 'thermal');
     const empActive = !!(overlays.emp || overlays.em || palette === 'em');
+    const dopplerActive = !!(overlays.doppler || palette === 'doppler');
 
     // --- Automatic Overlay Sync & Update ---
     if (thermalOverlay) {
@@ -1753,6 +1755,14 @@ function animationLoop(timestamp = performance.now()) {
         }
     }
 
+    if (openSpaceOverlay) {
+        if (window.hudMode === 'open' && !openSpaceOverlay.active) openSpaceOverlay.enable();
+        else if (window.hudMode !== 'open' && openSpaceOverlay.active) openSpaceOverlay.disable();
+        if (openSpaceOverlay.active) {
+            openSpaceOverlay.update(nodes, simulationTime, intensity, worldScale);
+        }
+    }
+
     const noiseThreshold = config.noiseThreshold ?? 0.15;
     // Strictly decouple noiseThreshold from activation state
     const snrActive = !!(overlays.snr || palette === 'snr');
@@ -1766,37 +1776,40 @@ function animationLoop(timestamp = performance.now()) {
 
     // --- Synchronized Uniform Feed from EmpOverlay pulseRings (Leading Edge & Diffusion Parity) ---
     if (window.referenceFrameManager && window.referenceFrameManager.empUniforms) {
-        window.referenceFrameManager.empUniforms.uEmpActive.value = empActive && empOverlay && empOverlay.active ? 1 : 0;
+        const isEmpLive = !!(empActive && empOverlay && empOverlay.active);
+        window.referenceFrameManager.empUniforms.uEmpActive.value = isEmpLive ? 1 : 0;
 
-        if (empActive && empOverlay && empOverlay.active && empOverlay.pulseRings) {
-            const radiiVal = window.referenceFrameManager.empUniforms.uEmpRadii.value;
-            const opacitiesVal = window.referenceFrameManager.empUniforms.uEmpOpacities.value;
-            const centersVal = window.referenceFrameManager.empUniforms.uEmpCenters.value;
+        const radiiVal = window.referenceFrameManager.empUniforms.uEmpRadii.value;
+        const opacitiesVal = window.referenceFrameManager.empUniforms.uEmpOpacities.value;
+        const centersVal = window.referenceFrameManager.empUniforms.uEmpCenters.value;
+
+        if (isEmpLive && Array.isArray(empOverlay.pulseRings)) {
             const rings = empOverlay.pulseRings;
-
             for (let j = 0; j < 16; j++) {
                 if (j < rings.length) {
-                    radiiVal[j] = rings[j].radius;
-                    const lifeProgress = rings[j].radius / rings[j].maxRadius;
-                    opacitiesVal[j] = Math.max(0.0, 0.35 * (1.0 - lifeProgress));
-                    centersVal[j].copy(rings[j].mesh.position);
+                    const r = rings[j];
+                    const maxR = Math.max(1.0, r.maxRadius || 120.0);
+                    radiiVal[j] = r.radius || 0.0;
+                    const lifeProgress = Math.min(1.0, (r.radius || 0.0) / maxR);
+                    // [↑] Stronger frame reflection from pulse rings | [↓] Softer ring-to-frame coupling
+                    opacitiesVal[j] = Math.max(0.0, 0.42 * (1.0 - lifeProgress));
+                    if (r.mesh && r.mesh.position) {
+                        centersVal[j].copy(r.mesh.position);
+                    }
                 } else {
                     radiiVal[j] = 0.0;
                     opacitiesVal[j] = 0.0;
                 }
             }
-            window.referenceFrameManager.empUniforms.uEmpRadii.needsUpdate = true;
-            window.referenceFrameManager.empUniforms.uEmpOpacities.needsUpdate = true;
         } else {
-            const radiiVal = window.referenceFrameManager.empUniforms.uEmpRadii.value;
-            const opacitiesVal = window.referenceFrameManager.empUniforms.uEmpOpacities.value;
             for (let j = 0; j < 16; j++) {
                 radiiVal[j] = 0.0;
                 opacitiesVal[j] = 0.0;
             }
-            window.referenceFrameManager.empUniforms.uEmpRadii.needsUpdate = true;
-            window.referenceFrameManager.empUniforms.uEmpOpacities.needsUpdate = true;
         }
+
+        window.referenceFrameManager.empUniforms.uEmpRadii.needsUpdate = true;
+        window.referenceFrameManager.empUniforms.uEmpOpacities.needsUpdate = true;
     }
 
     if (shellMaterial) {
@@ -1823,6 +1836,14 @@ function animationLoop(timestamp = performance.now()) {
     updateTethers(pairs, simulationTime, interpolation, palette, overlays, intensity, config.noiseThresh ?? 0.05);
     updateVaporField(nodes, pairs, overlays, intensity, simulationTime, worldScale);
     updateDoppler(nodes, worldScale, !!overlays.doppler, intensity);
+
+    if (dopplerShiftOverlay) {
+        if (dopplerActive && !dopplerShiftOverlay.active) dopplerShiftOverlay.enable();
+        else if (!dopplerActive && dopplerShiftOverlay.active) dopplerShiftOverlay.disable();
+        if (dopplerShiftOverlay.active) {
+            dopplerShiftOverlay.update(nodes, pairs, camera, simulationTime, intensity, worldScale);
+        }
+    }
 
     if (qeTetherManager) {
         qeTetherManager.update(pairs, simulationTime, qeActive);
