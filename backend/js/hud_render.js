@@ -16,6 +16,9 @@ import { AdSOverlay } from '/physics/visuals/ads_overlay.js';
 import { SNROverlay } from '../physics/visuals/snr_overlay.js';
 import { OpenSpaceOverlay } from '/physics/visuals/open_space_overlay.js';
 import { DopplerShiftOverlay } from '/physics/visuals/doppler_shift_overlay.js';
+import { TensegrityTensionManager } from '/physics/visuals/tensegrity_tension_manager.js';
+import { VacuumFluctuationsManager } from '/physics/visuals/vacuum_fluctuations_manager.js';
+
 
 const subatomicFactory = new SubatomicNodeFactory();
 const nodeRenderGroups = new Map();
@@ -94,6 +97,8 @@ let qeTetherManager = null;
 let snrOverlay = null;
 let openSpaceOverlay = null;
 let dopplerShiftOverlay = null;
+let tensegrityTensionManager = null;
+let vacuumFluctuationsManager = null;
 
 let dopplerGeometry = null;
 let dopplerLines = null;
@@ -152,9 +157,13 @@ export function initHUDRenderer(options = {}) {
     snrOverlay = new SNROverlay(scene, window.referenceFrameManager, '#deck-body-content');
     openSpaceOverlay = new OpenSpaceOverlay(scene, window.referenceFrameManager, '#deck-body-content');
     dopplerShiftOverlay = new DopplerShiftOverlay(scene, window.referenceFrameManager, '#deck-body-content');
-    
+    tensegrityTensionManager = new TensegrityTensionManager(scene, window.referenceFrameManager, '#deck-body-content');
+    vacuumFluctuationsManager = new VacuumFluctuationsManager(scene, window.referenceFrameManager, '#deck-body-content');
+
     window.snrOverlay = snrOverlay;
     window.dopplerShiftOverlay = dopplerShiftOverlay;
+    window.tensegrityTensionManager = tensegrityTensionManager;
+    window.vacuumFluctuationsManager = vacuumFluctuationsManager;
     window.toggleThermalOverlay = function (active) {
         if (!thermalOverlay) return;
         if (active) {
@@ -1726,9 +1735,12 @@ function animationLoop(timestamp = performance.now()) {
     // Strictly gate qeActive and adsActive so they can NEVER render under Dynamic (Default)
     const qeActive = !isDynamicDefault && !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe');
     const adsActive = !isDynamicDefault && !!(overlays.ads || palette === 'ads' || palette === 'ads-cft');
+    const sigmaActive = !isDynamicDefault && !!(overlays.tension || overlays.sigma || palette === 'tension' || palette === 'sigma');
+    const vacuumActive = !isDynamicDefault && !!(overlays.vacuum || overlays.lambda || overlays.atmos || palette === 'vacuum' || palette === 'lambda');
     const thermalActive = !!(overlays.thermal || palette === 'thermal');
     const empActive = !!(overlays.emp || overlays.em || palette === 'em');
     const dopplerActive = !!(overlays.doppler || palette === 'doppler');
+    
 
     // --- Automatic Overlay Sync & Update ---
     if (thermalOverlay) {
@@ -1837,6 +1849,28 @@ function animationLoop(timestamp = performance.now()) {
     updateVaporField(nodes, pairs, overlays, intensity, simulationTime, worldScale);
     updateDoppler(nodes, worldScale, !!overlays.doppler, intensity);
 
+    if (tensegrityTensionManager) {
+        tensegrityTensionManager.update({
+            nodes,
+            pairs,
+            worldScale,
+            dt,
+            intensity,
+            active: sigmaActive
+        });
+    }
+
+    if (vacuumFluctuationsManager) {
+        vacuumFluctuationsManager.update({
+            nodes,
+            worldScale,
+            dt,
+            intensity,
+            active: vacuumActive,
+            camera
+        });
+    }
+
     if (dopplerShiftOverlay) {
         if (dopplerActive && !dopplerShiftOverlay.active) dopplerShiftOverlay.enable();
         else if (!dopplerActive && dopplerShiftOverlay.active) dopplerShiftOverlay.disable();
@@ -1890,4 +1924,6 @@ export function disposeHUDRenderer() {
     gizmoCamera = null;
     nodeLabels.clear();
     initialized = false;
+    tensegrityTensionManager = null;
+    vacuumFluctuationsManager = null;
 }
