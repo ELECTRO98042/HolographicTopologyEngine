@@ -1,5 +1,4 @@
-import * as THREE from 'three';
-
+import * as THREE from '/js/vendor/graphics/three.js';
 /**
  * Creates a custom ShaderMaterial for Quantum Entanglement (QE) tethers.
  * Features:
@@ -13,7 +12,8 @@ export function createQETetherMaterial() {
         uniforms: {
             uTime: { value: 0.0 },
             uColor: { value: new THREE.Color(0x9d4edd) }, // Luminous QE Purple
-            uPulseSpeed: { value: 2.5 }
+            uPulseSpeed: { value: 2.5 },
+            uQEMode: { value: 0.0 }
         },
         vertexShader: `
             varying vec2 vUv;
@@ -35,8 +35,17 @@ export function createQETetherMaterial() {
             uniform float uTime;
             uniform vec3 uColor;
             uniform float uPulseSpeed;
+            uniform float uQEMode;
 
             void main() {
+                vec3 p = vec3(vUv, 0.0);
+                float density = 0.05;
+                vec3 col = vec3(0.70, 0.78, 0.90);
+
+                if (uQEMode > 0.5) {
+                    col = vec3(0.61, 0.30, 0.87); // Luminous QE Purple
+                }
+
                 // Standing wave pulsation along the tether length (vUv.y)
                 float wave = sin(vUv.y * 25.0 - uTime * 6.0) * 0.5 + 0.5;
                 

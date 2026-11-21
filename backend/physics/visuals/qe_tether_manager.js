@@ -1,6 +1,5 @@
-import * as THREE from 'three';
+import * as THREE from '/js/vendor/graphics/three.js';
 import { createQETetherMaterial } from './qe_tether_shader.js';
-
 export class QETetherManager {
     constructor(scene) {
         this.scene = scene;
