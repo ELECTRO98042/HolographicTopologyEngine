@@ -82,6 +82,7 @@ let ghostColors = null;
 let monoGeometry = null;
 let monoPoints = null;
 let monoPositions = null;
+let monoColors = null;
 const MONO_PER_TETHER = 3;
 
 let vaporPoints = null;
@@ -152,6 +153,7 @@ export function initHUDRenderer(options = {}) {
 
     qeTetherManager = new QETetherManager(scene);
     adsOverlay = new AdSOverlay(scene, window.referenceFrameManager, '#deck-body-content');
+    window.adsOverlay = adsOverlay;
     thermalOverlay = new ThermalOverlay(scene, window.referenceFrameManager, '#deck-body-content');
     empOverlay = new EmpOverlay(scene, window.referenceFrameManager, '#deck-body-content');
     snrOverlay = new SNROverlay(scene, window.referenceFrameManager, '#deck-body-content');
@@ -731,6 +733,103 @@ function resolveSchemaNodeColor(node, palette, speed, isCore, outColor) {
     }
     return outColor;
 }
+
+const THERMAL_GRADIENT_24 = (() => {
+    const stops = [];
+    const count = 24;
+    for (let i = 0; i < count; i++) {
+        const u = i / (count - 1);
+        let r, g, b;
+
+        if (u < 0.35) {
+            const k = u / 0.35;
+            r = 0.38 + 0.52 * k;
+            g = 0.06 + 0.10 * Math.pow(k, 1.3);
+            b = 0.05 + 0.03 * Math.sin(k * Math.PI);
+        } else if (u < 0.72) {
+            const k = (u - 0.35) / 0.37;
+            r = 0.90 + 0.10 * Math.sin(k * Math.PI * 0.5);
+            g = 0.16 + 0.68 * Math.pow(k, 1.15);
+            b = 0.05 + 0.22 * Math.pow(k, 1.8);
+        } else {
+            const k = (u - 0.72) / 0.28;
+            r = 1.00 - 0.22 * Math.pow(k, 1.2);
+            g = 0.84 + 0.16 * k;
+            b = 0.27 + 0.73 * Math.pow(k, 0.9);
+        }
+
+        stops.push({ pos: u, r, g, b });
+    }
+    return stops;
+})();
+
+function sampleContinuousThermalColor(heatNorm, outColor) {
+    const t = Math.max(0, Math.min(1, heatNorm));
+    const stops = THERMAL_GRADIENT_24;
+    const scaled = t * (stops.length - 1);
+    const idx = Math.min(stops.length - 2, Math.max(0, Math.floor(scaled)));
+    const localT = scaled - idx;
+
+    const a = stops[idx];
+    const b = stops[idx + 1];
+
+    outColor.setRGB(
+        a.r + (b.r - a.r) * localT,
+        a.g + (b.g - a.g) * localT,
+        a.b + (b.b - a.b) * localT
+    );
+    return outColor;
+}
+
+const EM_GRADIENT_24 = (() => {
+    const stops = [];
+    const count = 24;
+    for (let i = 0; i < count; i++) {
+        const u = i / (count - 1);
+        let r, g, b;
+
+        if (u < 0.4) {
+            // Lower EM activity: deep cobalt/indigo -> rich electric blue
+            const k = u / 0.4;
+            r = 0.10 + 0.08 * k;
+            g = 0.22 + 0.43 * Math.pow(k, 1.15);
+            b = 0.65 + 0.35 * k;
+        } else if (u < 0.78) {
+            // Mid EM activity: electric blue -> bright cyan / aqua
+            const k = (u - 0.4) / 0.38;
+            r = 0.18 + 0.22 * Math.pow(k, 1.3);
+            g = 0.65 + 0.33 * k;
+            b = 1.00;
+        } else {
+            // High EM activity: bright cyan -> luminous ice-white
+            const k = (u - 0.78) / 0.22;
+            r = 0.40 + 0.55 * k;
+            g = 0.98 + 0.02 * k;
+            b = 1.00;
+        }
+
+        stops.push({ pos: u, r, g, b });
+    }
+    return stops;
+})();
+
+function sampleContinuousEMColor(emNorm, outColor) {
+    const t = Math.max(0, Math.min(1, emNorm));
+    const stops = EM_GRADIENT_24;
+    const scaled = t * (stops.length - 1);
+    const idx = Math.min(stops.length - 2, Math.max(0, Math.floor(scaled)));
+    const localT = scaled - idx;
+
+    const a = stops[idx];
+    const b = stops[idx + 1];
+
+    outColor.setRGB(
+        a.r + (b.r - a.r) * localT,
+        a.g + (b.g - a.g) * localT,
+        a.b + (b.b - a.b) * localT
+    );
+    return outColor;
+}
 // Node & Point Sprite Color Assignment (updateNodes): Maps node positions, sizes, and point-sprite aura glow colors (nodeGlow).
 function updateNodes(nodes, worldScale, palette, overlays, intensity) {
     const count = Math.min(nodes.length, MAX_NODE_INSTANCES);
@@ -797,29 +896,38 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
         let glowRadius = radius * 2.5;
         tempColor.copy(nodeCol);
 
+        const safeDt = Math.max(0.001, Math.min(0.05, dt || 0.016));
+        const rawEmNorm = Math.max(0, Math.min(1, speed / 1.8));
+        const prevEm = typeof node._smoothEm === 'number' ? node._smoothEm : rawEmNorm;
+        const emAlpha = 1.0 - Math.exp(-safeDt * 2.4);
+        const smoothEm = prevEm + (rawEmNorm - prevEm) * emAlpha;
+        node._smoothEm = smoothEm;
+
         if (empActive) {
-            tempColor.setRGB(0.55, 0.98, 1.0);
-            glowRadius = radius * 3.6;
+            const spreadEm = Math.pow(smoothEm, 0.78);
+            sampleContinuousEMColor(spreadEm, tempColor);
+            glowRadius = radius * (1.8 + spreadEm * 1.6);
+            const emScale = (0.35 + spreadEm * 0.75) * Math.max(0.25, intensity);
+            tempColor.multiplyScalar(emScale);
         } else if (thermalActive) {
-            // =========================================================================
-            // THREE-TIER THERMAL SCHEMA (Amplitude-Scaled Radiance)
-            // =========================================================================
-            if (speed > 1.8) {
-                // HOT: Bright sky-blue to white radiance
-                tempColor.setRGB(0.85, 0.95, 1.0);
-                glowRadius = radius * 5.5;
-            } else if (speed > 0.7) {
-                // MEDIUM: Yellow to orange transition
-                tempColor.setRGB(1.0, 0.65, 0.15);
-                glowRadius = radius * 4.2;
-            } else {
-                // LOW: Red to red-brown gradient
-                tempColor.setRGB(0.65, 0.20, 0.10);
-                glowRadius = radius * 3.2;
-            }
+            const maxSpeedRef = 4.0;
+            const targetHeat = Math.max(0, Math.min(1, speed / maxSpeedRef));
+
+            const prevHeat = typeof node._smoothThermal === 'number' ? node._smoothThermal : targetHeat;
+            const graceAlpha = 1.0 - Math.exp(-dt * 2.8);
+            const smoothHeat = prevHeat + (targetHeat - prevHeat) * graceAlpha;
+            node._smoothThermal = smoothHeat;
+
+            node.kelvin = 250 + smoothHeat * 4750;
+            node.totalHeat = 0.4 + smoothHeat * 4.6;
+
+            sampleContinuousThermalColor(smoothHeat, tempColor);
+
+            glowRadius = radius * (2.1 + smoothHeat * 1.9);
+            const brightnessScale = (0.45 + smoothHeat * 0.65) * Math.max(0.25, intensity);
+            tempColor.multiplyScalar(brightnessScale);
 
             // Clean scalar intensity without compounding distortion
-            tempColor.multiplyScalar(Math.max(0.5, intensity));
         } else if (qeActive || palette === 'qe') {
             tempColor.setHex(0xa855f7); // Or 0x7b2cbf for deep violet
             glowRadius = radius * 3.2;
@@ -943,12 +1051,14 @@ function buildTetherMeshes() {
 
     monoGeometry = new THREE.BufferGeometry();
     monoPositions = new Float32Array(MAX_PAIRS * MONO_PER_TETHER * 3);
+    monoColors = new Float32Array(MAX_PAIRS * MONO_PER_TETHER * 3);
     monoGeometry.setAttribute('position', new THREE.BufferAttribute(monoPositions, 3).setUsage(THREE.DynamicDrawUsage));
+    monoGeometry.setAttribute('color', new THREE.BufferAttribute(monoColors, 3).setUsage(THREE.DynamicDrawUsage));
     monoGeometry.setDrawRange(0, 0);
     monoPoints = new THREE.Points(monoGeometry, new THREE.PointsMaterial({
-        color: 0xeab308,
         size: 3.4,
         sizeAttenuation: true,
+        vertexColors: true,
         transparent: true,
         opacity: 0.9,
         blending: THREE.AdditiveBlending,
@@ -1160,14 +1270,50 @@ function updateTethers(pairs, time, interpMode, palette, overlays, intensity, no
         }
 
         if (signalParticlesActive && mi + MONO_PER_TETHER * 3 <= MAX_PAIRS * MONO_PER_TETHER * 3) {
+            const nodeA = pair.nodeA || pair.a || {};
+            const nodeB = pair.nodeB || pair.b || {};
+            const speedA = Math.hypot(nodeA.vx || 0, nodeA.vy || 0, nodeA.vz || 0);
+            const speedB = Math.hypot(nodeB.vx || 0, nodeB.vy || 0, nodeB.vz || 0);
+
+            // Project relative node velocity onto normalized tether direction (dx, dy, dz)
+            const invDist = dist > 1e-4 ? 1.0 / dist : 0.0;
+            const tx = dx * invDist;
+            const ty = dy * invDist;
+            const tz = dz * invDist;
+            const relVx = (nodeB.vx || 0) - (nodeA.vx || 0);
+            const relVy = (nodeB.vy || 0) - (nodeA.vy || 0);
+            const relVz = (nodeB.vz || 0) - (nodeA.vz || 0);
+            const axialDrift = Math.max(-0.25, Math.min(0.25, (relVx * tx + relVy * ty + relVz * tz) * 0.08));
+
+            const avgSpeed = (speedA + speedB) * 0.5;
+            const emNorm = Math.max(0, Math.min(1, avgSpeed / 1.8));
+            const dotColor = new THREE.Color();
+
             for (let i = 0; i < MONO_PER_TETHER; i++) {
-                const t = (time * 0.16 + i / MONO_PER_TETHER) % 1.0;
-                const px = ax + dx * t;
-                const py = ay + dy * t;
-                const pz = az + dz * t;
-                monoPositions[mi++] = px;
-                monoPositions[mi++] = py;
-                monoPositions[mi++] = pz;
+                const phase = i / MONO_PER_TETHER;
+                const t = ((time * (0.16 + emNorm * 0.14) + axialDrift + phase) % 1.0 + 1.0) % 1.0;
+
+                // Slight lateral vector offset aligned with node velocity cross/perp component
+                const perpScale = (0.5 + emNorm * 1.5) * Math.sin(t * Math.PI);
+                const px = ax + dx * t + (-tz) * perpScale;
+                const py = ay + dy * t + (relVy * 0.6) * perpScale;
+                const pz = az + dz * t + tx * perpScale;
+
+                const dotSample = Math.max(0, Math.min(1, emNorm * 0.75 + t * 0.25));
+                if (palette === 'em' || overlays.em || overlays.emp) {
+                    sampleContinuousEMColor(dotSample, dotColor);
+                } else {
+                    dotColor.copy(primaryCol).lerp(highTensionCol, dotSample);
+                }
+
+                monoPositions[mi] = px;
+                monoPositions[mi + 1] = py;
+                monoPositions[mi + 2] = pz;
+
+                monoColors[mi] = dotColor.r;
+                monoColors[mi + 1] = dotColor.g;
+                monoColors[mi + 2] = dotColor.b;
+                mi += 3;
             }
         }
 
@@ -1203,6 +1349,7 @@ function updateTethers(pairs, time, interpMode, palette, overlays, intensity, no
         monoPoints.material.opacity = 0.9 * noiseAttenuation * Math.max(0.2, Math.min(1.5, intensity));
         monoGeometry.setDrawRange(0, mi / 3);
         monoGeometry.attributes.position.needsUpdate = true;
+        monoGeometry.attributes.color.needsUpdate = true;
     }
 }
 
@@ -1687,6 +1834,37 @@ function attachMainCanvasEvents(canvas) {
     });
 }
 
+export function releaseImportedConfigToPhysics(nodes = window.nodes) {
+    const targetNodes = Array.isArray(nodes) ? nodes : [];
+
+    for (const node of targetNodes) {
+        if (!node || typeof node !== 'object') continue;
+        if (node === window.selectedNode) continue;
+
+        // Release configuration/pin locks while preserving node identity,
+        // phase, amplitude, and custom properties.
+        node.isPinned = false;
+        if ('pinned' in node) node.pinned = false;
+        if ('fixed' in node) node.fixed = false;
+        if ('modelLocked' in node) node.modelLocked = false;
+        if ('staticConfig' in node) node.staticConfig = false;
+
+        if (node.velocity && typeof node.velocity === 'object') {
+            node.velocity.x = Number.isFinite(node.velocity.x) ? node.velocity.x : 0;
+            node.velocity.y = Number.isFinite(node.velocity.y) ? node.velocity.y : 0;
+            node.velocity.z = Number.isFinite(node.velocity.z) ? node.velocity.z : 0;
+        }
+    }
+
+    const refMgr = window.referenceFrameManager;
+    const scale = window.hudConfig?.worldScale ?? 1.0;
+    if (refMgr && typeof refMgr.switchFrame === 'function' && refMgr.activeFrameType) {
+        refMgr.switchFrame(refMgr.activeFrameType, scale);
+    }
+
+    return targetNodes;
+}
+
 // -----------------------------------------------------------------------------
 // Animation loopGlobal delta timing, physics steps, overlay state unpacking (qeActive, thermalActive, empActive), and pushing active values down to material uniforms.
 // -----------------------------------------------------------------------------
@@ -1740,7 +1918,7 @@ function animationLoop(timestamp = performance.now()) {
     const thermalActive = !!(overlays.thermal || palette === 'thermal');
     const empActive = !!(overlays.emp || overlays.em || palette === 'em');
     const dopplerActive = !!(overlays.doppler || palette === 'doppler');
-    
+
 
     // --- Automatic Overlay Sync & Update ---
     if (thermalOverlay) {
@@ -1750,7 +1928,7 @@ function animationLoop(timestamp = performance.now()) {
             thermalOverlay.update(nodes, dt);
         }
     }
-  
+
     if (empOverlay) {
         if (empActive && !empOverlay.active) empOverlay.enable();
         else if (!empActive && empOverlay.active) empOverlay.disable();
@@ -1796,15 +1974,29 @@ function animationLoop(timestamp = performance.now()) {
         const centersVal = window.referenceFrameManager.empUniforms.uEmpCenters.value;
 
         if (isEmpLive && Array.isArray(empOverlay.pulseRings)) {
-            const rings = empOverlay.pulseRings;
+            const rankedRings = [...empOverlay.pulseRings].sort((a, b) => {
+                const lifeA = Math.min(1.0, (a.radius || 0) / Math.max(1.0, a.maxRadius || 120.0));
+                const lifeB = Math.min(1.0, (b.radius || 0) / Math.max(1.0, b.maxRadius || 120.0));
+                const scoreA = (typeof a.strength === 'number' ? a.strength : 0.5) * (1.0 - lifeA);
+                const scoreB = (typeof b.strength === 'number' ? b.strength : 0.5) * (1.0 - lifeB);
+                return scoreB - scoreA;
+            });
+
             for (let j = 0; j < 16; j++) {
-                if (j < rings.length) {
-                    const r = rings[j];
+                if (j < rankedRings.length) {
+                    const r = rankedRings[j];
                     const maxR = Math.max(1.0, r.maxRadius || 120.0);
                     radiiVal[j] = r.radius || 0.0;
                     const lifeProgress = Math.min(1.0, (r.radius || 0.0) / maxR);
-                    // [↑] Stronger frame reflection from pulse rings | [↓] Softer ring-to-frame coupling
-                    opacitiesVal[j] = Math.max(0.0, 0.42 * (1.0 - lifeProgress));
+
+                    const strength = typeof r.strength === 'number'
+                        ? Math.max(0.0, Math.min(1.0, r.strength))
+                        : 0.5;
+
+                    const steppedStrength = Math.round(strength * 20) / 20;
+                    const reflectionPeak = 0.20 + steppedStrength * 0.20;
+                    opacitiesVal[j] = Math.max(0.0, reflectionPeak * (1.0 - lifeProgress));
+
                     if (r.mesh && r.mesh.position) {
                         centersVal[j].copy(r.mesh.position);
                     }
@@ -1812,11 +2004,6 @@ function animationLoop(timestamp = performance.now()) {
                     radiiVal[j] = 0.0;
                     opacitiesVal[j] = 0.0;
                 }
-            }
-        } else {
-            for (let j = 0; j < 16; j++) {
-                radiiVal[j] = 0.0;
-                opacitiesVal[j] = 0.0;
             }
         }
 
@@ -1889,7 +2076,7 @@ function animationLoop(timestamp = performance.now()) {
     renderGizmo();
 
     frameHandle = requestAnimationFrame(animationLoop);
-}    
+}
 
 // -----------------------------------------------------------------------------
 // Teardown

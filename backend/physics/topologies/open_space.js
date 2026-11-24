@@ -11,14 +11,13 @@ export class OpenSpaceTopology {
         const group = new THREE.Group();
         group.name = 'manifold_open';
 
-        // 6 Concentric Spin Network Shells mapped from inner core to outer boundary:
         const shellConfig = [
-            { radius: 35, color: 0xffffff, opacity: 0.02 }, // White (Innermost)
-            { radius: 70, color: 0xfacc15, opacity: 0.03 }, // Yellow
-            { radius: 110, color: 0xf97316, opacity: 0.04 }, // Orange
-            { radius: 155, color: 0xef4444, opacity: 0.06 }, // Red
-            { radius: 205, color: 0xa855f7, opacity: 0.09 }, // Purple
-            { radius: 260, color: 0x3b82f6, opacity: 0.08 }  // Blue (Outermost)
+            { radius: 35, color: 0xffffff, opacity: 0.02 },
+            { radius: 70, color: 0xfacc15, opacity: 0.03 },
+            { radius: 110, color: 0xf97316, opacity: 0.04 },
+            { radius: 155, color: 0xef4444, opacity: 0.06 },
+            { radius: 205, color: 0xa855f7, opacity: 0.09 },
+            { radius: 260, color: 0x3b82f6, opacity: 0.08 }
         ];
 
         shellConfig.forEach((cfg, index) => {
@@ -41,7 +40,7 @@ export class OpenSpaceTopology {
     }
 
     calculateTargets(nodes) {
-        // Open space leaves node positioning entirely to organic physics / telemetry stream
+        // Open space leaves node positioning to mutual equilibrium and boundary containment
     }
 
     applyBoundaryForces(nodes, dt = 0.016, scale = 1.0, time = 0) {
@@ -63,7 +62,6 @@ export class OpenSpaceTopology {
             let fy = a.fy || 0;
             let fz = a.fz || 0;
 
-            // Gentle pairwise separation & spring equilibrium so nodes don't stack or stay collinear
             for (let j = 0; j < nodes.length; j++) {
                 if (i === j) continue;
                 const b = nodes[j];
@@ -79,9 +77,9 @@ export class OpenSpaceTopology {
                 let dist = Math.hypot(dx, dy, dz);
 
                 if (dist < 1e-4) {
-                    const angle = (i * 2.39996 + j * 1.1) + time * 0.1;
+                    const angle = ((i - j) * 2.3999632) + time * 0.05;
                     dx = Math.cos(angle);
-                    dy = Math.sin(angle * 0.7);
+                    dy = Math.sin(angle * 0.5);
                     dz = Math.sin(angle);
                     dist = 1.0;
                 }
@@ -91,33 +89,26 @@ export class OpenSpaceTopology {
                 const nz = dz / dist;
 
                 if (dist < targetDist) {
-                    const push = ((targetDist - dist) / targetDist) * 35.0;
+                    const push = ((targetDist - dist) / targetDist) * 75.0;
                     fx += nx * push;
                     fy += ny * push;
                     fz += nz * push;
                 } else if (dist > targetDist * 1.6) {
-                    const pull = Math.min(18.0, ((dist - targetDist * 1.6) / targetDist) * 12.0);
+                    const pull = Math.min(36.0, ((dist - targetDist * 1.6) / targetDist) * 24.0);
                     fx -= nx * pull;
                     fy -= ny * pull;
                     fz -= nz * pull;
                 }
             }
 
-            // Soft outer boundary containment around the outermost open-space shell
             const r = Math.hypot(ax, ay, az);
             if (r > softR && r > 1e-4) {
                 const excess = (r - softR) / Math.max(1.0, maxR - softR);
-                const pullIn = Math.min(80.0, excess * excess * 45.0);
+                const pullIn = Math.min(140.0, excess * excess * 75.0);
                 fx -= (ax / r) * pullIn;
                 fy -= (ay / r) * pullIn;
                 fz -= (az / r) * pullIn;
             }
-
-            // Gentle 3D off-axis drift so collinear nodes can break out into 3D space
-            const phase = i * 2.1 + time * 0.4;
-            fx += Math.cos(phase) * 4.0;
-            fy += Math.sin(phase * 0.8) * 3.0;
-            fz += Math.sin(phase) * 5.0;
 
             a.fx = fx;
             a.fy = fy;

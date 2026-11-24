@@ -58,7 +58,7 @@ export function createQETetherMaterial() {
                 vec3 baseGlow = uColor * (0.4 + 0.4 * wave);
                 vec3 pulseColor = mix(baseGlow, vec3(0.9, 1.0, 1.5), pulse);
                 
-                float alpha = 0.25 + 0.45 * wave + pulse;
+                float alpha = clamp(0.25 + 0.45 * wave + pulse, 0.0, 0.95);
 
                 gl_FragColor = vec4(pulseColor, alpha);
             }

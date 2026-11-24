@@ -5,16 +5,16 @@ export class HyperbolicTopology {
         this.name = 'hyperbolic';
         this.outerThroat = 230;
         this.outerHeight = 295;
+        this.guideThroat = 115;
+        this.minSeparation = 42;
     }
 
     createMesh(scale = 1.0) {
         const group = new THREE.Group();
         group.name = 'manifold_hyperbolic';
-        group.position.set(0, 0, 0); // Explicitly anchor to world origin
+        group.position.set(0, 0, 0);
         group.scale.set(scale, scale, scale);
 
-        // 6 Nested Hyperboloid Shells using native THREE.LatheGeometry (Hyperbolic cosine profile)
-        // 1. White, 2. Yellow, 3. Orange, 4. Red, 5. Purple, 6. Blue
         const hyperConfig = [
             { throat: 30, height: 70, color: 0xffffff, opacity: 0.03 },
             { throat: 60, height: 105, color: 0xfacc15, opacity: 0.04 },
@@ -30,7 +30,7 @@ export class HyperbolicTopology {
 
             for (let j = 0; j <= segments; j++) {
                 const v = (j / segments) * 2.0 - 1.0;
-                const yCoord = v * cfg.height; // Scale handled by group.scale
+                const yCoord = v * cfg.height;
                 const radius = cfg.throat * Math.cosh(v * 1.1);
                 points.push(new THREE.Vector2(radius, yCoord));
             }
@@ -54,7 +54,6 @@ export class HyperbolicTopology {
             group.add(mesh);
         });
 
-        // Asymptotic Throat Waist Ring at y = 0
         const waistMat = new THREE.LineBasicMaterial({
             color: 0x00ffcc,
             transparent: true,
@@ -73,18 +72,17 @@ export class HyperbolicTopology {
         const waistLine = new THREE.Line(new THREE.BufferGeometry().setFromPoints(waistPts), waistMat);
         group.add(waistLine);
 
-        group.updateMatrixWorld(true); // Force matrix update on creation
+        group.updateMatrixWorld(true);
         return group;
     }
 
     calculateTargets(nodes) {
-        const count = nodes.length;
+        const count = Math.max(1, nodes.length);
         nodes.forEach((node, i) => {
-            const u = (i / count) * 4 * Math.PI;
-            const h = ((i / count) - 0.5) * 200;
-            const r = 40 * Math.cosh(h / 80);
+            const u = (i / count) * 2 * Math.PI;
+            const r = this.guideThroat;
             node.targetX = r * Math.cos(u);
-            node.targetY = h;
+            node.targetY = 0;
             node.targetZ = r * Math.sin(u);
         });
     }
@@ -93,10 +91,13 @@ export class HyperbolicTopology {
         if (!Array.isArray(nodes) || nodes.length === 0) return;
 
         const s = Math.max(0.25, scale);
-        const maxH = (this.outerHeight || 295) * s;
+        const outerH = this.outerHeight || 295;
+        const maxH = outerH * s;
         const softH = maxH * 0.85;
         const hSpan = Math.max(1.0, maxH - softH);
         const throat = this.outerThroat || 230;
+        const guideThroat = (this.guideThroat || 115) * s;
+        const minSep = (this.minSeparation || 42) * Math.max(0.5, Math.min(2.0, s));
 
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
@@ -110,13 +111,15 @@ export class HyperbolicTopology {
             let fy = node.fy || 0;
             let fz = node.fz || 0;
 
+            // 1. Soft top/bottom height containment
             const absY = Math.abs(y);
             if (absY > softH) {
                 const tY = (absY - softH) / hSpan;
-                fy -= Math.sign(y) * Math.min(140.0, 12.0 * tY + 65.0 * tY * tY);
+                fy -= Math.sign(y) * Math.min(180.0, 18.0 * tY + 85.0 * tY * tY);
             }
 
-            const v = Math.max(-1.0, Math.min(1.0, (y / s) / (this.outerHeight || 295)));
+            // 2. Soft outer hyperboloid wall containment
+            const v = Math.max(-1.0, Math.min(1.0, (y / s) / outerH));
             const maxRho = throat * Math.cosh(v * 1.1) * s;
             const softRho = maxRho * 0.85;
             const rhoSpan = Math.max(1.0, maxRho - softRho);
@@ -124,16 +127,53 @@ export class HyperbolicTopology {
 
             if (rho > softRho && rho > 1e-4) {
                 const tR = (rho - softRho) / rhoSpan;
-                const pullR = Math.min(140.0, 12.0 * tR + 65.0 * tR * tR);
+                const pullR = Math.min(180.0, 18.0 * tR + 85.0 * tR * tR);
                 fx -= (x / rho) * pullR;
                 fz -= (z / rho) * pullR;
             }
 
-            // Gentle 3D off-axis drift so unpinned nodes stay active inside the hyperboloid
-            const phase = i * 2.094 + time * 0.35;
-            fx += Math.cos(phase) * 2.5;
-            fy += Math.sin(phase * 0.8) * 2.0;
-            fz += Math.sin(phase) * 2.5;
+            // 3. Conformal hyperboloid throat potential & level-plane (y = 0) alignment
+            const preferredRho = guideThroat * Math.cosh(v * 1.1);
+            const nx = rho > 1e-4 ? x / rho : 1.0;
+            const nz = rho > 1e-4 ? z / rho : 0.0;
+            const radialDelta = preferredRho - rho;
+            fx += nx * radialDelta * 0.65;
+            fz += nz * radialDelta * 0.65;
+
+            // Level axial restoring force toward y = 0 (horizontal floor/waist alignment)
+            fy += (-y) * 0.15;
+
+            // 4. Symmetric pairwise repulsion so unpinned nodes space out evenly without clumping
+            for (let j = 0; j < nodes.length; j++) {
+                if (i === j) continue;
+                const other = nodes[j];
+                if (!other) continue;
+
+                const ox = other.position ? other.position.x : (other.x ?? 0);
+                const oy = other.position ? other.position.y : (other.y ?? 0);
+                const oz = other.position ? other.position.z : (other.z ?? 0);
+
+                let dx = x - ox;
+                let dy = y - oy;
+                let dz = z - oz;
+                let dist = Math.hypot(dx, dy, dz);
+
+                if (dist < 1e-4) {
+                    const angle = ((i - j) * 2.3999632) + time * 0.05;
+                    dx = Math.cos(angle);
+                    dy = 0;
+                    dz = Math.sin(angle);
+                    dist = 1.0;
+                }
+
+                if (dist < minSep) {
+                    const overlap = (minSep - dist) / minSep;
+                    const rep = overlap * overlap * 95.0;
+                    fx += (dx / dist) * rep;
+                    fy += (dy / dist) * rep;
+                    fz += (dz / dist) * rep;
+                }
+            }
 
             node.fx = fx;
             node.fy = fy;

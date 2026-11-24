@@ -1,0 +1,33 @@
+{
+  "version": "2.9.0",
+  "coordinate_system": "3D",
+  "name": "Canonical 12-Node Conformal Validation Ring",
+  "nodes": [
+    { "id": "Q-001", "name": "Ring-01", "type": "TOPOLOGY", "category": "BOUNDARY_RING", "tier": "BOUNDARY", "x": 115, "y": 4, "z": 0, "attrs": { "mass": 1.0, "group": "ring_even", "dampingFactor": 0.9 } },
+    { "id": "Q-002", "name": "Ring-02", "type": "METRIC", "category": "BULK_CORE", "tier": "BOUNDARY", "x": 99.5, "y": -5, "z": 57.5, "attrs": { "mass": 1.0, "group": "ring_odd", "dampingFactor": 0.9 } },
+    { "id": "Q-003", "name": "Ring-03", "type": "FIELD", "category": "BOUNDARY_RING", "tier": "BOUNDARY", "x": 57.5, "y": 6, "z": 99.5, "attrs": { "mass": 1.0, "group": "ring_even", "dampingFactor": 0.9 } },
+    { "id": "Q-004", "name": "Ring-04", "type": "POTENTIAL", "category": "BULK_CORE", "tier": "BOUNDARY", "x": 0, "y": -4, "z": 115, "attrs": { "mass": 1.0, "group": "ring_odd", "dampingFactor": 0.9 } },
+    { "id": "Q-005", "name": "Ring-05", "type": "TOPOLOGY", "category": "BOUNDARY_RING", "tier": "BOUNDARY", "x": -57.5, "y": 5, "z": 99.5, "attrs": { "mass": 1.0, "group": "ring_even", "dampingFactor": 0.9 } },
+    { "id": "Q-006", "name": "Ring-06", "type": "METRIC", "category": "BULK_CORE", "tier": "BOUNDARY", "x": -99.5, "y": -6, "z": 57.5, "attrs": { "mass": 1.0, "group": "ring_odd", "dampingFactor": 0.9 } },
+    { "id": "Q-007", "name": "Ring-07", "type": "FIELD", "category": "BOUNDARY_RING", "tier": "BOUNDARY", "x": -115, "y": 4, "z": 0, "attrs": { "mass": 1.0, "group": "ring_even", "dampingFactor": 0.9 } },
+    { "id": "Q-008", "name": "Ring-08", "type": "POTENTIAL", "category": "BULK_CORE", "tier": "BOUNDARY", "x": -99.5, "y": -5, "z": -57.5, "attrs": { "mass": 1.0, "group": "ring_odd", "dampingFactor": 0.9 } },
+    { "id": "Q-009", "name": "Ring-09", "type": "TOPOLOGY", "category": "BOUNDARY_RING", "tier": "BOUNDARY", "x": -57.5, "y": 6, "z": -99.5, "attrs": { "mass": 1.0, "group": "ring_even", "dampingFactor": 0.9 } },
+    { "id": "Q-010", "name": "Ring-10", "type": "METRIC", "category": "BULK_CORE", "tier": "BOUNDARY", "x": 0, "y": -4, "z": -115, "attrs": { "mass": 1.0, "group": "ring_odd", "dampingFactor": 0.9 } },
+    { "id": "Q-011", "name": "Ring-11", "type": "FIELD", "category": "BOUNDARY_RING", "tier": "BOUNDARY", "x": 57.5, "y": 5, "z": -99.5, "attrs": { "mass": 1.0, "group": "ring_even", "dampingFactor": 0.9 } },
+    { "id": "Q-012", "name": "Ring-12", "type": "POTENTIAL", "category": "BULK_CORE", "tier": "BOUNDARY", "x": 99.5, "y": -6, "z": -57.5, "attrs": { "mass": 1.0, "group": "ring_odd", "dampingFactor": 0.9 } }
+  ],
+  "edges": [
+    { "source": "Q-001", "target": "Q-002", "label": "Ring Tether" },
+    { "source": "Q-002", "target": "Q-003", "label": "Ring Tether" },
+    { "source": "Q-003", "target": "Q-004", "label": "Ring Tether" },
+    { "source": "Q-004", "target": "Q-005", "label": "Ring Tether" },
+    { "source": "Q-005", "target": "Q-006", "label": "Ring Tether" },
+    { "source": "Q-006", "target": "Q-007", "label": "Ring Tether" },
+    { "source": "Q-007", "target": "Q-008", "label": "Ring Tether" },
+    { "source": "Q-008", "target": "Q-009", "label": "Ring Tether" },
+    { "source": "Q-009", "target": "Q-010", "label": "Ring Tether" },
+    { "source": "Q-010", "target": "Q-011", "label": "Ring Tether" },
+    { "source": "Q-011", "target": "Q-012", "label": "Ring Tether" },
+    { "source": "Q-012", "target": "Q-001", "label": "Ring Tether" }
+  ]
+}

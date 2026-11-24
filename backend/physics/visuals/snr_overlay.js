@@ -15,6 +15,7 @@ export class SNROverlay {
         this.active = false;
         this.lastFrameType = null;
         this.lastWorldScale = 1.0;
+        this.lastTime = null;
 
         this._cleanColor = new THREE.Color(0x10b981);
         this._degradedColor = new THREE.Color(0xef4444);
@@ -26,12 +27,14 @@ export class SNROverlay {
         this.active = true;
         this.group.visible = true;
         this.lastFrameType = null;
+        this.lastTime = null;
     }
 
     disable() {
         if (!this.active) return;
         this.active = false;
         this.group.visible = false;
+        this.lastTime = null;
         this.clearTubules();
     }
 
@@ -60,10 +63,34 @@ export class SNROverlay {
     }
 
     _nodePos(node, worldScale, outVec) {
-        const x = (node.position ? node.position.x : (node.x || 0)) * worldScale;
-        const y = (node.position ? node.position.y : (node.y || 0)) * worldScale;
-        const z = (node.position ? node.position.z : (node.z || 0)) * worldScale;
+        const x = (node?.position && typeof node.position.x === 'number' ? node.position.x : (node?.x ?? 0)) * worldScale;
+        const y = (node?.position && typeof node.position.y === 'number' ? node.position.y : (node?.y ?? 0)) * worldScale;
+        const z = (node?.position && typeof node.position.z === 'number' ? node.position.z : (node?.z ?? 0)) * worldScale;
         return outVec.set(x, y, z);
+    }
+
+    _nodeSpeed(node) {
+        if (!node) return 0;
+        const vx = typeof node.vx === 'number' ? node.vx : (node.velocity?.x ?? 0);
+        const vy = typeof node.vy === 'number' ? node.vy : (node.velocity?.y ?? 0);
+        const vz = typeof node.vz === 'number' ? node.vz : (node.velocity?.z ?? 0);
+        if (!Number.isFinite(vx) || !Number.isFinite(vy) || !Number.isFinite(vz)) return 0;
+        return Math.hypot(vx, vy, vz);
+    }
+
+    _computeDt(time) {
+        if (typeof time !== 'number' || !Number.isFinite(time)) {
+            this.lastTime = null;
+            return 1 / 60;
+        }
+        if (this.lastTime === null) {
+            this.lastTime = time;
+            return 1 / 60;
+        }
+        const rawDt = time - this.lastTime;
+        this.lastTime = time;
+        if (!Number.isFinite(rawDt) || rawDt <= 0) return 0;
+        return Math.min(rawDt, 0.1);
     }
 
     update(edges, nodes, time, noiseThreshold = 0.15, worldScale = 1.0) {
@@ -71,17 +98,19 @@ export class SNROverlay {
 
         const safeEdges = Array.isArray(edges) ? edges : [];
         const safeNodes = Array.isArray(nodes) ? nodes : [];
+        const safeScale = Number.isFinite(worldScale) && worldScale > 0 ? worldScale : 1.0;
+        const dt = this._computeDt(time);
+
         const currentFrameType = this.referenceFrameManager
             ? (this.referenceFrameManager.activeFrameType || this.referenceFrameManager.activeMode || 'open')
             : 'open';
 
-        if (this.lastFrameType !== currentFrameType || Math.abs(this.lastWorldScale - worldScale) > 0.0001) {
+        if (this.lastFrameType !== currentFrameType || Math.abs(this.lastWorldScale - safeScale) > 0.0001) {
             this.clearTubules();
             this.lastFrameType = currentFrameType;
-            this.lastWorldScale = worldScale;
+            this.lastWorldScale = safeScale;
         }
 
-        // Trim extra pools
         while (this.tubules.length > safeEdges.length) {
             const t = this.tubules.pop();
             if (t) {
@@ -99,15 +128,16 @@ export class SNROverlay {
             }
         }
 
-        // Normalized noise pressure [0..1] for smooth SNR color & stability feedback
-        const noiseRatio = THREE.MathUtils.clamp(noiseThreshold / 0.5, 0, 1);
-        const tubeRadius = Math.max(0.6, 3.8 * worldScale);
+        const noiseRatio = THREE.MathUtils.clamp((noiseThreshold ?? 0.15) / 0.5, 0, 1);
+        const tubeRadius = Math.max(0.6, 3.8 * safeScale);
 
         const startVec = new THREE.Vector3();
         const endVec = new THREE.Vector3();
 
         for (let idx = 0; idx < safeEdges.length; idx++) {
             const edge = safeEdges[idx];
+            if (!edge) continue;
+
             const srcKey = typeof edge.source === 'object' && edge.source !== null
                 ? (edge.source.id || edge.source.name)
                 : (edge.source ?? edge.from);
@@ -136,8 +166,8 @@ export class SNROverlay {
             }
 
             if (!useCachedEndpoints) {
-                this._nodePos(sourceNode, worldScale, startVec);
-                this._nodePos(targetNode, worldScale, endVec);
+                this._nodePos(sourceNode, safeScale, startVec);
+                this._nodePos(targetNode, safeScale, endVec);
 
                 if (this.referenceFrameManager && typeof this.referenceFrameManager.transformPosition === 'function') {
                     this.referenceFrameManager.transformPosition(startVec, currentFrameType);
@@ -157,8 +187,10 @@ export class SNROverlay {
                 }
             }
 
+            const currentLen = startVec.distanceTo(endVec);
+
             if (!tubule) {
-                tubule = this.createTubuleMesh(startVec, endVec, tubeRadius);
+                tubule = this.createTubuleMesh(startVec, endVec, tubeRadius, currentLen);
                 this.tubules[idx] = tubule;
                 this.group.add(tubule.mesh);
             } else {
@@ -178,45 +210,70 @@ export class SNROverlay {
                 }
             }
 
-            // Compute SNR stress once before coloring, deforming, and pacing packets
+            if (!Number.isFinite(tubule.restLength) || tubule.restLength <= 1e-3) {
+                tubule.restLength = Math.max(currentLen, 1.0);
+            } else {
+                // Gently adapt baseline toward settled length so frame transitions don't lock in permanent strain
+                tubule.restLength = THREE.MathUtils.lerp(tubule.restLength, currentLen, Math.min(1, dt * 0.15));
+            }
+
+            const edgeStrain = THREE.MathUtils.clamp(
+                Math.abs(currentLen - tubule.restLength) / Math.max(1.0, tubule.restLength),
+                0,
+                1.5
+            );
+
+            const speedA = this._nodeSpeed(sourceNode);
+            const speedB = this._nodeSpeed(targetNode);
+            const meanSpeed = (speedA + speedB) * 0.5;
+            const kineticDrive = THREE.MathUtils.clamp(meanSpeed * 0.12, 0, 2.0);
+            const physicsDrive = Math.min(2.5, kineticDrive + edgeStrain * 1.2);
+
             const edgeNoise = typeof edge.noise === 'number' ? THREE.MathUtils.clamp(edge.noise, 0, 1) : noiseRatio;
             const snrStress = THREE.MathUtils.clamp(Math.max(noiseRatio, edgeNoise), 0, 1);
 
-            // --- Independent Tubule Pass ---
+            // --- Physics-Driven Tubule Wave & Stress Pass ---
             tubule.mesh.visible = true;
             tubule.mesh.material.color.lerpColors(this._cleanColor, this._degradedColor, snrStress);
             tubule.mesh.material.opacity = THREE.MathUtils.lerp(0.15, 0.12, snrStress);
-            this.deformTubuleMesh(tubule, time, snrStress, worldScale);
 
-            // --- Independent Packet Pass + Tubule Highlight Coupling ---
+            // Advance tubule wave phase by real node kinetic activity + strain
+            tubule.wavePhase = (tubule.wavePhase ?? (idx * 0.7)) + dt * (0.6 + physicsDrive * 4.2);
+            this.deformTubuleMesh(tubule, tubule.wavePhase, snrStress, physicsDrive, edgeStrain, safeScale);
+
+            // --- Physics-Driven Packet Transit & Wake Pass ---
             if (!packet) {
-                packet = this.createPacketMesh(worldScale);
+                packet = this.createPacketMesh(safeScale, idx);
                 this.packets[idx] = packet;
                 this.group.add(packet.mesh);
             }
 
             packet.mesh.visible = true;
-            const speed = THREE.MathUtils.lerp(0.38, 0.22, snrStress);
-            packet.progress = (time * speed + idx * 0.27) % 1.0;
+            const baseRate = THREE.MathUtils.lerp(0.28, 0.14, snrStress);
+            const packetRate = baseRate * (0.25 + physicsDrive * 0.85);
+            packet.progress = (packet.progress + dt * packetRate) % 1.0;
             packet.mesh.position.lerpVectors(startVec, endVec, packet.progress);
 
             const edgeFade = Math.min(
                 THREE.MathUtils.smoothstep(packet.progress, 0.0, 0.12),
                 THREE.MathUtils.smoothstep(1.0 - packet.progress, 0.0, 0.12)
             );
-            const baseScale = Math.max(0.4, worldScale);
-            packet.mesh.scale.setScalar(baseScale * THREE.MathUtils.lerp(0.35, 1.0, edgeFade));
+            const baseScale = Math.max(0.4, safeScale);
+            const energyScale = 1.0 + Math.min(0.45, physicsDrive * 0.2);
+            packet.mesh.scale.setScalar(baseScale * energyScale * THREE.MathUtils.lerp(0.35, 1.0, edgeFade));
             packet.mesh.material.opacity = THREE.MathUtils.lerp(0.15, 0.85, edgeFade);
 
             if (tubule.uniforms) {
                 tubule.uniforms.uPacketPos.value.copy(packet.mesh.position);
                 tubule.uniforms.uPacketActive.value = 1.0;
-                tubule.uniforms.uPacketRadius.value = Math.max(14.0, tubeRadius * 5.5) * Math.max(0.5, worldScale);
+                tubule.uniforms.uPacketRadius.value =
+                    Math.max(14.0, tubeRadius * (5.5 + Math.min(3.5, physicsDrive * 1.5))) *
+                    Math.max(0.5, safeScale);
             }
         }
     }
 
-    createTubuleMesh(start, end, tubeRadius) {
+    createTubuleMesh(start, end, tubeRadius, initialLength = 1.0) {
         const s = start.clone();
         const e = end.clone();
         const path = new THREE.LineCurve3(s, e);
@@ -279,10 +336,20 @@ export class SNROverlay {
 
         const mesh = new THREE.Mesh(geometry, material);
         mesh.frustumCulled = false;
-        return { mesh, geometry, path, start: s, end: e, radius: tubeRadius, uniforms };
+        return {
+            mesh,
+            geometry,
+            path,
+            start: s,
+            end: e,
+            radius: tubeRadius,
+            restLength: Math.max(initialLength, 1.0),
+            wavePhase: 0,
+            uniforms
+        };
     }
 
-    createPacketMesh(worldScale = 1.0) {
+    createPacketMesh(worldScale = 1.0, idx = 0) {
         const packetGeo = new THREE.SphereGeometry(1.3, 8, 8);
         const packetMat = new THREE.MeshBasicMaterial({
             color: 0xff8800,
@@ -294,15 +361,14 @@ export class SNROverlay {
         const packetMesh = new THREE.Mesh(packetGeo, packetMat);
         packetMesh.frustumCulled = false;
         packetMesh.scale.setScalar(Math.max(0.4, worldScale));
-        return { mesh: packetMesh, progress: Math.random() };
+        return { mesh: packetMesh, progress: (idx * 0.27) % 1.0 };
     }
 
-    deformTubuleMesh(tubule, time, snrStress, worldScale = 1.0) {
+    deformTubuleMesh(tubule, wavePhase, snrStress, physicsDrive = 0, edgeStrain = 0, worldScale = 1.0) {
         const posAttr = tubule.geometry.attributes.position;
         const tubularSegments = 24;
         const radialSegments = 8;
 
-        // Build orthonormal basis (tangent, normal, binormal) from edge direction
         const tangent = new THREE.Vector3().subVectors(tubule.end, tubule.start);
         if (tangent.lengthSq() < 1e-6) return;
         tangent.normalize();
@@ -314,10 +380,11 @@ export class SNROverlay {
         const normal = new THREE.Vector3().crossVectors(tangent, upRef).normalize();
         const binormal = new THREE.Vector3().crossVectors(tangent, normal).normalize();
 
-        // Continuous smooth undulation + high-noise interference ramp
-        const waveAmp = snrStress * 1.25 * worldScale;
-        const jagFactor = THREE.MathUtils.smoothstep(snrStress, 0.45, 1.0);
-        const jagAmp = jagFactor * 2.2 * worldScale;
+        // Wave amplitude scales with SNR stress + physical strain/motion
+        const motionBoost = 0.2 + Math.min(1.2, physicsDrive * 0.5 + edgeStrain * 0.8);
+        const waveAmp = (snrStress * 1.25 + edgeStrain * 0.9) * motionBoost * worldScale;
+        const jagFactor = THREE.MathUtils.smoothstep(snrStress + edgeStrain * 0.35, 0.45, 1.0);
+        const jagAmp = jagFactor * 2.2 * (0.4 + Math.min(1.0, physicsDrive * 0.5)) * worldScale;
 
         const p = new THREE.Vector3();
         const offset = new THREE.Vector3();
@@ -325,18 +392,16 @@ export class SNROverlay {
         for (let i = 0; i <= tubularSegments; i++) {
             const u = i / tubularSegments;
             tubule.path.getPointAt(u, p);
-            const env = Math.sin(u * Math.PI); // Pin both ends to source/target nodes
+            const env = Math.sin(u * Math.PI);
 
-            // Smooth undulation in normal/binormal plane
-            const waveN = Math.sin(time * 4.5 + u * 7.5) * waveAmp * env;
-            const waveB = Math.cos(time * 3.8 + u * 6.5) * waveAmp * env;
+            const waveN = Math.sin(wavePhase + u * 7.5) * waveAmp * env;
+            const waveB = Math.cos(wavePhase * 0.85 + u * 6.5) * waveAmp * env;
 
-            // Smoothly blended high-frequency interference when SNR degrades
             const jagN = jagAmp > 0.001
-                ? (Math.sin(time * 19.0 + i * 3.7) * 0.65 + Math.cos(time * 31.0 + i * 7.1) * 0.35) * jagAmp * env
+                ? (Math.sin(wavePhase * 4.2 + i * 3.7) * 0.65 + Math.cos(wavePhase * 6.8 + i * 7.1) * 0.35) * jagAmp * env
                 : 0;
             const jagB = jagAmp > 0.001
-                ? (Math.cos(time * 21.0 + i * 4.3) * 0.65 + Math.sin(time * 29.0 + i * 6.7) * 0.35) * jagAmp * env
+                ? (Math.cos(wavePhase * 4.6 + i * 4.3) * 0.65 + Math.sin(wavePhase * 6.4 + i * 6.7) * 0.35) * jagAmp * env
                 : 0;
 
             for (let j = 0; j <= radialSegments; j++) {

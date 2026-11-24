@@ -4,13 +4,14 @@ export class SphericalTopology {
     constructor() {
         this.name = 'spheroid';
         this.outerRadius = 275;
+        this.shellRadius = 150;
+        this.minSeparation = 52;
     }
 
     createMesh(scale = 1.0) {
         const group = new THREE.Group();
         group.name = 'manifold_spheroid';
 
-        // 1. 6 Concentric Spheroidal Shells (White, Yellow, Orange, Red, Purple, Blue)
         const shellConfig = [
             { radius: 40, color: 0xffffff, opacity: 0.03, stretchY: 1.0 },
             { radius: 80, color: 0xfacc15, opacity: 0.04, stretchY: 1.0 },
@@ -37,7 +38,6 @@ export class SphericalTopology {
             group.add(shellMesh);
         });
 
-        // 2. Explicit Longitudinal Meridian Hoops (Wrapping Pole-to-Pole)
         const meridianMat = new THREE.LineBasicMaterial({
             color: 0x00ffcc,
             transparent: true,
@@ -54,7 +54,7 @@ export class SphericalTopology {
             const points = [];
             const segments = 40;
             for (let j = 0; j <= segments; j++) {
-                const phi = (j / segments) * Math.PI - Math.PI / 2; // -90° to +90°
+                const phi = (j / segments) * Math.PI - Math.PI / 2;
                 const y = maxR * stretchY * Math.sin(phi);
                 const rXZ = maxR * Math.cos(phi);
                 const x = rXZ * Math.cos(theta);
@@ -65,7 +65,6 @@ export class SphericalTopology {
             group.add(new THREE.Line(geom, meridianMat));
         }
 
-        // 3. Explicit Latitudinal Parallel Rings (Horizontal Slices)
         const parallelMat = new THREE.LineBasicMaterial({
             color: 0xfacc15,
             transparent: true,
@@ -94,22 +93,24 @@ export class SphericalTopology {
     }
 
     calculateTargets(nodes) {
-        const count = nodes.length;
+        const count = Math.max(1, nodes.length);
+        const r = this.shellRadius;
         nodes.forEach((node, i) => {
-            const phi = Math.acos(-1 + (2 * i) / Math.max(1, count));
-            const theta = Math.sqrt(count * Math.PI) * phi;
-            const r = 130;
-            node.targetX = r * Math.cos(theta) * Math.sin(phi);
-            node.targetY = r * Math.sin(theta) * Math.sin(phi);
-            node.targetZ = r * Math.cos(phi);
+            const theta = (i / count) * 2 * Math.PI;
+            node.targetX = r * Math.cos(theta);
+            node.targetY = 0;
+            node.targetZ = r * Math.sin(theta);
         });
     }
 
     applyBoundaryForces(nodes, dt = 0.016, scale = 1.0, time = 0) {
         if (!Array.isArray(nodes) || nodes.length === 0) return;
 
-        const maxR = this.outerRadius * Math.max(0.25, scale);
+        const s = Math.max(0.25, scale);
+        const maxR = this.outerRadius * s;
         const softR = maxR * 0.85;
+        const eqR = (this.shellRadius || 150) * s;
+        const minSep = (this.minSeparation || 52) * Math.max(0.5, Math.min(2.0, s));
 
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
@@ -124,24 +125,58 @@ export class SphericalTopology {
             let fz = node.fz || 0;
 
             const r = Math.hypot(x, y, z);
-            if (r > softR && r > 1e-4) {
+            if (r > 1e-4) {
                 const nx = x / r;
                 const ny = y / r;
                 const nz = z / r;
-                const span = Math.max(1.0, maxR - softR);
-                const t = (r - softR) / span;
-                const inwardForce = Math.min(140.0, (12.0 * t + 65.0 * t * t));
 
-                fx -= nx * inwardForce;
-                fy -= ny * inwardForce;
-                fz -= nz * inwardForce;
+                // Conformal radial shell restoring force toward eqR
+                fx += nx * (eqR - r) * 0.65;
+                fy += ny * (eqR - r) * 0.65;
+                fz += nz * (eqR - r) * 0.65;
+
+                // Outer boundary containment
+                if (r > softR) {
+                    const span = Math.max(1.0, maxR - softR);
+                    const t = (r - softR) / span;
+                    const inwardForce = Math.min(180.0, 18.0 * t + 85.0 * t * t);
+                    fx -= nx * inwardForce;
+                    fy -= ny * inwardForce;
+                    fz -= nz * inwardForce;
+                }
             }
 
-            // Gentle tangential swirl around Y to prevent static radial stalling
-            const phase = i * 2.094 + time * 0.35;
-            fx += Math.cos(phase) * 2.5;
-            fy += Math.sin(phase * 0.7) * 2.0;
-            fz += Math.sin(phase) * 2.5;
+            // Pairwise repulsion so nodes distribute symmetrically across the spherical shell
+            for (let j = 0; j < nodes.length; j++) {
+                if (i === j) continue;
+                const other = nodes[j];
+                if (!other) continue;
+
+                const ox = other.position ? other.position.x : (other.x ?? 0);
+                const oy = other.position ? other.position.y : (other.y ?? 0);
+                const oz = other.position ? other.position.z : (other.z ?? 0);
+
+                let dx = x - ox;
+                let dy = y - oy;
+                let dz = z - oz;
+                let dist = Math.hypot(dx, dy, dz);
+
+                if (dist < 1e-4) {
+                    const angle = ((i - j) * 2.3999632) + time * 0.05;
+                    dx = Math.cos(angle);
+                    dy = Math.sin(angle * 0.5);
+                    dz = Math.sin(angle);
+                    dist = 1.0;
+                }
+
+                if (dist < minSep) {
+                    const overlap = (minSep - dist) / minSep;
+                    const rep = overlap * overlap * 105.0;
+                    fx += (dx / dist) * rep;
+                    fy += (dy / dist) * rep;
+                    fz += (dz / dist) * rep;
+                }
+            }
 
             node.fx = fx;
             node.fy = fy;
@@ -176,7 +211,6 @@ export class SphericalTopology {
                 y = ny * maxR;
                 z = nz * maxR;
 
-                // Remove outward radial velocity while keeping tangential motion along the sphere
                 const vx = node.vx || 0;
                 const vy = node.vy || 0;
                 const vz = node.vz || 0;

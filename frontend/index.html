@@ -430,7 +430,8 @@
     <script type="module">
         import { ReferenceFrameManager } from '/physics/reference_frames.js';
         // import { initHUDRenderer, setRenderMode, resetRenderCamera } from '/js/hud_render.js';
-        import { initHUDRenderer, setRenderMode, resetRenderCamera } from '/js/hud_render.js';
+        import { initHUDRenderer, setRenderMode, resetRenderCamera, releaseImportedConfigToPhysics } from '/js/hud_render.js';
+        window.releaseImportedConfigToPhysics = releaseImportedConfigToPhysics;
 
         const refSelect = document.getElementById('ref-frame-select');
             if (refSelect) {
@@ -698,88 +699,49 @@
 
         window.setTopologyMode = function (mode) {
             if (!mode) return;
-            userSelectedMode = mode;
-            console.log(`[TopologyMode] Setting mode to: "${mode}"`);
-            // Normalize mode alias if needed (e.g. 'cubic' -> 'cubed')
             const normalizedMode = (mode === 'cubic') ? 'cubed' : mode;
-
             userSelectedMode = normalizedMode;
             window.hudMode = normalizedMode;
-
             console.log(`[TopologyMode] Setting mode to: "${normalizedMode}"`);
-            try {
-                const radius = 120.0;
-                window.nodes.forEach((node, i) => {
-                    if (mode === 'spheroid') {
-                        if (node !== window.selectedNode) {
-                            node.isPinned = false;
-                        }
-                        // Physics-driven: let SphericalTopology boundary forces & constraints guide nodes
-                        if (node.position && typeof node.position.set === 'function') {
-                            node.position.set(node.x || 0, node.y || 0, node.z || 0);
-                        }
-                    } else if (mode === 'cubed' || mode === 'cubic') {
-                        // Physics-driven: let CubicLatticeTopology boundary forces & constraints guide nodes
-                        if (node !== window.selectedNode) {
-                            node.isPinned = false;
-                        }
-                        if (node.position && typeof node.position.set === 'function') {
-                            node.position.set(node.x || 0, node.y || 0, node.z || 0);
-                        }
-                    } else if (mode === 'toroidal') {
-                        // Physics-driven: let ToroidalTopology boundary forces & constraints guide nodes
-                        if (node !== window.selectedNode) {
-                            node.isPinned = false;
-                        }
-                        if (node.position && typeof node.position.set === 'function') {
-                            node.position.set(node.x || 0, node.y || 0, node.z || 0);
-                        }
-                    } else if (mode === 'hyperbolic') {
-                        // Physics-driven: let HyperbolicTopology boundary forces & constraints guide nodes
-                        if (node !== window.selectedNode) {
-                            node.isPinned = false;
-                        }
-                        if (node.position && typeof node.position.set === 'function') {
-                            node.position.set(node.x || 0, node.y || 0, node.z || 0);
-                        }
-                    } else if (mode === 'open') {
-                        const nonCoreNodes = window.nodes.filter(n => !(n.isCore || n.tier === 'BULK_CORE'));
-                        const ringCount = Math.max(1, nonCoreNodes.length);
-                        const angleStep = (Math.PI * 2) / ringCount;
-                        let nonCoreIdx = 0;
 
-                        window.nodes.forEach((node) => {
-                            if (node.isCore || node.tier === 'BULK_CORE') {
-                                node.x = 0;
-                                node.y = 0;
-                                node.z = 0;
-                            } else {
-                                const angle = nonCoreIdx * angleStep;
-                                const yOffset = (nonCoreIdx % 2 === 0 ? 1 : -1) * 24;
-                                node.x = Math.cos(angle) * 65;
-                                node.y = yOffset;
-                                node.z = Math.sin(angle) * 65;
-                                nonCoreIdx++;
-                            }
-                            if (node.position && typeof node.position.set === 'function') {
-                                node.position.set(node.x, node.y, node.z);
-                            }
-                            node.vx = 0;
-                            node.vy = 0;
-                            node.vz = 0;
+            try {
+                const nodes = Array.isArray(window.nodes) ? window.nodes : [];
+
+                for (let i = 0; i < nodes.length; i++) {
+                    const node = nodes[i];
+                    if (!node) continue;
+
+                    // Clear stale manifold targets from prior frames so physics/boundary forces own settlement
+                    delete node.targetX;
+                    delete node.targetY;
+                    delete node.targetZ;
+
+                    if (normalizedMode === 'open') {
+                        if (!(node.isCore || node.tier === 'BULK_CORE') && node !== window.selectedNode) {
                             node.isPinned = false;
-                        });
+                        }
+                    } else if (node !== window.selectedNode) {
+                        node.isPinned = false;
                     }
-                });
+
+                    if (node.position && typeof node.position.set === 'function') {
+                        const nx = typeof node.x === 'number' ? node.x : (node.position.x || 0);
+                        const ny = typeof node.y === 'number' ? node.y : (node.position.y || 0);
+                        const nz = typeof node.z === 'number' ? node.z : (node.position.z || 0);
+                        node.position.set(nx, ny, nz);
+                    }
+                }
 
                 setRenderMode(normalizedMode);
-                // Sync the dropdown value if called programmatically
-        const refSel = document.getElementById('ref-frame-select');
-        if (refSel && refSel.value !== normalizedMode) {
-            refSel.value = normalizedMode;
-        }
 
-                window.broadcastHUDStateToBuilder(window.nodes);
+                const refSel = document.getElementById('ref-frame-select');
+                if (refSel && refSel.value !== normalizedMode) {
+                    refSel.value = normalizedMode;
+                }
+
+                if (typeof window.broadcastHUDStateToBuilder === 'function') {
+                    window.broadcastHUDStateToBuilder(nodes);
+                }
             } catch (err) {
                 console.error(`[TopologyMode] EXCEPTION while setting mode "${mode}":`, err);
             }
@@ -827,6 +789,32 @@
                     node.fz = 0;
                 });
             };
+
+            window.openTestingSuite = function (forceState = true) {
+                    if (!window.testingSuite && typeof window.TestingSuiteWindow === 'function') {
+                        window.testingSuite = new window.TestingSuiteWindow();
+                    }
+                    if (window.testingSuite && typeof window.testingSuite.toggleDrawer === 'function') {
+                        window.testingSuite.toggleDrawer(forceState);
+                    } else {
+                        console.warn('[TestingSuite] TestingSuiteWindow not loaded yet.');
+                    }
+                };
+        
+            document.addEventListener('click', (e) => {
+                const trigger = e.target.closest('#btn-test-validate, [data-action="test-validate"], button, a');
+                if (!trigger) return;
+
+                const isTestValidate =
+                    trigger.id === 'btn-test-validate' ||
+                    trigger.dataset?.action === 'test-validate' ||
+                    /test\s*&\s*validate/i.test(trigger.textContent || '');
+
+                if (isTestValidate) {
+                    e.preventDefault();
+                    window.openTestingSuite(true);
+                }
+            });
 
         // Sliders binding
         const bindSlider = (id, valId, unit = '') => {

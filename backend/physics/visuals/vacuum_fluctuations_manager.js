@@ -135,7 +135,6 @@ export class VacuumFluctuationsManager {
         this.foamShell.position.copy(center);
         this.foamShell.rotation.y += safeDt * 0.05 * lambdaDensity;
 
-        this.ghostAuraInstanced.instanceMatrix.needsUpdate = true;
         // Vacuum density governs baseline pulse rate across all node ghost auras
         const pulseRate = cfg.auraBasePulseHz * (0.5 + lambdaDensity * cfg.auraPulseGain);
         const pulseWave = 0.7 + 0.3 * Math.sin(this._time * Math.PI * 2.0 * pulseRate);
@@ -153,7 +152,7 @@ export class VacuumFluctuationsManager {
         for (let i = 0; i < count; i++) {
             const p = nodes[i]?.position || nodes[i]?.pos || nodes[i];
             if (!p) continue;
-            nodePos.set(p.x || 0, p.y || 0, p.z || 0);
+            nodePos.set((p.x || 0) * worldScale, (p.y || 0) * worldScale, (p.z || 0) * worldScale);
 
             const phase = i * 0.73;
             const pulse = 0.5 + 0.5 * Math.sin(this._time * Math.PI * 2.0 * pulseRate + phase);
@@ -167,14 +166,9 @@ export class VacuumFluctuationsManager {
             dummy.updateMatrix();
             this.ghostAuraInstanced.setMatrixAt(i, dummy.matrix);
         }
-
         this.ghostAuraInstanced.instanceMatrix.needsUpdate = true;
-        this.ghostAuraInstanced.material.opacity = Math.min(
-            0.28,
-            cfg.auraRingOpacity * Math.max(0.25, intensity) * (0.7 + 0.3 * Math.sin(this._time * Math.PI * 2.0 * pulseRate))
-        );
     }
-
+    
     dispose() {
         if (this.group && this.scene) {
             this.scene.remove(this.group);

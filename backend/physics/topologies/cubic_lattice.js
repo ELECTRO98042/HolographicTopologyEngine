@@ -3,21 +3,21 @@ import * as THREE from '/js/vendor/graphics/three.js';
 export class CubicLatticeTopology {
     constructor() {
         this.name = 'cubed';
+        this.halfExtent = 162.5;
+        this.minSeparation = 46;
     }
 
     createMesh(scale = 1.0) {
         const group = new THREE.Group();
         group.name = 'manifold_cubed';
 
-        // 6 Concentric Nested Cubes mapped from inner core to outer boundary:
-        // 1. White, 2. Yellow, 3. Orange, 4. Red, 5. Purple, 6. Blue
         const cubeConfig = [
-            { size: 50, color: 0xffffff, opacity: 0.07 }, // White (Innermost)
-            { size: 95, color: 0xfacc15, opacity: 0.09 }, // Yellow
-            { size: 145, color: 0xf97316, opacity: 0.12 }, // Orange
-            { size: 200, color: 0xef4444, opacity: 0.14 }, // Red
-            { size: 260, color: 0xa855f7, opacity: 0.11 }, // Purple
-            { size: 325, color: 0x3b82f6, opacity: 0.09 }  // Blue (Outermost)
+            { size: 50, color: 0xffffff, opacity: 0.07 },
+            { size: 95, color: 0xfacc15, opacity: 0.09 },
+            { size: 145, color: 0xf97316, opacity: 0.12 },
+            { size: 200, color: 0xef4444, opacity: 0.14 },
+            { size: 260, color: 0xa855f7, opacity: 0.11 },
+            { size: 325, color: 0x3b82f6, opacity: 0.09 }
         ];
 
         cubeConfig.forEach((cfg, index) => {
@@ -37,7 +37,6 @@ export class CubicLatticeTopology {
             group.add(cubeMesh);
         });
 
-        // 2. Orthogonal Axial Guidance Tracers connecting corners & centers
         const tracerMat = new THREE.LineBasicMaterial({
             color: 0x00ffcc,
             transparent: true,
@@ -75,14 +74,16 @@ export class CubicLatticeTopology {
             node.targetZ = z;
         });
     }
-    
+
     applyBoundaryForces(nodes, dt = 0.016, scale = 1.0, time = 0) {
         if (!Array.isArray(nodes) || nodes.length === 0) return;
 
-        const halfExtent = this.halfExtent || 180;
-        const maxE = halfExtent * Math.max(0.25, scale);
+        const s = Math.max(0.25, scale);
+        const halfExtent = this.halfExtent || 162.5;
+        const maxE = halfExtent * s;
         const softE = maxE * 0.85;
         const span = Math.max(1.0, maxE - softE);
+        const minSep = (this.minSeparation || 46) * Math.max(0.5, Math.min(2.0, s));
 
         for (let i = 0; i < nodes.length; i++) {
             const node = nodes[i];
@@ -98,22 +99,48 @@ export class CubicLatticeTopology {
 
             if (Math.abs(x) > softE) {
                 const t = (Math.abs(x) - softE) / span;
-                fx -= Math.sign(x) * Math.min(140.0, 12.0 * t + 65.0 * t * t);
+                fx -= Math.sign(x) * Math.min(180.0, 18.0 * t + 85.0 * t * t);
             }
             if (Math.abs(y) > softE) {
                 const t = (Math.abs(y) - softE) / span;
-                fy -= Math.sign(y) * Math.min(140.0, 12.0 * t + 65.0 * t * t);
+                fy -= Math.sign(y) * Math.min(180.0, 18.0 * t + 85.0 * t * t);
             }
             if (Math.abs(z) > softE) {
                 const t = (Math.abs(z) - softE) / span;
-                fz -= Math.sign(z) * Math.min(140.0, 12.0 * t + 65.0 * t * t);
+                fz -= Math.sign(z) * Math.min(180.0, 18.0 * t + 85.0 * t * t);
             }
 
-            // Gentle 3D off-axis drift so unpinned nodes stay active inside the cubic frame
-            const phase = i * 2.094 + time * 0.35;
-            fx += Math.cos(phase) * 2.5;
-            fy += Math.sin(phase * 0.8) * 2.5;
-            fz += Math.sin(phase * 1.2) * 2.5;
+            // Pairwise repulsion inside cubic volume
+            for (let j = 0; j < nodes.length; j++) {
+                if (i === j) continue;
+                const other = nodes[j];
+                if (!other) continue;
+
+                const ox = other.position ? other.position.x : (other.x ?? 0);
+                const oy = other.position ? other.position.y : (other.y ?? 0);
+                const oz = other.position ? other.position.z : (other.z ?? 0);
+
+                let dx = x - ox;
+                let dy = y - oy;
+                let dz = z - oz;
+                let dist = Math.hypot(dx, dy, dz);
+
+                if (dist < 1e-4) {
+                    const angle = ((i - j) * 2.3999632) + time * 0.05;
+                    dx = Math.cos(angle);
+                    dy = Math.sin(angle * 0.5);
+                    dz = Math.sin(angle);
+                    dist = 1.0;
+                }
+
+                if (dist < minSep) {
+                    const overlap = (minSep - dist) / minSep;
+                    const rep = overlap * overlap * 100.0;
+                    fx += (dx / dist) * rep;
+                    fy += (dy / dist) * rep;
+                    fz += (dz / dist) * rep;
+                }
+            }
 
             node.fx = fx;
             node.fy = fy;
@@ -121,7 +148,47 @@ export class CubicLatticeTopology {
         }
     }
 
-    enforceConstraints(nodePositions) {
+    enforceConstraints(nodePositions, scale = 1.0) {
+        if (!Array.isArray(nodePositions) || nodePositions.length === 0) return nodePositions;
+
+        const maxE = (this.halfExtent || 162.5) * Math.max(0.25, scale);
+
+        for (let i = 0; i < nodePositions.length; i++) {
+            const node = nodePositions[i];
+            if (!node) continue;
+
+            let x = node.position ? node.position.x : (node.x ?? 0);
+            let y = node.position ? node.position.y : (node.y ?? 0);
+            let z = node.position ? node.position.z : (node.z ?? 0);
+
+            if (!Number.isFinite(x)) x = 0;
+            if (!Number.isFinite(y)) y = 0;
+            if (!Number.isFinite(z)) z = 0;
+
+            if (Math.abs(x) > maxE) {
+                const sgn = Math.sign(x);
+                x = sgn * maxE;
+                if (typeof node.vx === 'number' && Math.sign(node.vx) === sgn) node.vx *= -0.35;
+            }
+            if (Math.abs(y) > maxE) {
+                const sgn = Math.sign(y);
+                y = sgn * maxE;
+                if (typeof node.vy === 'number' && Math.sign(node.vy) === sgn) node.vy *= -0.35;
+            }
+            if (Math.abs(z) > maxE) {
+                const sgn = Math.sign(z);
+                z = sgn * maxE;
+                if (typeof node.vz === 'number' && Math.sign(node.vz) === sgn) node.vz *= -0.35;
+            }
+
+            node.x = x;
+            node.y = y;
+            node.z = z;
+            if (node.position && typeof node.position.set === 'function') {
+                node.position.set(x, y, z);
+            }
+        }
+
         return nodePositions;
     }
 }

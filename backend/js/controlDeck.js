@@ -151,39 +151,48 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });*/
 
-    // Action & Export Buttons with Null Checks
-    const pinAllBtn = document.getElementById('btn-pin-all');
-    if (pinAllBtn) {
-        pinAllBtn.addEventListener('click', () => {
-            if (window.nodes && window.nodes.length > 0) {
-                window.nodes.forEach(n => { if (!n.isCore) n.isPinned = true; });
-                console.log("All nodes pinned.");
-            }
-        });
-    }
-
+    //document.getElementById('btn-release-all').addEventListener('click', () => {
+    //    if (window.nodes && window.nodes.length > 0) {
+    //        window.nodes.forEach(n => { if (!n.isCore) n.isPinned = false; });
+    //        console.log("All nodes released.");
+    //    }
+    //});
     const releaseAllBtn = document.getElementById('btn-release-all');
     if (releaseAllBtn) {
         releaseAllBtn.addEventListener('click', () => {
-            if (window.nodes && window.nodes.length > 0) {
+            if (typeof window.releaseImportedConfigToPhysics === 'function') {
+                const released = window.releaseImportedConfigToPhysics(window.nodes);
+                if (typeof window.broadcastHUDStateToBuilder === 'function') {
+                    window.broadcastHUDStateToBuilder(released);
+                }
+            } else if (window.nodes && window.nodes.length > 0) {
                 window.nodes.forEach(n => { if (!n.isCore) n.isPinned = false; });
-                console.log("All nodes released.");
             }
+            console.log("All nodes released to physics.");
         });
     }
 
-    const exportJsonBtn = document.getElementById('btn-export-json');
-    if (exportJsonBtn) {
-        exportJsonBtn.addEventListener('click', () => {
-            const payload = {
-                version: "2.6.8",
-                timestamp: new Date().toISOString(),
-                config: window.hudConfig,
-                nodes: window.nodes || []
-            };
-            // ... download logic ...
-        });
-    }
+    // JSON Export
+    document.getElementById('btn-export-json').addEventListener('click', () => {
+        const payload = {
+            version: "2.6.8",
+            timestamp: new Date().toISOString(),
+            config: window.hudConfig,
+            nodes: window.nodes || []
+        };
+        downloadFile(JSON.stringify(payload, null, 2), "holographic_topology_config.json", "application/json");
+    });
+
+    // CSV Export
+    document.getElementById('btn-export-csv').addEventListener('click', () => {
+        let csv = "ID,X,Y,Z,Pinned,Core\n";
+        if (window.nodes && window.nodes.length > 0) {
+            window.nodes.forEach(n => {
+                csv += `${n.id},${n.x.toFixed(2)},${n.y.toFixed(2)},${n.z.toFixed(2)},${n.isPinned || false},${n.isCore || false}\n`;
+            });
+        }
+        downloadFile(csv, "holographic_telemetry.csv", "text/csv");
+    });
 
     // DOT Graph Export (Graphviz)
     document.getElementById('btn-export-dot').addEventListener('click', () => {

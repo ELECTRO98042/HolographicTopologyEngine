@@ -279,6 +279,7 @@ export class DopplerShiftManager {
         let maxBlue = 1.0;
         let minRed = 1.0;
         let sumOriginRad = 0;
+        const refBeamCandidates = [];
 
         for (let i = 0; i < nodeCount; i++) {
             const { x, y, z, vx, vy, vz } = this._getNodePosVel(nodes[i], worldScale);
@@ -293,7 +294,8 @@ export class DopplerShiftManager {
             const toCamZ = camPos.z - z;
             const camDist = Math.max(1e-4, Math.hypot(toCamX, toCamY, toCamZ));
             const vObs = (vx * toCamX + vy * toCamY + vz * toCamZ) / camDist;
-            const betaObs = Math.max(-0.75, Math.min(0.75, vObs / this.waveSpeed));
+            // Smooth tanh response: responsive in low-speed frames, non-clipping in high-speed frames
+            const betaObs = 0.75 * Math.tanh(vObs / (this.waveSpeed * 0.55));
             const obsShift = 1.0 / (1.0 - betaObs);
 
             sumObsShift += obsShift;
@@ -321,7 +323,10 @@ export class DopplerShiftManager {
             sumOriginRad += vOrig;
 
             if (showOrigin) {
-                const spokeLen = cfg.dipoleBaseLength + Math.min(28.0, Math.abs(vOrig) * cfg.dipoleLengthSpeedGain);
+                const absVOrig = Math.abs(vOrig);
+                const maxDipoleGain = Math.max(28.0, cfg.dipoleLengthSpeedGain * 1.35);
+                const smoothRadialGain = maxDipoleGain * (1.0 - Math.exp(-absVOrig * (cfg.dipoleLengthSpeedGain / 95.0)));
+                const spokeLen = cfg.dipoleBaseLength + smoothRadialGain;
                 const dirSign = vOrig >= 0 ? 1 : -1;
                 this._dir.set(rOrigX * dirSign, rOrigY * dirSign, rOrigZ * dirSign);
                 if (this._dir.lengthSq() < 1e-6) {
@@ -379,14 +384,20 @@ export class DopplerShiftManager {
                 this.beamMachAttr.setX(beamCount, machRatio);
                 beamCount++;
 
-                if (refBeamCount < MAX_REF_BEAMS) {
-                    this._beamOrigins[refBeamCount].set(x, y, z);
-                    this._beamDirs[refBeamCount].copy(this._dir);
-                    this._beamPolarities[refBeamCount] = nodeDopplerPolarity;
-                    this._beamSpreads[refBeamCount] = tanHalfAngle;
-                    this._beamLengths[refBeamCount] = beamLength;
-                    refBeamCount++;
-                }
+                this.beamPolarityAttr.setX(beamCount, nodeDopplerPolarity);
+                this.beamMachAttr.setX(beamCount, machRatio);
+                beamCount++;
+
+                refBeamCandidates.push({
+                    speed,
+                    x, y, z,
+                    dx: this._dir.x,
+                    dy: this._dir.y,
+                    dz: this._dir.z,
+                    polarity: nodeDopplerPolarity,
+                    spread: tanHalfAngle,
+                    length: beamLength
+                });
             }
         }
 
@@ -465,9 +476,14 @@ export class DopplerShiftManager {
             if (this.tubuleMaterial.uniforms.uWaveSpeed) this.tubuleMaterial.uniforms.uWaveSpeed.value = cfg.tubuleWaveSpeed;
             if (this.tubuleMaterial.uniforms.uRibContrast) this.tubuleMaterial.uniforms.uRibContrast.value = cfg.tubuleRibContrast;
         }
+        if (this.tubuleMaterial.uniforms.uOpacity) {
+            this.tubuleMaterial.uniforms.uOpacity.value = Math.min(0.38, cfg.tubuleOpacity * gain); // [↑] Higher max sleeve alpha | [↓] Cleaner center see-through
+        }
 
         const minClosingVel = cfg.tubuleMinClosingVel ?? 0.015;
-        const maxPairDist = (cfg.tubuleMaxDist ?? 420.0) * Math.max(0.5, worldScale);
+        const worldScaleFactor = cfg.tubuleWorldScaleFactor ?? 0.65;
+        const effectiveScale = 1.0 + (Math.max(0.25, worldScale) - 1.0) * worldScaleFactor;
+        const maxPairDist = (cfg.tubuleMaxDist ?? 420.0) * Math.max(0.5, effectiveScale);
 
         if (showPairwise) {
             for (let p = 0; p < pairInputs.length; p++) {
@@ -491,9 +507,11 @@ export class DopplerShiftManager {
                 this._dir.set(item.dx, item.dy, item.dz).normalize();
                 this._quat.setFromUnitVectors(this._upAxis, this._dir);
 
-                const zoomFactor = Math.max(0.25, worldScale);
+                const zoomFactor = Math.max(0.25, effectiveScale);
                 const thinning = 1.0 / Math.pow(zoomFactor, cfg.tubuleZoomThinning ?? 0.65);
-                const rawRadius = cfg.tubuleBaseRadius + Math.min(5.5, Math.abs(closingVel) * cfg.tubuleSpeedRadiusGain);
+                const absClosing = Math.abs(closingVel);
+                const speedRadiusBoost = 5.5 * (1.0 - Math.exp(-absClosing * (cfg.tubuleSpeedRadiusGain / 12.0)));
+                const rawRadius = cfg.tubuleBaseRadius + speedRadiusBoost;
                 const radius = Math.max(cfg.tubuleMinRadius ?? 3.5, Math.min(rawRadius * thinning, item.dist * 0.22));
 
                 this._dummy.position.copy(this._mid);
@@ -503,7 +521,8 @@ export class DopplerShiftManager {
                 this.tubuleMesh.setMatrixAt(tubuleCount, this._dummy.matrix);
 
                 this.closingStateAttr.setX(tubuleCount, closingVel);
-                this.waveAmpAttr.setX(tubuleCount, cfg.tubuleWaveAmp + Math.min(0.65, Math.abs(closingVel) * 0.8));
+                const waveBoost = 0.65 * (1.0 - Math.exp(-absClosing * 0.35));
+                this.waveAmpAttr.setX(tubuleCount, cfg.tubuleWaveAmp + waveBoost);
 
                 if (closingVel > 0.01) {
                     this._color.setHex(0xa78bfa); // Closing: violet
@@ -540,12 +559,22 @@ export class DopplerShiftManager {
             du.uDopplerActive.value = 1;
             du.uDopplerShiftAvg.value = this.lastTelemetry.avgObserverShift;
             if (du.uDopplerTime) du.uDopplerTime.value = time;
-            if (du.uBeamCount) du.uBeamCount.value = refBeamCount;
             if (du.uRefStrength) du.uRefStrength.value = cfg.refReflectionStrength;
             if (du.uRefAlphaBoost) du.uRefAlphaBoost.value = cfg.refAlphaBoost;
 
+            refBeamCandidates.sort((a, b) => b.speed - a.speed);
+            refBeamCount = Math.min(MAX_REF_BEAMS, refBeamCandidates.length);
+            if (du.uBeamCount) du.uBeamCount.value = refBeamCount;
+
             for (let b = 0; b < MAX_REF_BEAMS; b++) {
                 if (b < refBeamCount) {
+                    const cand = refBeamCandidates[b];
+                    this._beamOrigins[b].set(cand.x, cand.y, cand.z);
+                    this._beamDirs[b].set(cand.dx, cand.dy, cand.dz);
+                    this._beamPolarities[b] = cand.polarity;
+                    this._beamSpreads[b] = cand.spread;
+                    this._beamLengths[b] = cand.length;
+
                     du.uBeamOrigins?.value?.[b]?.copy(this._beamOrigins[b]);
                     du.uBeamDirs?.value?.[b]?.copy(this._beamDirs[b]);
                     if (du.uBeamPolarities?.value) du.uBeamPolarities.value[b] = this._beamPolarities[b];

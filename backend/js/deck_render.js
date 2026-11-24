@@ -551,14 +551,17 @@ class DeckViewport {
 
             const nodeData = {
                 id: n.id || `Q-00${index + 1}`,
-                name: n.name || n.label || n.id || `Node-${index + 1}`, // <--- Exact fallback sequence
+                name: n.name || n.label || n.id || `Node-${index + 1}`,
                 type: n.type || 'TOPOLOGY_NODE',
-                formula: n.formula || 'g_\mu = n_\mu'
+                category: n.category || 'BULK_CORE',
+                tier: n.tier || 'BOUNDARY',
+                formula: n.formula || 'g_\\mu\\nu = \\eta_\\mu\\nu',
+                attrs: n.attrs || {}
             };
 
             const geometry = new THREE.SphereGeometry(1.8, 24, 24);
             const material = new THREE.MeshBasicMaterial({
-                color: n.color ? parseInt(n.color.replace('#', '0x')) : 0x00f0ff,
+                color: n.color ? parseInt(String(n.color).replace('#', '0x'), 16) : 0x00f0ff,
                 wireframe: true
             });
             const mesh = new THREE.Mesh(geometry, material);
@@ -577,7 +580,6 @@ class DeckViewport {
         });
 
         // 2. Universal Edge & Link Resolution
-        let connectedPairs = 0;
         if (Array.isArray(edgesArray) && edgesArray.length > 0) {
             edgesArray.forEach(edge => {
                 const srcRaw = edge.source !== undefined ? edge.source : edge.from;
@@ -594,26 +596,17 @@ class DeckViewport {
 
                 if (nodeA && nodeB) {
                     this.createConnectionLine(nodeA, nodeB);
-                    connectedPairs++;
                 }
             });
         }
 
-        if (connectedPairs === 0 && this.nodes.length > 1) {
-            for (let i = 0; i < this.nodes.length - 1; i++) {
-                this.createConnectionLine(this.nodes[i], this.nodes[i + 1]);
-            }
-            this.createConnectionLine(this.nodes[this.nodes.length - 1], this.nodes[0]);
-        }
-
-        // Auto-center camera target and position on ingested nodes bounding center for 1:1 scale alignment
         if (this.nodes.length > 0 && this.controls) {
             const center = new THREE.Vector3();
             this.nodes.forEach(n => center.add(n.mesh.position));
             center.divideScalar(this.nodes.length);
 
             this.controls.target.copy(center);
-            this.camera.position.set(center.x, center.y + 100, center.z + 300); // 180° flipped Z offset
+            this.camera.position.set(center.x, center.y + 100, center.z + 300);
             this.controls.update();
         }
 
@@ -637,6 +630,9 @@ class DeckViewport {
                 id: n.data?.id || `Q-00${index + 1}`,
                 name: n.data?.name || `Node-${index + 1}`,
                 type: n.data?.type || 'TOPOLOGY_NODE',
+                category: n.data?.category || 'BULK_CORE',
+                tier: n.data?.tier || 'BOUNDARY',
+                formula: n.data?.formula || 'g_\\mu\\nu = \\eta_\\mu\\nu',
                 x: n.mesh ? n.mesh.position.x : 0,
                 y: n.mesh ? n.mesh.position.y : 0,
                 z: n.mesh ? n.mesh.position.z : 0,
@@ -649,7 +645,6 @@ class DeckViewport {
             }))
         };
 
-        // Serialize cleanly via normalizer adapter
         const payload = ImportSanityNormalizer.formatForMainHUD(rawStagedModel);
 
         console.debug("[FHPP PIPELINE TEST] Outbound Commit Payload:", {
@@ -661,6 +656,7 @@ class DeckViewport {
         const syncChannel = new BroadcastChannel('holographic_sync_channel');
         localStorage.setItem('holographic_latest_sync', JSON.stringify(payload));
         syncChannel.postMessage(payload);
+        syncChannel.close();
         console.log("[DECK SYNC] Pristine FHPP payload broadcasted to Main HUD.");
     }
 

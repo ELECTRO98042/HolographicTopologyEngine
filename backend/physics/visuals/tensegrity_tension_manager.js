@@ -186,6 +186,7 @@ export class TensegrityTensionManager {
             this.setVisible(false);
             return;
         }
+
         const telemetry = this.engine.evaluate({
             nodes,
             pairs,
@@ -196,21 +197,21 @@ export class TensegrityTensionManager {
 
         this.setVisible(true);
         const safeDt = Math.min(0.05, Math.max(0.001, dt || 0.016));
-        this._time += safeDt;
         const cfg = this.cfg;
         const gain = Math.max(0.15, intensity);
 
-        // Compute manifold centroid & aggregate Hookean tension
-        //const center = new THREE.Vector3();
-        //for (let i = 0; i < nodes.length; i++) {
-        //    const p = nodes[i]?.position || nodes[i]?.pos || nodes[i];
-        //    if (p && typeof p.x === 'number') center.add(p);
-        //}
-        //center.multiplyScalar(1 / nodes.length);
-        this.group.position.copy(telemetry.centroid);
+        const meanLoad = telemetry.meanNormalizedStress;
+        const imbalanceNorm = telemetry.imbalanceNorm ?? 0;
+        const overEquilibrium = Math.max(-0.5, telemetry.overEquilibrium);
+        const stressDrive = Math.max(0, overEquilibrium) * 0.6 + imbalanceNorm * 0.4;
+        const anisoRate = Math.min(2.5, (telemetry.tensor?.anisotropicMag ?? 0) * 0.5);
 
-        let sumLoad = 0;
-        let activeCount = 0;
+        // Advance internal time proportionally to stress & imbalance so wave motion reflects mechanical energy
+        const dynamicTimeStep = safeDt * (0.65 + stressDrive * 1.45 + anisoRate * 0.35);
+        this._time += dynamicTimeStep;
+
+        // Keep group at world origin so world-space connectors & vectors align with posA/posB/midpoint
+        this.group.position.set(0, 0, 0);
         const center = telemetry.centroid;
 
         const posAttr = this.connectorLines.geometry.getAttribute('position');
@@ -233,8 +234,10 @@ export class TensegrityTensionManager {
             colAttr.setXYZ(drawVerts + 1, stressCol.r, stressCol.g, stressCol.b);
             drawVerts += 2;
 
+            // Smooth saturating curve from Hookean restoring force magnitude (avoids hard ceiling clipping)
             const rawVecLen = Math.abs(p.hookeanForceMag) * cfg.vectorFieldScale * gain * 0.05;
-            const vecLen = Math.min(cfg.maxVectorLength, rawVecLen);
+            const vecLen = cfg.maxVectorLength * (1.0 - Math.exp(-rawVecLen / Math.max(1e-4, cfg.maxVectorLength)));
+
             vecPosAttr.setXYZ(
                 vecVerts,
                 p.midpoint.x - p.axis.x * vecLen * 0.5,
@@ -252,16 +255,15 @@ export class TensegrityTensionManager {
             vecVerts += 2;
         }
 
-        const meanLoad = telemetry.meanNormalizedStress;
-        const overEquilibrium = Math.max(-0.5, telemetry.overEquilibrium);
-        const stressDrive = Math.max(0, overEquilibrium) * 0.6 + (telemetry.imbalanceNorm ?? 0) * 0.4;
+        // Frame-aware deformation scaling for curved/warped reference frames
+        const frameFactor = (telemetry.activeFrame === 'toroidal' || telemetry.activeFrame === 'hyperbolic')
+            ? 0.85
+            : 1.0;
+        const deformMag = stressDrive * cfg.shellDeformAmp * frameFactor;
 
-        // Elastic shell vertex deformation when tension exceeds equilibrium
+        // Elastic shell vertex deformation driven by stress excess & residual imbalance
         const shellPosAttr = this.shellMesh.geometry.getAttribute('position');
         const baseArr = this._shellBasePositions;
-        const deformMag = stressDrive * cfg.shellDeformAmp;
-
-        
         for (let v = 0; v < shellPosAttr.count; v++) {
             const idx = v * 3;
             const bx = baseArr[idx];
@@ -272,34 +274,47 @@ export class TensegrityTensionManager {
         }
         shellPosAttr.needsUpdate = true;
 
+        const spinScale = 0.25 + stressDrive * 1.75 + anisoRate * 0.4;
         this.shellMesh.position.copy(center);
         this.shellMesh.scale.setScalar(worldScale);
-        this.shellMesh.rotation.y += safeDt * 0.14;
-        this.shellMesh.material.opacity = Math.min(0.45, cfg.shellWireOpacity * gain);
+        this.shellMesh.rotation.y += safeDt * 0.14 * spinScale;
+        this.shellMesh.material.opacity = Math.min(
+            0.48,
+            (cfg.shellWireOpacity * (0.7 + stressDrive * 0.6)) * gain
+        );
 
-        // Symmetric stress-tensor ghost compression / expansion
-        const tensorDelta = stressDrive * cfg.ghostStressScaleGain;
+        // Symmetric stress-tensor ghost compression / expansion driven by stress & net force imbalance
+        const tensorDelta = stressDrive * cfg.ghostStressScaleGain * frameFactor;
         this.innerGhost.position.copy(center);
         this.outerGhost.position.copy(center);
         this.innerGhost.scale.setScalar(Math.max(0.45, (cfg.ghostBaseScale - tensorDelta) * worldScale));
         this.outerGhost.scale.setScalar(Math.max(0.65, (cfg.ghostBaseScale + tensorDelta) * worldScale));
-        this.innerGhost.rotation.y -= safeDt * 0.18;
-        this.outerGhost.rotation.x += safeDt * 0.12;
-        this.innerGhost.material.opacity = Math.min(0.24, cfg.ghostOpacity * gain);
-        this.outerGhost.material.opacity = Math.min(0.22, cfg.ghostOpacity * 0.85 * gain);
+        this.innerGhost.rotation.y -= safeDt * 0.18 * (0.3 + stressDrive * 1.5);
+        this.outerGhost.rotation.x += safeDt * 0.12 * (0.3 + imbalanceNorm * 1.6);
+        this.innerGhost.material.opacity = Math.min(
+            0.26,
+            (cfg.ghostOpacity * (0.75 + imbalanceNorm * 0.5)) * gain
+        );
+        this.outerGhost.material.opacity = Math.min(
+            0.24,
+            (cfg.ghostOpacity * 0.85 * (0.75 + meanLoad * 0.5)) * gain
+        );
 
         this.connectorLines.geometry.setDrawRange(0, drawVerts);
         posAttr.needsUpdate = true;
         colAttr.needsUpdate = true;
         this.connectorLines.material.opacity = Math.min(
             cfg.connectorPeakOpacity,
-            (cfg.connectorBaseOpacity + meanLoad * 0.25) * gain
+            (cfg.connectorBaseOpacity + meanLoad * 0.25 + imbalanceNorm * 0.12) * gain
         );
 
         this.vectorLines.geometry.setDrawRange(0, vecVerts);
         vecPosAttr.needsUpdate = true;
         vecColAttr.needsUpdate = true;
-        this.vectorLines.material.opacity = Math.min(0.65, cfg.vectorFieldOpacity * gain);
+        this.vectorLines.material.opacity = Math.min(
+            0.68,
+            (cfg.vectorFieldOpacity * (0.7 + stressDrive * 0.5)) * gain
+        );
     }
 
     dispose() {

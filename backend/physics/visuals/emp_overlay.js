@@ -53,17 +53,18 @@ export class EmpOverlay {
         }
     }
 
-    triggerPulse(centerPos, maxRadius = 180.0, worldScale = 1.0) {
+    triggerPulse(centerPos, maxRadius = 180.0, worldScale = 1.0, strength = 0.5) {
         if (!this.active) return;
 
-        const geometry = new THREE.SphereGeometry(1.0, 32, 24);
+        const clampedStrength = Math.max(0.0, Math.min(1.0, strength));
+        const geometry = new THREE.SphereGeometry(1.0, 28, 20);
 
-        // Preserving signature ghosted cyan color with additive blending
+        // Subtle non-wireframe ghost shell so it doesn't tangle with manifold wireframes
         const material = new THREE.MeshBasicMaterial({
             color: new THREE.Color(0x00f0ff),
-            wireframe: true,
+            wireframe: false,
             transparent: true,
-            opacity: 0.35,
+            opacity: 0.03,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             toneMapped: false
@@ -76,7 +77,8 @@ export class EmpOverlay {
             mesh: pulseMesh,
             radius: 1.0 * worldScale,
             maxRadius: maxRadius,
-            speed: 140.0 * worldScale // Corrected property name matching update loop
+            speed: (125.0 + clampedStrength * 45.0) * worldScale,
+            strength: clampedStrength
         };
 
         this.empGroup.add(pulseMesh);
@@ -124,7 +126,20 @@ export class EmpOverlay {
                 const vy = node.vy || 0;
                 const vz = node.vz || 0;
                 const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-                const dynamicInterval = Math.max(0.6, nodeTimer.interval / (1.0 + speed * 0.15));
+
+                // 1. Compute and declare effectiveSpeed BEFORE dynamicInterval and maxRadius
+                const rawNorm = Math.max(0, Math.min(1, speed / 3.0));
+                const prevSmooth = typeof node._empSmoothNorm === 'number' ? node._empSmoothNorm : rawNorm;
+                const smoothAlpha = 1.0 - Math.exp(-scaledDt * 2.4);
+                const smoothNorm = prevSmooth + (rawNorm - prevSmooth) * smoothAlpha;
+                node._empSmoothNorm = smoothNorm;
+                const effectiveSpeed = smoothNorm * 3.0;
+                // Stronger smoothed EM excitation -> larger ghost radius, weaker -> smaller radius
+                const radiusScale = 0.78 + smoothNorm * 0.52; // ~0.78x to 1.30x
+                const maxRadius = (160.0 + effectiveSpeed * 24.0) * radiusScale * worldScale;
+
+                // 2. Now safe to use effectiveSpeed in both dynamicInterval and maxRadius
+                const dynamicInterval = Math.max(0.85, nodeTimer.interval / (1.0 + effectiveSpeed * 0.12));
 
                 if (nodeTimer.time >= dynamicInterval) {
                     nodeTimer.time = 0;
@@ -132,8 +147,10 @@ export class EmpOverlay {
                     const py = (node.position ? node.position.y : (node.y || 0)) * worldScale;
                     const pz = (node.position ? node.position.z : (node.z || 0)) * worldScale;
 
-                    const maxRadius = (160.0 + speed * 35.0) * worldScale;
-                    this.triggerPulse(new THREE.Vector3(px, py, pz), maxRadius, worldScale);
+                    // Stronger smoothed EM excitation -> larger ghost radius, weaker -> smaller radius
+                    const radiusScale = 0.78 + smoothNorm * 0.52; // ~0.78x to 1.30x
+                    const maxRadius = (160.0 + effectiveSpeed * 24.0) * radiusScale * worldScale;
+                    this.triggerPulse(new THREE.Vector3(px, py, pz), maxRadius, worldScale, smoothNorm);
                 }
             });
 

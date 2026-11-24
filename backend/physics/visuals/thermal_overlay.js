@@ -6,8 +6,8 @@
 
 import * as THREE from 'three';
 
-const SAFE_RADIUS_SCALE = 0.05;   // Scales total heat (Q) conservatively to starburst radius
-const MAX_LUMINANCE_CLAMP = 1.0;  // Caps fragment output intensity
+const SAFE_RADIUS_SCALE = 0.025;   // Scales total heat (Q) conservatively to starburst radius
+const MAX_LUMINANCE_CLAMP = 0.5;  // Caps fragment output intensity
 const HEAT_DISSIPATION_COEFF = 0.2; // Controls how fast heat falls off over distance (d)
 
 export class ThermalOverlay {
@@ -82,6 +82,9 @@ export class ThermalOverlay {
     update(nodeDataArray, deltaTime) {
         if (!this.active || !Array.isArray(nodeDataArray) || nodeDataArray.length === 0) return;
 
+        const safeDt = Math.max(0.001, Math.min(0.05, deltaTime || 0.016));
+        const alpha = 1.0 - Math.exp(-safeDt * 3.0);
+
         this._updateStarbursts(nodeDataArray);
 
         const proximityData = nodeDataArray.map(node => {
@@ -90,7 +93,7 @@ export class ThermalOverlay {
             const pz = node.position ? node.position.z : (node.z || 0);
             return {
                 position: new THREE.Vector3(px, py, pz),
-                totalHeat: Math.min((node.totalHeat || 1.0) * 0.1, MAX_LUMINANCE_CLAMP),
+                totalHeat: Math.min((node.totalHeat || 1.0) * 0.05, MAX_LUMINANCE_CLAMP),
                 dissipationCoeff: HEAT_DISSIPATION_COEFF
             };
         });
