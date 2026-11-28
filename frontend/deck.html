@@ -518,19 +518,22 @@
   <script>
     // --- LIVE UTC TIMESTAMP CLOCK ---
       function initUTCClock() {
-        const clockEl = document.getElementById('utc-clock') || document.querySelector('.utc-timestamp');
+          const clockEl =
+            document.getElementById('sys-time') ||
+            document.getElementById('utc-clock') ||
+            document.querySelector('.utc-timestamp, .utc-clock-display');
 
-        function updateClock() {
-          const now = new Date();
-          const utcString = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
-          if (clockEl) {
-            clockEl.textContent = utcString;
+          function updateClock() {
+            const now = new Date();
+            const utcString = now.toISOString().replace('T', ' ').substring(11, 19) + ' UTC';
+            if (clockEl) {
+              clockEl.textContent = utcString;
+            }
           }
-        }
 
-        updateClock();
-        setInterval(updateClock, 1000);
-      }
+          updateClock();
+          setInterval(updateClock, 1000);
+        }
 
       // Execute immediately if DOM is ready, otherwise wait for load
       if (document.readyState === 'loading') {

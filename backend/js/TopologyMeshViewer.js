@@ -1,20 +1,23 @@
 import * as THREE from './vendor/graphics/three.js';
-import { WaveEquationSolver } from '/physics/dynamics/WaveEquationSolver.js';
-
 export class TopologyMeshViewer {
     constructor(canvas) {
         this.canvas = canvas;
         this.container = this.canvas.parentElement;
-        this.gridSize = 64; // 64x64 vertex grid
-        this.zScale = 1.0;  // Z-height multiplier slider state
+        this.gridSize = 64; // 64x64 vertex grid (4,096 vertices)
+        this.dataGridSize = 64;    // Incoming 64x64 field_2d telemetry
+        this.zScale = 1.0;
+        this.renderGridSize = 64; // Finer 128x128 render mesh
+        this.gridSize = this.renderGridSize; // Keep if other methods reference this.gridSize  // Z-height multiplier slider state
 
         this.renderLayout();
+        this.resize()
         this.bindEvents();
 
-        // 1. Initialize Fallback Physical Wave Solver (32x32 internal solver grid)
-        this.solverGridSize = 32;
-        this.solver = new WaveEquationSolver(this.solverGridSize, 0.995, 0.6);
-        this.isServerDriven = false; // Tracks whether backend stream is active
+        // 1. Fallback Physical Wave Solver (only active when no HUD model or stream is present)
+        // this.solverGridSize = 32;
+        // this.solver = new WaveEquationSolver(this.solverGridSize, 0.995, 0.6);
+        this.isServerDriven = false;
+        this.hasHudModel = false;
 
         // 2. Scene Setup
         this.scene = new THREE.Scene();
@@ -23,8 +26,10 @@ export class TopologyMeshViewer {
         const width = this.canvas.clientWidth || window.innerWidth;
         const height = this.canvas.clientHeight || window.innerHeight;
         this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-        this.camera.position.set(0, -16, 18);
+        this.camera.fov = 35;
+        this.camera.position.set(0, -14, 10);
         this.camera.lookAt(0, 0, 0);
+        this.camera.updateProjectionMatrix();
 
         // 4. Renderer Setup
         this.renderer = new THREE.WebGLRenderer({
@@ -35,7 +40,7 @@ export class TopologyMeshViewer {
         this.renderer.setSize(width, height, false);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
-        // 5. Geometry & Wireframe Mesh Setup
+        // 5. 64x64 Geometry & Wireframe Mesh Setup
         this.geometry = new THREE.PlaneGeometry(20, 20, this.gridSize - 1, this.gridSize - 1);
 
         this.material = new THREE.MeshBasicMaterial({
@@ -48,35 +53,98 @@ export class TopologyMeshViewer {
         this.mesh = new THREE.Mesh(this.geometry, this.material);
         this.scene.add(this.mesh);
 
-        // Ingest live physics nodes from Main HUD broadcast channel
-        const telemetryChannel = new BroadcastChannel('holographic_telemetry_channel');
-        telemetryChannel.onmessage = (event) => {
-            const data = event.data;
-            if (data && data.type === 'hud_update' && data.nodes) {
-                this.updateCoordinates(data.nodes);
+        // Listen for active Main HUD model updates on holographic_sync_channel
+        this.syncChannel = new BroadcastChannel('holographic_sync_channel');
+        this.syncChannel.onmessage = (event) => {
+            const msg = event.data;
+            if (!msg || !Array.isArray(msg.nodes)) return;
+
+            if (
+                msg.type === 'SYNC_FROM_HUD' ||
+                msg.type === 'SYNC_TOPOLOGY' ||
+                msg.type === 'SYNC_FROM_BUILDER'
+            ) {
+                this.setModelState({
+                    type: msg.type,
+                    source: msg.origin || 'MAIN_HUD',
+                    nodes: msg.nodes,
+                    edges: Array.isArray(msg.edges) ? msg.edges : []
+                });
             }
         };
+
+        // Read initial Main HUD model on open (opener first, then latest HUD sync cache)
+        try {
+            if (window.opener && Array.isArray(window.opener.nodes) && window.opener.nodes.length > 0) {
+                this.setModelState({
+                    type: 'OPENER_SNAPSHOT',
+                    source: 'MAIN_HUD',
+                    nodes: window.opener.nodes,
+                    edges: Array.isArray(window.opener.edges) ? window.opener.edges : []
+                });
+            } else {
+                const saved = localStorage.getItem('holographic_latest_sync');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed && Array.isArray(parsed.nodes) && parsed.nodes.length > 0) {
+                        this.setModelState({
+                            type: 'STORAGE_SNAPSHOT',
+                            source: parsed.origin || 'MAIN_HUD',
+                            nodes: parsed.nodes,
+                            edges: Array.isArray(parsed.edges) ? parsed.edges : []
+                        });
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('[TopologyMeshViewer] Initial Main HUD model check skipped:', err);
+        }
 
         // Start Render Loop
         this.animate();
     }
 
+    setModelState(modelState) {
+        if (!modelState || typeof modelState !== 'object') return;
+        this.latestModelState = modelState;
+
+        if (Array.isArray(modelState.field_2d) && modelState.field_2d.length > 0) {
+            this.hasHudModel = true;
+            this.isServerDriven = true;
+            this.updateCoordinates(modelState);
+            return;
+        }
+
+        const nodes = Array.isArray(modelState.nodes) ? modelState.nodes : [];
+        if (nodes.length > 0) {
+            this.hasHudModel = true;
+            this.updateCoordinates(nodes);
+        }
+    }
+
     renderLayout() {
         if (!this.container) return;
-        // Style container as flex row and inject the sidebar controls next to the canvas
         this.container.style.display = 'flex';
         this.container.style.flexDirection = 'row';
         this.container.style.position = 'relative';
+        this.container.style.width = '100%';
+        this.container.style.maxWidth = '100%';
+        this.container.style.minWidth = '0';
+        this.container.style.boxSizing = 'border-box';
+        this.container.style.overflow = 'hidden';
 
-        this.canvas.style.flex = '1';
+        this.canvas.style.flex = '1 1 0';
+        this.canvas.style.width = '0';
+        this.canvas.style.minWidth = '0';
+        this.canvas.style.maxWidth = '100%';
         this.canvas.style.height = '100%';
+        this.canvas.style.boxSizing = 'border-box';
         this.canvas.style.display = 'block';
 
-        // Check if control panel already exists
         if (!this.container.querySelector('#lattice-controls-panel')) {
             const panel = document.createElement('div');
             panel.id = 'lattice-controls-panel';
-            panel.style.cssText = 'width: 280px; background: #080d0d; border-left: 1.5px solid #00ffcc33; padding: 16px; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; z-index: 5;';
+            panel.style.cssText = 'flex: 0 0 260px; width: 260px; box-sizing: border-box; background: #080d0d; border-left: 1.5px solid #00ffcc33; padding: 14px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; z-index: 5;';
             panel.innerHTML = `
                 <div style="color: #00ffcc; font-size: 12px; font-weight: bold; letter-spacing: 1px;">LATTICE CONTROLS</div>
                 <div style="background: rgba(0,255,204,0.05); border: 1.5px solid #00ffcc33; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
@@ -103,27 +171,48 @@ export class TopologyMeshViewer {
 
     updateCoordinates(input) {
         if (!this.geometry) return;
-        this.isServerDriven = true; // Mark active stream
 
         const positionAttribute = this.geometry.attributes.position;
         if (!positionAttribute) return;
 
-        // Handle broadcasted nodes array from Main HUD
+        // Handle CH-02 projection object from WebSocket JSON frames
+        if (input && typeof input === 'object' && !Array.isArray(input) && Array.isArray(input.field_2d)) {
+            const rows = input.field_2d.length;
+            const cols = rows > 0 && Array.isArray(input.field_2d[0]) ? input.field_2d[0].length : 0;
+            if (rows > 0 && cols > 0) {
+                const flat = new Float32Array(rows * cols);
+                let k = 0;
+                for (let r = 0; r < rows; r++) {
+                    const row = input.field_2d[r];
+                    for (let c = 0; c < cols; c++) {
+                        const v = Number(row?.[c]);
+                        flat[k++] = Number.isFinite(v) ? v : 0;
+                    }
+                }
+                this.updateCoordinates(flat);
+                return;
+            }
+        }
+
+        // Handle node list from Main HUD / CH-02 projection
         if (Array.isArray(input)) {
-            const count = positionAttribute.count; // 4096 for 64x64
+            const count = positionAttribute.count;
             for (let i = 0; i < count; i++) {
                 const vx = positionAttribute.getX(i);
                 const vy = positionAttribute.getY(i);
 
                 let cumulativeZ = 0;
-                input.forEach(node => {
-                    const dx = vx - (node.x || 0) * 0.05;
-                    const dy = vy - (node.y || 0) * 0.05;
+                for (let n = 0; n < input.length; n++) {
+                    const node = input[n];
+                    const nx = Number.isFinite(node?.x) ? node.x : (Array.isArray(node?.position) ? node.position[0] : 0);
+                    const ny = Number.isFinite(node?.y) ? node.y : (Array.isArray(node?.position) ? node.position[1] : 0);
+                    const dx = vx - (nx || 0) * 0.05;
+                    const dy = vy - (ny || 0) * 0.05;
                     const dist = Math.sqrt(dx * dx + dy * dy);
                     if (dist < 4.0) {
                         cumulativeZ += Math.cos(dist * Math.PI * 0.25) * 1.5;
                     }
-                });
+                }
 
                 positionAttribute.setZ(i, cumulativeZ * this.zScale);
             }
@@ -134,55 +223,58 @@ export class TopologyMeshViewer {
         let data = null;
         if (input && typeof input === 'object' && 'gridPositions' in input) {
             data = input.gridPositions;
-        } else if (input instanceof Float64Array || input instanceof Float32Array) {
+        } else if (
+            input instanceof Float64Array ||
+            input instanceof Float32Array ||
+            Array.isArray(input)
+        ) {
             data = input;
         }
 
         if (!data) return;
 
-        // If receiving a flat array of Z-heights matching vertex count (e.g. 4096 or 1024)
+        // Flat Z-height array matching vertex count (4096 for 64x64)
         if (data.length === positionAttribute.count) {
             for (let i = 0; i < positionAttribute.count; i++) {
-                positionAttribute.setZ(i, data[i] * this.zScale);
+                const val = Number(data[i]);
+                positionAttribute.setZ(i, (Number.isFinite(val) ? val : 0) * this.zScale);
             }
             positionAttribute.needsUpdate = true;
             return;
         }
 
-        // If receiving a 32x32 array (1024 values) and mapping onto 64x64 (4096 values) via bilinear/nearest interpolation
+        // Upsample 32x32 (1024) source grid onto 64x64 (4096) target grid using consistent (x, y) indexing
         if (data.length === 1024 && positionAttribute.count === 4096) {
             const srcSize = 32;
-            const destSize = this.gridSize; // 64
+            const destSize = this.gridSize || 64;
             for (let i = 0; i < positionAttribute.count; i++) {
                 const x = i % destSize;
                 const y = Math.floor(i / destSize);
                 const sx = Math.min(srcSize - 1, Math.floor((x / destSize) * srcSize));
                 const sy = Math.min(srcSize - 1, Math.floor((y / destSize) * srcSize));
-                positionAttribute.setZ(i, data[sx * srcSize + sy] * this.zScale);
+                const val = Number(data[sy * srcSize + sx]);
+                positionAttribute.setZ(i, (Number.isFinite(val) ? val : 0) * this.zScale);
             }
             positionAttribute.needsUpdate = true;
             return;
         }
 
-        // Standard full-vector grid position update
-        if (positionAttribute.array.length === data.length) {
-            for (let i = 0; i < positionAttribute.count; i++) {
-                positionAttribute.setZ(i, data[i * 3 + 2] * this.zScale);
-            }
-            positionAttribute.needsUpdate = true;
-        } else {
-            const count = Math.min(positionAttribute.count, Math.floor(data.length / 3));
-            for (let i = 0; i < count; i++) {
-                positionAttribute.setZ(i, data[i * 3 + 2] * this.zScale);
-            }
-            positionAttribute.needsUpdate = true;
+        // Full 3D vector array (x, y, z per point)
+        const pointCount = Math.min(positionAttribute.count, Math.floor(data.length / 3));
+        for (let i = 0; i < pointCount; i++) {
+            const val = Number(data[i * 3 + 2]);
+            positionAttribute.setZ(i, (Number.isFinite(val) ? val : 0) * this.zScale);
         }
+        positionAttribute.needsUpdate = true;
     }
 
     animate() {
-        requestAnimationFrame(this.animate.bind(this));
+        requestAnimationFrame(() => this.animate());
 
-        if (!this.isServerDriven) {
+        const positionAttribute = this.geometry && this.geometry.attributes && this.geometry.attributes.position;
+        const count = positionAttribute ? positionAttribute.count : 0;
+
+        if (!this.hasHudModel && !this.isServerDriven) {
             if (this.solver && typeof this.solver.step === 'function') {
                 this.solver.step();
             }
@@ -191,21 +283,51 @@ export class TopologyMeshViewer {
                 : typeof this.solver.getState === 'function' ? this.solver.getState()
                     : (this.solver.field || this.solver.grid);
 
-            if (field && this.geometry) {
-                const positionAttribute = this.geometry.attributes.position;
-                const N = this.gridSize; // 64
-                const sSize = this.solverGridSize; // 32
+            if (field && positionAttribute) {
+                const N = this.gridSize;
+                const sSize = this.solverGridSize;
 
-                for (let i = 0; i < positionAttribute.count; i++) {
+                for (let i = 0; i < count; i++) {
                     const x = i % N;
                     const y = Math.floor(i / N);
 
                     const sx = Math.min(sSize - 1, Math.floor((x / N) * sSize));
                     const sy = Math.min(sSize - 1, Math.floor((y / N) * sSize));
 
-                    const zVal = field[sx * sSize + sy] || 0;
+                    const zVal = field[sy * sSize + sx] || 0;
                     positionAttribute.setZ(i, zVal * 4.0 * this.zScale);
                 }
+                positionAttribute.needsUpdate = true;
+            }
+        } else if (positionAttribute && this._targetZ && this._targetZ.length === count) {
+            if (!this._currentZ || this._currentZ.length !== count) {
+                this._currentZ = new Float32Array(count);
+                for (let i = 0; i < count; i++) {
+                    this._currentZ[i] = this._targetZ[i];
+                }
+            }
+
+            const alpha = 0.28;
+            let dirty = false;
+
+            for (let i = 0; i < count; i++) {
+                const target = this._targetZ[i];
+                const current = this._currentZ[i];
+                const diff = target - current;
+
+                if (diff > 1e-4 || diff < -1e-4) {
+                    const next = current + diff * alpha;
+                    this._currentZ[i] = next;
+                    positionAttribute.setZ(i, next * this.zScale);
+                    dirty = true;
+                } else if (current !== target) {
+                    this._currentZ[i] = target;
+                    positionAttribute.setZ(i, target * this.zScale);
+                    dirty = true;
+                }
+            }
+
+            if (dirty) {
                 positionAttribute.needsUpdate = true;
             }
         }
@@ -216,12 +338,19 @@ export class TopologyMeshViewer {
     }
 
     resize() {
-        if (!this.canvas || !this.renderer || !this.camera) return;
-        const width = this.canvas.clientWidth;
-        const height = this.canvas.clientHeight;
+        if (!this.renderer || !this.camera) return;
+
+        const targetEl = this.container || (this.canvas && this.canvas.parentElement) || this.canvas;
+        if (!targetEl) return;
+
+        const rect = targetEl.getBoundingClientRect ? targetEl.getBoundingClientRect() : null;
+        const width = Math.max(1, Math.floor((rect && rect.width) || targetEl.clientWidth || 1));
+        const height = Math.max(1, Math.floor((rect && rect.height) || targetEl.clientHeight || 1));
+
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         this.camera.aspect = width / height;
         this.camera.updateProjectionMatrix();
-        this.renderer.setSize(width, height, false);
+        this.renderer.setSize(width, height, true);
     }
 
     connect(url = '/ws/telemetry') {
@@ -232,45 +361,41 @@ export class TopologyMeshViewer {
         this.ws.binaryType = 'arraybuffer';
 
         this.ws.onmessage = (event) => {
-            if (event.data instanceof ArrayBuffer) {
-                const buffer = event.data;
-                if (buffer.byteLength >= 24) {
-                    try {
-                        const headerView = new DataView(buffer, 0, 24);
-                        const step = headerView.getUint32(8, true);
-                        const numPoints = headerView.getUint32(16, true);
-                        const expectedLength = 24 + (numPoints * 3 * 8 * 3) + (numPoints * 8);
+            if (typeof event.data === 'string') {
+                try {
+                    const payload = JSON.parse(event.data);
+                    const ch02 = payload?.projection?.channel === 'CH-02'
+                        ? payload.projection
+                        : payload?.projections?.['CH-02'];
 
-                        if (buffer.byteLength >= expectedLength && numPoints > 0) {
-                            this.isServerDriven = true; // Mark active stream only on valid data
-                            const vectorByteLength = numPoints * 3 * 8;
-                            let offset = 24;
-
-                            const gridPositions = new Float64Array(buffer, offset, numPoints * 3);
-                            offset += vectorByteLength;
-                            const efieldReal = new Float64Array(buffer, offset, numPoints * 3);
-                            offset += vectorByteLength;
-                            const efieldImag = new Float64Array(buffer, offset, numPoints * 3);
-                            offset += vectorByteLength;
-                            const probDensity = new Float64Array(buffer, offset, numPoints);
-
-                            this.updateCoordinates({
-                                step,
-                                timeElapsed: 0,
-                                numPoints,
-                                gridPositions,
-                                efieldReal,
-                                efieldImag,
-                                probDensity
+                    if (ch02) {
+                        this.isServerDriven = true;
+                        if (Array.isArray(ch02.field_2d) && ch02.field_2d.length > 0) {
+                            this.setModelState({
+                                ...ch02,
+                                type: 'WS_TELEMETRY',
+                                source: 'MAIN_HUD_WS',
+                                nodes: Array.isArray(ch02.nodes) ? ch02.nodes : [],
+                                edges: Array.isArray(ch02.edges) ? ch02.edges : []
                             });
-                            return;
+                        } else if (Array.isArray(ch02.nodes) && ch02.nodes.length > 0) {
+                            this.setModelState({
+                                type: 'WS_TELEMETRY',
+                                source: 'MAIN_HUD_WS',
+                                nodes: ch02.nodes,
+                                edges: Array.isArray(ch02.edges) ? ch02.edges : []
+                            });
                         }
-                    } catch (e) {
-                        console.error("Binary parse error:", e);
                     }
+                } catch (err) {
+                    console.warn('[TopologyMeshViewer] Failed to parse WS JSON frame:', err);
                 }
-                const floatData = new Float32Array(buffer);
-                this.updateCoordinates(floatData);
+                return;
+            }
+
+            if (event.data instanceof ArrayBuffer) {
+                this.isServerDriven = true;
+                // existing binary ArrayBuffer path...
             }
         };
 

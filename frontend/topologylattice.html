@@ -18,7 +18,7 @@
             box-sizing: border-box;
             font-family: 'Courier New', Courier, monospace;
         }
-    
+
         *,
         *:before,
         *:after {
@@ -32,13 +32,10 @@
 </head>
 
 <body>
-    <div id="channel-mount" style="width: 100vw; height: 100vh; position: relative;"></div>
-    <div id="lattice-container"></div>
     <!-- CH-02 View Container (Topology Lattice 3D) -->
-    <div id="view-CH-02" class="channel-view"
-        style="display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; display: flex;">
+    <div id="view-CH-02" class="channel-view" style="display: flex; width: 100%; height: 100%; position: relative;">
         <canvas id="canvas-CH-02" style="flex: 1; height: 100%; display: block;"></canvas>
-    
+
         <!-- Lattice Control Panel Sidebar -->
         <div
             style="width: 280px; background: #080d0d; border-left: 1.5px solid #00ffcc33; padding: 16px; display: flex; flex-direction: column; gap: 16px; z-index: 5;">
@@ -53,14 +50,18 @@
             </div>
         </div>
     </div>
-    
-    <script>
+
+    <script type="module">
+        import { TopologyMeshViewer } from '/js/TopologyMeshViewer.js';
+
         window.addEventListener('DOMContentLoaded', () => {
-            const mount = document.getElementById('channel-mount');
-            if (mount && window.TopologyMeshViewer) {
-                const viewer = new TopologyMeshViewer(mount);
-                viewer.connect('/ws/telemetry');
-            }
+            const canvas = document.getElementById('canvas-CH-02');
+            if (!canvas) return;
+
+            const viewer = new TopologyMeshViewer(canvas);
+            viewer.connect('/ws/telemetry');
+
+            window.addEventListener('resize', () => viewer.resize());
         });
     </script>
 </body>

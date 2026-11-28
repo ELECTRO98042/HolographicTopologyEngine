@@ -87,13 +87,15 @@ export class ThermalOverlay {
 
         this._updateStarbursts(nodeDataArray);
 
+        const scale = this.frameManager?.currentScale ?? 1.0;
         const proximityData = nodeDataArray.map(node => {
-            const px = node.position ? node.position.x : (node.x || 0);
-            const py = node.position ? node.position.y : (node.y || 0);
-            const pz = node.position ? node.position.z : (node.z || 0);
+            const px = (node.position ? node.position.x : (node.x || 0)) * scale;
+            const py = (node.position ? node.position.y : (node.y || 0)) * scale;
+            const pz = (node.position ? node.position.z : (node.z || 0)) * scale;
+            const rawHeat = typeof node.totalHeat === 'number' ? node.totalHeat : 1.0;
             return {
                 position: new THREE.Vector3(px, py, pz),
-                totalHeat: Math.min((node.totalHeat || 1.0) * 0.05, MAX_LUMINANCE_CLAMP),
+                totalHeat: Math.min(Math.max(0.25, rawHeat) * 0.12, MAX_LUMINANCE_CLAMP),
                 dissipationCoeff: HEAT_DISSIPATION_COEFF
             };
         });

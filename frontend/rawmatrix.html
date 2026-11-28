@@ -25,11 +25,6 @@
             box-sizing: inherit;
         }
     </style>
-    <!-- Core Engine & Viewer Scripts -->
-    <script type="module" src="/js/OscilloscopeViewer.js"></script>
-    <script type="module" src="/js/TopologyMeshViewer.js"></script>
-    <script type="module" src="/js/controlDeck.js"></script>
-    <script type="module" src="/js/RawMatrixViewer.js"></script>
 </head>
 
 <body>
@@ -38,14 +33,20 @@
     <script type="module">
         import { RawMatrixViewer } from '/js/RawMatrixViewer.js';
 
-        document.addEventListener('DOMContentLoaded', () => {
+        function initMatrixPage() {
             const container = document.getElementById('tensorMatrixContainer');
-            if (!container) return;
+            if (!container || window.matrixViewer) return;
 
             const viewer = new RawMatrixViewer(container);
             window.matrixViewer = viewer;
-            viewer.connect('/ws/matrix'); //edited to correct ws/matrix instead of ws/telemetry to isolate the channel
-        });
+            viewer.connect('/ws/matrix');
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initMatrixPage);
+        } else {
+            initMatrixPage();
+        }
     </script>
 </body>
 

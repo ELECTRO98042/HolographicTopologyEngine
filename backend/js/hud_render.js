@@ -95,9 +95,26 @@ const MAX_EMP_NODES = 8;
 let thermalOverlay = null;
 let empOverlay = null;
 let qeTetherManager = null;
+// --- 1. SNR GATE: Dedicated Red Technical Indicator Layer ---
 let snrOverlay = null;
+let snrGateGeometry = null;
+let snrGateLines = null;
+let snrGatePositions = null;
+let snrGateColors = null;
+const SNR_VERTS_PER_PAIR = 4; // Two orthogonal cross segments at each gated link midpoint
+let snrGateInstancedMesh = null;
+const SNR_BARS_PER_PAIR = 2; // Horizontal + vertical crosshair arm per gated link
+const SNR_MAX_BARS = MAX_PAIRS * SNR_BARS_PER_PAIR;
+const snrDummy = new THREE.Object3D();
+let snrGateRenderState = {
+    active: false,
+    threshold: 0.05
+};
+
 let openSpaceOverlay = null;
 let dopplerShiftOverlay = null;
+
+
 let tensegrityTensionManager = null;
 let vacuumFluctuationsManager = null;
 
@@ -105,6 +122,27 @@ let dopplerGeometry = null;
 let dopplerLines = null;
 let dopplerPositions = null;
 let dopplerColors = null;
+
+let phaseFluxInstancedMesh = null;
+const FLUX_BARS_PER_PAIR = 2;
+const FLUX_MAX_BARS = MAX_PAIRS * FLUX_BARS_PER_PAIR;
+const fluxDummy = new THREE.Object3D();
+
+let phaseFluxRenderState = {
+    active: false,
+    threshold: 0.35
+};
+let pinLocksInstancedMesh = null;
+const pinDummy = new THREE.Object3D();
+
+let highCouplingInstancedMesh = null;
+const couplingDummy = new THREE.Object3D();
+
+let pathDivergenceInstancedMesh = null;
+const pathDivDummy = new THREE.Object3D();
+
+let baseDeltaInstancedMesh = null;
+const baseDeltaDummy = new THREE.Object3D();
 
 let raycaster = null;
 let pointerNDC = new THREE.Vector2();
@@ -133,6 +171,11 @@ const fieldTetherMid = Array.from({ length: MAX_TETHERS }, () => new THREE.Vecto
 
 const tempVec = new THREE.Vector3();
 const tempColor = new THREE.Color();
+
+const hudTelemetryChannel = typeof BroadcastChannel !== 'undefined'
+    ? new BroadcastChannel('holographic_telemetry_channel')
+    : null;
+let lastOscPushTime = 0;
 
 // -----------------------------------------------------------------------------
 // Initialisation
@@ -268,8 +311,14 @@ export function initHUDRenderer(options = {}) {
 
     buildTetherMeshes();
     buildVaporField();
-    // buildEMPField();
     buildDopplerField();
+    // keep these separated as they belong to different rendering systems.
+    buildSnrGateMarkers();
+    buildPhaseFluxMarkers();
+    buildPinLocksMarkers();
+    buildHighCouplingMarkers();
+    buildPathDivergenceMarkers();
+    buildBaseDeltaMarkers();
     buildShell(options.mode || 'open');
     buildGizmo(options.gizmoCanvas || document.getElementById('gizmoCanvas'));
 
@@ -297,7 +346,6 @@ export function setColorPalette(schema) {
     const targetSchema = schema || 'dynamic';
     window.hudConfig.colorPalette = targetSchema;
 
-    // Sanitize and clear stale overlay flags when returning to dynamic
     if (!window.hudConfig.overlays) window.hudConfig.overlays = {};
     if (targetSchema === 'dynamic') {
         window.hudConfig.overlays.qe = false;
@@ -313,14 +361,6 @@ export function setColorPalette(schema) {
         };
         shellMaterial.uniforms.uColorSchema.value = paletteModes[targetSchema] !== undefined ? paletteModes[targetSchema] : 0;
         shellMaterial.uniforms.uColorSchema.needsUpdate = true;
-    }
-    if (targetSchema === 'dynamic') {
-        window.hudConfig.overlays.qe = false;
-        window.hudConfig.overlays.quantumEntanglement = false;
-        window.hudConfig.overlays.ads = false;
-        window.hudConfig.overlays.doppler = false;
-    } else if (targetSchema === 'doppler') {
-        window.hudConfig.overlays.doppler = true;
     }
 }
 
@@ -838,7 +878,7 @@ function updateNodes(nodes, worldScale, palette, overlays, intensity) {
 
     nodeMesh.count = count;
 
-    const empActive = !!(overlays.emp || overlays.em || palette === 'em');
+    const empActive = !!(overlays.emp || palette === 'em');
     const thermalActive = !!overlays.thermal || palette === 'thermal';
     const waveActive = !!overlays.wave; // <--- Add this back
     const qeActive = !!(overlays.qe || overlays.quantumEntanglement || palette === 'qe');
@@ -1198,7 +1238,7 @@ function updateTethers(pairs, time, interpMode, palette, overlays, intensity, no
     else if (palette === 'vacuum') { primaryCol.set(0x34d399); highTensionCol.set(0x6ee7b7); }
 
     const auraActive = palette === 'ads' || palette === 'qe' || palette === 'composite' || !!overlays.ads;
-    const signalParticlesActive = palette === 'snr' || palette === 'em' || palette === 'composite' || !!overlays.snr;
+    const signalParticlesActive = palette === 'snr' || palette === 'em' || palette === 'composite';
     const multipathActive = !!overlays.multipath;
     const waveOverlay = !!overlays.wave || !!overlays.qe;
     const noiseAttenuation = Math.max(0.2, 1.0 - noiseThresh * 1.5);
@@ -1579,9 +1619,9 @@ function updateVaporField(nodes, pairs, overlayFlags, intensity, time, worldScal
     const atmosActive = !!overlayFlags.atmos || !!overlayFlags.vacuum;
     const thermalActive = !!overlayFlags.thermal;
     const waveActive = !!overlayFlags.wave;
-    const empActive = !!overlayFlags.emp || !!overlayFlags.em;
+    const empActive = !!overlayFlags.emp;
     const dopplerActive = !!overlayFlags.doppler;
-    const multipathActive = !!overlayFlags.multipath || !!overlayFlags.snr;
+    const multipathActive = !!overlayFlags.multipath;
     const qeActive = !!overlayFlags.qe || !!overlayFlags.quantumEntanglement; // Declared once here cleanly
     const allOff = !atmosActive && !thermalActive && !waveActive
         && !empActive && !dopplerActive && !multipathActive && !qeActive;
@@ -1652,6 +1692,144 @@ function buildDopplerField() {
     scene.add(dopplerLines);
 }
 
+// SNR GATE TECHNICAL INDICATORS
+function syncSnrGateRenderState(detail = {}) {
+    const cfg = window.hudConfig || {};
+    const active = typeof detail.active === 'boolean'
+        ? detail.active
+        : Boolean(cfg.diagnosticOverlays?.snrGate);
+    const rawThresh = Number.isFinite(detail.threshold)
+        ? detail.threshold
+        : (Number.isFinite(cfg.noiseThresh) ? cfg.noiseThresh : (cfg.noiseThreshold ?? 0.05));
+
+    snrGateRenderState.active = active;
+    snrGateRenderState.threshold = Number(rawThresh);
+
+    if (snrGateInstancedMesh) {
+        snrGateInstancedMesh.visible = active;
+        if (!active) snrGateInstancedMesh.count = 0;
+    }
+}
+
+window.addEventListener('hud:snr-gate-update', (e) => {
+    syncSnrGateRenderState(e?.detail || {});
+});
+
+window.addEventListener('hud:diagnostic-overlay-toggle', (e) => {
+    const d = e?.detail || {};
+    if (d.key === 'snr-gate' || d.diagnostic === 'snrGate') {
+        syncSnrGateRenderState(d);
+    }
+});
+
+function buildSnrGateMarkers() {
+    const barGeo = new THREE.BoxGeometry(1, 1, 1);
+    const barMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.94,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false
+    });
+
+    snrGateInstancedMesh = new THREE.InstancedMesh(barGeo, barMat, SNR_MAX_BARS);
+    snrGateInstancedMesh.name = 'snrGateTechnicalMarkers';
+    snrGateInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    snrGateInstancedMesh.frustumCulled = false;
+    snrGateInstancedMesh.visible = false;
+    snrGateInstancedMesh.count = 0;
+    scene.add(snrGateInstancedMesh);
+}
+
+function updateSnrGateTechnicalIndicators(pairs) {
+    if (!snrGateInstancedMesh) return;
+
+    const cfgActive = Boolean(window.hudConfig?.diagnosticOverlays?.snrGate);
+    const active = snrGateRenderState.active || cfgActive;
+
+    if (!active || !Array.isArray(pairs) || pairs.length === 0) {
+        snrGateInstancedMesh.visible = false;
+        snrGateInstancedMesh.count = 0;
+        return;
+    }
+
+    snrGateInstancedMesh.visible = true;
+    const intensity = Number.isFinite(window.hudConfig?.overlayIntensity)
+        ? Math.max(0.25, Math.min(1.0, window.hudConfig.overlayIntensity * 0.92))
+        : 0.94;
+    snrGateInstancedMesh.material.opacity = intensity;
+
+    const threshold = Number.isFinite(window.hudConfig?.noiseThresh)
+        ? window.hudConfig.noiseThresh
+        : (Number.isFinite(window.hudConfig?.noiseThreshold) ? window.hudConfig.noiseThreshold : snrGateRenderState.threshold);
+
+    const gatedCandidates = [];
+    for (let i = 0; i < pairs.length; i++) {
+        const pair = pairs[i];
+        if (!pair) continue;
+
+        const a = pair.nodeA || pair.a || {};
+        const b = pair.nodeB || pair.b || {};
+        const tension = Number.isFinite(pair.tension)
+            ? pair.tension
+            : (Number.isFinite(pair.strain) ? pair.strain : 0.2);
+        const relVel = Math.hypot(
+            (b.vx || 0) - (a.vx || 0),
+            (b.vy || 0) - (a.vy || 0),
+            (b.vz || 0) - (a.vz || 0)
+        );
+        const noise = Math.min(1, tension * 0.75 + Math.min(0.25, relVel * 0.05));
+
+        if (noise > threshold) {
+            gatedCandidates.push({ pair, noise });
+        }
+    }
+
+    gatedCandidates.sort((x, y) => y.noise - x.noise);
+
+    let barIdx = 0;
+    const thickness = 1.4;
+    const maxHighlightedLinks = gatedCandidates.length <= 6 ? gatedCandidates.length : 3;
+
+    for (let g = 0; g < maxHighlightedLinks; g++) {
+        if (barIdx + 2 > SNR_MAX_BARS) break;
+        const { pair } = gatedCandidates[g];
+        const isTopGated = g < 3;
+        const armLength = isTopGated ? 5.5 : 3.8;
+
+        const mx = (pair.ax + pair.bx) * 0.5;
+        const my = (pair.ay + pair.by) * 0.5;
+        const mz = (pair.az + pair.bz) * 0.5;
+
+        tempColor.setRGB(1.0, isTopGated ? 0.24 : 0.14, isTopGated ? 0.24 : 0.14);
+
+        snrDummy.position.set(mx, my, mz);
+        snrDummy.rotation.set(0, 0, 0);
+        snrDummy.scale.set(armLength, thickness, thickness);
+        snrDummy.updateMatrix();
+        snrGateInstancedMesh.setMatrixAt(barIdx, snrDummy.matrix);
+        snrGateInstancedMesh.setColorAt(barIdx, tempColor);
+        barIdx++;
+
+        snrDummy.position.set(mx, my, mz);
+        snrDummy.rotation.set(0, 0, 0);
+        snrDummy.scale.set(thickness, armLength, thickness);
+        snrDummy.updateMatrix();
+        snrGateInstancedMesh.setMatrixAt(barIdx, snrDummy.matrix);
+        snrGateInstancedMesh.setColorAt(barIdx, tempColor);
+        barIdx++;
+    }
+
+    snrGateInstancedMesh.count = barIdx;
+    snrGateInstancedMesh.instanceMatrix.needsUpdate = true;
+    if (snrGateInstancedMesh.instanceColor) {
+        snrGateInstancedMesh.instanceColor.needsUpdate = true;
+    }
+}
+
+
+
 function updateDoppler(nodes, worldScale, active, intensity) {
     dopplerLines.visible = active;
     if (!active) return;
@@ -1684,6 +1862,403 @@ function updateDoppler(nodes, worldScale, active, intensity) {
     dopplerGeometry.setDrawRange(0, vi);
     dopplerGeometry.attributes.position.needsUpdate = true;
     dopplerGeometry.attributes.color.needsUpdate = true;
+}
+
+function syncPhaseFluxRenderState(detail = {}) {
+    const cfg = window.hudConfig || {};
+    const active = typeof detail.active === 'boolean'
+        ? detail.active
+        : Boolean(cfg.diagnosticOverlays?.phaseFlux);
+    const rawThresh = Number.isFinite(detail.threshold)
+        ? detail.threshold
+        : (Number.isFinite(cfg.phaseFluxThresh) ? cfg.phaseFluxThresh : 0.35);
+
+    phaseFluxRenderState.active = active;
+    phaseFluxRenderState.threshold = Number(rawThresh);
+
+    if (phaseFluxInstancedMesh) {
+        phaseFluxInstancedMesh.visible = active;
+        if (!active) phaseFluxInstancedMesh.count = 0;
+    }
+}
+
+window.addEventListener('hud:phase-flux-update', (e) => {
+    syncPhaseFluxRenderState(e?.detail || {});
+});
+
+window.addEventListener('hud:diagnostic-overlay-toggle', (e) => {
+    const d = e?.detail || {};
+    if (d.key === 'wave' || d.diagnostic === 'phaseFlux') {
+        syncPhaseFluxRenderState(d);
+    }
+});
+
+function buildPhaseFluxMarkers() {
+    const barGeo = new THREE.BoxGeometry(1, 1, 1);
+    const barMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.92,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false
+    });
+
+    phaseFluxInstancedMesh = new THREE.InstancedMesh(barGeo, barMat, FLUX_MAX_BARS);
+    phaseFluxInstancedMesh.name = 'phaseFluxTechnicalMarkers';
+    phaseFluxInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    phaseFluxInstancedMesh.frustumCulled = false;
+    phaseFluxInstancedMesh.visible = false;
+    phaseFluxInstancedMesh.count = 0;
+    scene.add(phaseFluxInstancedMesh);
+}
+
+function updatePhaseFluxTechnicalIndicators(pairs, simTime = 0) {
+    if (!phaseFluxInstancedMesh) return;
+
+    const cfgActive = Boolean(window.hudConfig?.diagnosticOverlays?.phaseFlux);
+    const active = phaseFluxRenderState.active || cfgActive;
+
+    if (!active || !Array.isArray(pairs) || pairs.length === 0) {
+        phaseFluxInstancedMesh.visible = false;
+        phaseFluxInstancedMesh.count = 0;
+        return;
+    }
+
+    phaseFluxInstancedMesh.visible = true;
+    const intensity = Number.isFinite(window.hudConfig?.overlayIntensity)
+        ? Math.max(0.25, Math.min(1.0, window.hudConfig.overlayIntensity * 0.9))
+        : 0.92;
+    phaseFluxInstancedMesh.material.opacity = intensity;
+
+    const threshold = Number.isFinite(window.hudConfig?.phaseFluxThresh)
+        ? window.hudConfig.phaseFluxThresh
+        : phaseFluxRenderState.threshold;
+
+    const phaseOf = (n, fallbackAngle) => {
+        if (n && typeof n.phase === 'number' && Number.isFinite(n.phase)) return n.phase;
+        if (n && typeof n._phase === 'number' && Number.isFinite(n._phase)) return n._phase;
+        return fallbackAngle + simTime * 0.5;
+    };
+
+    const wrapDiff = (a, b) => {
+        let d = (a - b) % (Math.PI * 2);
+        if (d > Math.PI) d -= Math.PI * 2;
+        if (d < -Math.PI) d += Math.PI * 2;
+        return Math.abs(d);
+    };
+
+    const candidates = [];
+    for (let i = 0; i < pairs.length; i++) {
+        const pair = pairs[i];
+        if (!pair) continue;
+
+        const a = pair.nodeA || pair.a || {};
+        const b = pair.nodeB || pair.b || {};
+        const phiA = phaseOf(a, Math.atan2(pair.az, pair.ax));
+        const phiB = phaseOf(b, Math.atan2(pair.bz, pair.bx));
+        const dPhi = wrapDiff(phiA, phiB);
+        const omegaA = Number.isFinite(a.omega) ? a.omega : (Number.isFinite(a.dPhase) ? a.dPhase : 0.25);
+        const omegaB = Number.isFinite(b.omega) ? b.omega : (Number.isFinite(b.dPhase) ? b.dPhase : 0.25);
+        const flux = Math.min(3.14, dPhi * 0.7 + Math.min(1.0, Math.abs(omegaB - omegaA) * 0.4));
+
+        if (flux > threshold) {
+            candidates.push({ pair, flux });
+        }
+    }
+
+    candidates.sort((x, y) => y.flux - x.flux);
+
+    let barIdx = 0;
+    const thickness = 1.4;
+    const maxHighlighted = candidates.length <= 6 ? candidates.length : 3;
+
+    for (let g = 0; g < maxHighlighted; g++) {
+        if (barIdx + 2 > FLUX_MAX_BARS) break;
+        const { pair } = candidates[g];
+        const isTop = g < 3;
+        const armLength = isTop ? 5.5 : 3.8;
+
+        const mx = (pair.ax + pair.bx) * 0.5;
+        const my = (pair.ay + pair.by) * 0.5;
+        const mz = (pair.az + pair.bz) * 0.5;
+
+        tempColor.setRGB(1.0, isTop ? 0.75 : 0.62, isTop ? 0.14 : 0.08);
+
+        fluxDummy.position.set(mx, my, mz);
+        fluxDummy.rotation.set(0, 0, Math.PI * 0.25);
+        fluxDummy.scale.set(armLength, thickness, thickness);
+        fluxDummy.updateMatrix();
+        phaseFluxInstancedMesh.setMatrixAt(barIdx, fluxDummy.matrix);
+        phaseFluxInstancedMesh.setColorAt(barIdx, tempColor);
+        barIdx++;
+
+        fluxDummy.position.set(mx, my, mz);
+        fluxDummy.rotation.set(0, 0, -Math.PI * 0.25);
+        fluxDummy.scale.set(armLength, thickness, thickness);
+        fluxDummy.updateMatrix();
+        phaseFluxInstancedMesh.setMatrixAt(barIdx, fluxDummy.matrix);
+        phaseFluxInstancedMesh.setColorAt(barIdx, tempColor);
+        barIdx++;
+    }
+
+    phaseFluxInstancedMesh.count = barIdx;
+    phaseFluxInstancedMesh.instanceMatrix.needsUpdate = true;
+    if (phaseFluxInstancedMesh.instanceColor) {
+        phaseFluxInstancedMesh.instanceColor.needsUpdate = true;
+    }
+}
+
+function makeTechnicalCrosshairMesh(name, maxInstances) {
+    const geo = new THREE.BoxGeometry(1, 1, 1);
+    const mat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.92,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        toneMapped: false
+    });
+    const mesh = new THREE.InstancedMesh(geo, mat, maxInstances);
+    mesh.name = name;
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.frustumCulled = false;
+    mesh.visible = false;
+    mesh.count = 0;
+    scene.add(mesh);
+    return mesh;
+}
+
+function buildPinLocksMarkers() {
+    pinLocksInstancedMesh = makeTechnicalCrosshairMesh("pinLocksTechnicalMarkers", MAX_NODES * 2);
+}
+
+function updatePinLocksTechnicalIndicators(nodes, worldScale = 1.0) {
+    if (!pinLocksInstancedMesh) return;
+    const active = Boolean(window.hudConfig?.diagnosticOverlays?.pinLocks || window.hudConfig?.overlays?.emp);
+    if (!active || !Array.isArray(nodes) || nodes.length === 0) {
+        pinLocksInstancedMesh.visible = false;
+        pinLocksInstancedMesh.count = 0;
+        return;
+    }
+
+    const lockedNodes = nodes
+        .filter((n) => n && (n.isCore || n.tier === "BULK_CORE" || n.isPinned || n.pinned || n.fixed))
+        .slice(0, 6);
+
+    pinLocksInstancedMesh.visible = lockedNodes.length > 0;
+    let idx = 0;
+    const thickness = 1.4;
+
+    for (let i = 0; i < lockedNodes.length; i++) {
+        if (idx + 2 > MAX_NODES * 2) break;
+        const n = lockedNodes[i];
+        const isCore = Boolean(n.isCore || n.tier === "BULK_CORE");
+        const armLen = isCore ? 6.5 : 4.8;
+        const x = (n.position ? n.position.x : (n.x || 0)) * worldScale;
+        const y = (n.position ? n.position.y : (n.y || 0)) * worldScale;
+        const z = (n.position ? n.position.z : (n.z || 0)) * worldScale;
+
+        tempColor.setRGB(0.22, 0.74, 0.97);
+
+        pinDummy.position.set(x, y, z);
+        pinDummy.rotation.set(0, 0, 0);
+        pinDummy.scale.set(armLen, thickness, thickness);
+        pinDummy.updateMatrix();
+        pinLocksInstancedMesh.setMatrixAt(idx, pinDummy.matrix);
+        pinLocksInstancedMesh.setColorAt(idx, tempColor);
+        idx++;
+
+        pinDummy.position.set(x, y, z);
+        pinDummy.rotation.set(0, 0, 0);
+        pinDummy.scale.set(thickness, armLen, thickness);
+        pinDummy.updateMatrix();
+        pinLocksInstancedMesh.setMatrixAt(idx, pinDummy.matrix);
+        pinLocksInstancedMesh.setColorAt(idx, tempColor);
+        idx++;
+    }
+
+    pinLocksInstancedMesh.count = idx;
+    pinLocksInstancedMesh.instanceMatrix.needsUpdate = true;
+    if (pinLocksInstancedMesh.instanceColor) pinLocksInstancedMesh.instanceColor.needsUpdate = true;
+}
+
+function buildHighCouplingMarkers() {
+    highCouplingInstancedMesh = makeTechnicalCrosshairMesh("highCouplingTechnicalMarkers", MAX_PAIRS * 2);
+}
+
+function updateHighCouplingTechnicalIndicators(pairs) {
+    if (!highCouplingInstancedMesh) return;
+    const active = Boolean(window.hudConfig?.diagnosticOverlays?.highCoupling || window.hudConfig?.overlays?.atmos);
+    if (!active || !Array.isArray(pairs) || pairs.length === 0) {
+        highCouplingInstancedMesh.visible = false;
+        highCouplingInstancedMesh.count = 0;
+        return;
+    }
+
+    const threshold = Number.isFinite(window.hudConfig?.highCouplingThresh) ? window.hudConfig.highCouplingThresh : 0.55;
+    const ranked = pairs
+        .map((pair) => {
+            const c = Number.isFinite(pair?.coupling) ? pair.coupling : (0.35 + (pair?.tension || 0) * 0.65);
+            return { pair, c };
+        })
+        .filter((x) => x.c >= threshold)
+        .sort((a, b) => b.c - a.c)
+        .slice(0, 3);
+
+    highCouplingInstancedMesh.visible = ranked.length > 0;
+    let idx = 0;
+    const thickness = 1.4;
+    const armLen = 5.2;
+
+    for (let i = 0; i < ranked.length; i++) {
+        if (idx + 2 > MAX_PAIRS * 2) break;
+        const { pair } = ranked[i];
+        const mx = (pair.ax + pair.bx) * 0.5;
+        const my = (pair.ay + pair.by) * 0.5;
+        const mz = (pair.az + pair.bz) * 0.5;
+
+        tempColor.setRGB(0.20, 0.83, 0.60);
+
+        couplingDummy.position.set(mx, my, mz);
+        couplingDummy.rotation.set(0, 0, Math.PI * 0.25);
+        couplingDummy.scale.set(armLen, thickness, thickness);
+        couplingDummy.updateMatrix();
+        highCouplingInstancedMesh.setMatrixAt(idx, couplingDummy.matrix);
+        highCouplingInstancedMesh.setColorAt(idx, tempColor);
+        idx++;
+
+        couplingDummy.position.set(mx, my, mz);
+        couplingDummy.rotation.set(0, 0, -Math.PI * 0.25);
+        couplingDummy.scale.set(armLen, thickness, thickness);
+        couplingDummy.updateMatrix();
+        highCouplingInstancedMesh.setMatrixAt(idx, couplingDummy.matrix);
+        highCouplingInstancedMesh.setColorAt(idx, tempColor);
+        idx++;
+    }
+
+    highCouplingInstancedMesh.count = idx;
+    highCouplingInstancedMesh.instanceMatrix.needsUpdate = true;
+    if (highCouplingInstancedMesh.instanceColor) highCouplingInstancedMesh.instanceColor.needsUpdate = true;
+}
+
+function buildPathDivergenceMarkers() {
+    pathDivergenceInstancedMesh = makeTechnicalCrosshairMesh("pathDivergenceTechnicalMarkers", MAX_NODES * 2);
+}
+
+function updatePathDivergenceTechnicalIndicators(nodes, worldScale = 1.0) {
+    if (!pathDivergenceInstancedMesh) return;
+    const active = Boolean(window.hudConfig?.diagnosticOverlays?.pathDivergence || window.hudConfig?.overlays?.doppler);
+    if (!active || !Array.isArray(nodes) || nodes.length === 0) {
+        pathDivergenceInstancedMesh.visible = false;
+        pathDivergenceInstancedMesh.count = 0;
+        return;
+    }
+
+    const ranked = nodes
+        .map((n) => ({
+            n,
+            speed: Math.hypot(n?.vx || 0, n?.vy || 0, n?.vz || 0)
+        }))
+        .sort((a, b) => b.speed - a.speed)
+        .slice(0, 3);
+
+    pathDivergenceInstancedMesh.visible = ranked.length > 0;
+    let idx = 0;
+    const thickness = 1.4;
+    const armLen = 5.5;
+
+    for (let i = 0; i < ranked.length; i++) {
+        if (idx + 2 > MAX_NODES * 2) break;
+        const { n } = ranked[i];
+        const x = (n.position ? n.position.x : (n.x || 0)) * worldScale;
+        const y = (n.position ? n.position.y : (n.y || 0)) * worldScale;
+        const z = (n.position ? n.position.z : (n.z || 0)) * worldScale;
+
+        tempColor.setRGB(0.75, 0.52, 0.99);
+
+        pathDivDummy.position.set(x, y, z);
+        pathDivDummy.rotation.set(0, 0, Math.PI * 0.25);
+        pathDivDummy.scale.set(armLen, thickness, thickness);
+        pathDivDummy.updateMatrix();
+        pathDivergenceInstancedMesh.setMatrixAt(idx, pathDivDummy.matrix);
+        pathDivergenceInstancedMesh.setColorAt(idx, tempColor);
+        idx++;
+
+        pathDivDummy.position.set(x, y, z);
+        pathDivDummy.rotation.set(0, 0, -Math.PI * 0.25);
+        pathDivDummy.scale.set(armLen, thickness, thickness);
+        pathDivDummy.updateMatrix();
+        pathDivergenceInstancedMesh.setMatrixAt(idx, pathDivDummy.matrix);
+        pathDivergenceInstancedMesh.setColorAt(idx, tempColor);
+        idx++;
+    }
+
+    pathDivergenceInstancedMesh.count = idx;
+    pathDivergenceInstancedMesh.instanceMatrix.needsUpdate = true;
+    if (pathDivergenceInstancedMesh.instanceColor) pathDivergenceInstancedMesh.instanceColor.needsUpdate = true;
+}
+
+function buildBaseDeltaMarkers() {
+    baseDeltaInstancedMesh = makeTechnicalCrosshairMesh("baseDeltaTechnicalMarkers", MAX_NODES * 2);
+}
+
+function updateBaseDeltaTechnicalIndicators(nodes, worldScale = 1.0) {
+    if (!baseDeltaInstancedMesh) return;
+    const active = Boolean(window.hudConfig?.diagnosticOverlays?.baseDelta || window.hudConfig?.overlays?.multipath);
+    if (!active || !Array.isArray(nodes) || nodes.length === 0) {
+        baseDeltaInstancedMesh.visible = false;
+        baseDeltaInstancedMesh.count = 0;
+        return;
+    }
+
+    const ranked = nodes
+        .map((n) => {
+            const x = n?.position ? n.position.x : (n?.x || 0);
+            const y = n?.position ? n.position.y : (n?.y || 0);
+            const z = n?.position ? n.position.z : (n?.z || 0);
+            const bx = n?._baseX ?? x;
+            const by = n?._baseY ?? y;
+            const bz = n?._baseZ ?? z;
+            return { n, delta: Math.hypot(x - bx, y - by, z - bz) };
+        })
+        .sort((a, b) => b.delta - a.delta)
+        .slice(0, 3);
+
+    baseDeltaInstancedMesh.visible = ranked.length > 0;
+    let idx = 0;
+    const thickness = 1.4;
+    const armLen = 5.4;
+
+    for (let i = 0; i < ranked.length; i++) {
+        if (idx + 2 > MAX_NODES * 2) break;
+        const { n } = ranked[i];
+        const x = (n.position ? n.position.x : (n.x || 0)) * worldScale;
+        const y = (n.position ? n.position.y : (n.y || 0)) * worldScale;
+        const z = (n.position ? n.position.z : (n.z || 0)) * worldScale;
+
+        tempColor.setRGB(0.98, 0.57, 0.24);
+
+        baseDeltaDummy.position.set(x, y, z);
+        baseDeltaDummy.rotation.set(0, 0, 0);
+        baseDeltaDummy.scale.set(armLen, thickness, thickness);
+        baseDeltaDummy.updateMatrix();
+        baseDeltaInstancedMesh.setMatrixAt(idx, baseDeltaDummy.matrix);
+        baseDeltaInstancedMesh.setColorAt(idx, tempColor);
+        idx++;
+
+        baseDeltaDummy.position.set(x, y, z);
+        baseDeltaDummy.rotation.set(0, 0, 0);
+        baseDeltaDummy.scale.set(thickness, armLen, thickness);
+        baseDeltaDummy.updateMatrix();
+        baseDeltaInstancedMesh.setMatrixAt(idx, baseDeltaDummy.matrix);
+        baseDeltaInstancedMesh.setColorAt(idx, tempColor);
+        idx++;
+    }
+
+    baseDeltaInstancedMesh.count = idx;
+    baseDeltaInstancedMesh.instanceMatrix.needsUpdate = true;
+    if (baseDeltaInstancedMesh.instanceColor) baseDeltaInstancedMesh.instanceColor.needsUpdate = true;
 }
 
 // -----------------------------------------------------------------------------
@@ -1916,9 +2491,17 @@ function animationLoop(timestamp = performance.now()) {
     const sigmaActive = !isDynamicDefault && !!(overlays.tension || overlays.sigma || palette === 'tension' || palette === 'sigma');
     const vacuumActive = !isDynamicDefault && !!(overlays.vacuum || overlays.lambda || overlays.atmos || palette === 'vacuum' || palette === 'lambda');
     const thermalActive = !!(overlays.thermal || palette === 'thermal');
-    const empActive = !!(overlays.emp || overlays.em || palette === 'em');
+    const empActive = !!(palette === 'em');
     const dopplerActive = !!(overlays.doppler || palette === 'doppler');
-
+    const noiseThreshold = config.noiseThreshold ?? 0.15;
+    const snrActive = palette === 'snr';
+    if (snrOverlay) {
+        if (snrActive && !snrOverlay.active) snrOverlay.enable();
+        else if (!snrActive && snrOverlay.active) snrOverlay.disable();
+        if (snrOverlay.active) {
+            snrOverlay.update(edges, nodes, simulationTime, noiseThreshold, worldScale);
+        }
+    }
 
     // --- Automatic Overlay Sync & Update ---
     if (thermalOverlay) {
@@ -1953,9 +2536,6 @@ function animationLoop(timestamp = performance.now()) {
         }
     }
 
-    const noiseThreshold = config.noiseThreshold ?? 0.15;
-    // Strictly decouple noiseThreshold from activation state
-    const snrActive = !!(overlays.snr || palette === 'snr');
     if (snrOverlay) {
         if (snrActive && !snrOverlay.active) snrOverlay.enable();
         else if (!snrActive && snrOverlay.active) snrOverlay.disable();
@@ -2031,10 +2611,103 @@ function animationLoop(timestamp = performance.now()) {
     syncFloor(config);
 
     const pairs = buildPairList(nodes, edges, worldScale);
+
+    function updateHUDTelemetryStats(nodes, pairs, simTime) {
+        const integrityEl = document.querySelector('.hud-integrity');
+        const eeEl = document.querySelector('.hud-ee');
+        const phiEl = document.querySelector('.hud-phi');
+        const telemEl = document.querySelector('.hud-telemetry');
+
+        const totalNodes = Array.isArray(nodes) ? nodes.length : 0;
+        let finiteNodes = 0;
+        let speedSum = 0;
+
+        for (let i = 0; i < totalNodes; i++) {
+            const n = nodes[i] || {};
+            const x = n.position ? n.position.x : n.x;
+            const y = n.position ? n.position.y : n.y;
+            const z = n.position ? n.position.z : n.z;
+            const vx = n.vx ?? 0;
+            const vy = n.vy ?? 0;
+            const vz = n.vz ?? 0;
+
+            const isFiniteAll =
+                Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) &&
+                Number.isFinite(vx) && Number.isFinite(vy) && Number.isFinite(vz);
+
+            if (isFiniteAll) {
+                finiteNodes += 1;
+                speedSum += Math.hypot(vx, vy, vz);
+            }
+        }
+
+        const integrityPct = totalNodes > 0 ? (finiteNodes / totalNodes) * 100 : 100;
+        const meanSpeed = finiteNodes > 0 ? speedSum / finiteNodes : 0;
+
+        const pairCount = Array.isArray(pairs) ? pairs.length : 0;
+        let couplingSum = 0;
+        for (let p = 0; p < pairCount; p++) {
+            const tVal = Number.isFinite(pairs[p]?.tension) ? pairs[p].tension : 0;
+            couplingSum += Math.max(0, Math.min(1, 1 - tVal));
+        }
+        const meanCoupling = pairCount > 0 ? couplingSum / pairCount : 0;
+
+        const maxPairs = totalNodes > 1 ? (totalNodes * (totalNodes - 1)) / 2 : 1;
+        const density = Math.min(1, pairCount / maxPairs);
+        const phiProxy = meanCoupling * density;
+
+        if (integrityEl) {
+            integrityEl.textContent = `System Integrity: ${integrityPct.toFixed(1)}%`;
+        }
+        if (eeEl) {
+            eeEl.textContent = `Entanglement (See) [proxy]: ${meanCoupling.toFixed(3)}`;
+        }
+        if (phiEl) {
+            phiEl.textContent = `Integrated Info (Phi) [proxy]: ${phiProxy.toFixed(3)}`;
+        }
+        if (telemEl) {
+            telemEl.textContent = `Nodes: ${totalNodes} | Pairs: ${pairCount} | v̄: ${meanSpeed.toFixed(2)} | t: ${simTime.toFixed(1)}s`;
+        }
+    }
+
     updateNodes(nodes, worldScale, palette, overlays, intensity);
     updateTethers(pairs, simulationTime, interpolation, palette, overlays, intensity, config.noiseThresh ?? 0.05);
+    updateSnrGateTechnicalIndicators(pairs);
+    updatePhaseFluxTechnicalIndicators(pairs, simulationTime);
+    updatePinLocksTechnicalIndicators(nodes, worldScale);
+    updateHighCouplingTechnicalIndicators(pairs);
+    updatePathDivergenceTechnicalIndicators(nodes, worldScale);
+    updateBaseDeltaTechnicalIndicators(nodes, worldScale);
     updateVaporField(nodes, pairs, overlays, intensity, simulationTime, worldScale);
     updateDoppler(nodes, worldScale, !!overlays.doppler, intensity);
+
+    if (Array.isArray(nodes) && nodes.length > 0) {
+        const scopePayloadNodes = nodes.map((n) => ({
+            id: n.id,
+            phase: typeof n.phase === 'number'
+                ? n.phase
+                : (typeof n._phase === 'number' ? n._phase : simulationTime),
+            x: n.position ? n.position.x : (n.x || 0),
+            y: n.position ? n.position.y : (n.y || 0),
+            z: n.position ? n.position.z : (n.z || 0)
+        }));
+
+        if (
+            typeof window !== 'undefined' &&
+            window.oscilloscopeViewer &&
+            typeof window.oscilloscopeViewer.updateWaveform === 'function'
+        ) {
+            window.oscilloscopeViewer.updateWaveform(scopePayloadNodes);
+        }
+
+        if (hudTelemetryChannel && (timestamp - lastOscPushTime >= 33)) {
+            lastOscPushTime = timestamp;
+            hudTelemetryChannel.postMessage({
+                type: 'hud_update',
+                nodes: scopePayloadNodes
+            });
+        }
+    }
 
     if (tensegrityTensionManager) {
         tensegrityTensionManager.update({

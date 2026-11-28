@@ -3,6 +3,11 @@
 
 <head>
     <meta charset="UTF-8">
+    <script>
+        window.__deckErrs = [];
+        window.addEventListener('error', (e) => window.__deckErrs.push(e.message || String(e)));
+        window.addEventListener('unhandledrejection', (e) => window.__deckErrs.push(String(e.reason || e)));
+    </script>
     <title>Holographic Topology Engine HUD v3.0 (WebGL Unified)</title>
     <link rel="stylesheet" href="/css/style.css">
     <style>
@@ -36,13 +41,36 @@
             text-transform: uppercase;
         }
 
-        .hud-integrity,
-        .hud-ee,
-        .hud-phi {
-            font-size: 14px;
-            margin: 5px 0;
+        .hud-stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            font-size: 12px;
+            line-height: 1.35;
+            margin: 2px 0;
+            white-space: nowrap;
         }
 
+        .hud-stat-row span:first-child {
+            color: rgba(0, 255, 204, 0.8);
+        }
+
+        .hud-stat-row span:last-child {
+            font-weight: bold;
+            color: #00ffcc;
+        }
+
+        .hud-telemetry {
+            font-size: 10px;
+            line-height: 1.3;
+            color: rgba(0, 255, 204, 0.78);
+            border-top: 1px solid rgba(0, 255, 204, 0.2);
+            margin-top: 5px;
+            padding-top: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
         canvas {
             display: block;
         }
@@ -179,6 +207,13 @@
             box-shadow: 0 0 5px rgba(0, 255, 204, 0.5);
         }
 
+        .overlay-toggle.diag-locked {
+            opacity: 0.35;
+            cursor: not-allowed;
+            border-style: dashed;
+            filter: grayscale(0.6);
+        }
+
         .action-matrix {
             display: flex;
             flex-direction: column;
@@ -240,11 +275,21 @@
 
 <body>
     <!-- Primary Telemetry HUD -->
-    <div id="hud-container" style="width: 299px;">
-        <h3>HOLOGRAPHIC HUD V3.0</h3>
-        <div class="hud-integrity">System Integrity: 100%</div>
-        <div class="hud-ee">Entanglement (See): 0.0</div>
-        <div class="hud-phi">Integrated Info (Phi): 0.0</div>
+    <div id="hud-container" style="width: 300px; padding: 10px 12px;">
+        <h3 style="font-size: 10px; margin: 0 0 6px 0; letter-spacing: 1.5px;">HOLOGRAPHIC HUD V3.0</h3>
+        <div class="hud-stat-row">
+            <span>Integrity</span>
+            <span class="hud-integrity">100.0%</span>
+        </div>
+        <div class="hud-stat-row">
+            <span>Entanglement (S_ee)</span>
+            <span class="hud-ee">0.000</span>
+        </div>
+        <div class="hud-stat-row">
+            <span>Integrated Info (Φ)</span>
+            <span class="hud-phi">0.000</span>
+        </div>
+        <div class="hud-telemetry">Nodes: 0 | Pairs: 0 | v̄: 0.00 | t: 0.0s</div>
     </div>
 
     <!-- Spatial Control Deck -->
@@ -357,14 +402,14 @@
             <hr class="deck-divider">
 
             <div class="deck-section">
-                <label class="section-label">Interference Overlays</label>
+                <label class="section-label">Diagnostic Overlays / Exports / Pin Options</label>
                 <div class="overlay-grid">
-                    <button class="overlay-toggle" data-overlay="thermal">Thermal</button>
-                    <button class="overlay-toggle" data-overlay="wave">Wave Interf.</button>
-                    <button class="overlay-toggle" data-overlay="emp">EMP Dist.</button>
-                    <button class="overlay-toggle" data-overlay="atmos">Atmospheric</button>
-                    <button class="overlay-toggle" data-overlay="doppler">Doppler</button>
-                    <button class="overlay-toggle" data-overlay="multipath">Multipath</button>
+                    <button class="overlay-toggle" data-overlay="snr-gate">SNR Gate</button>
+                    <button class="overlay-toggle" data-overlay="wave">Phase / Flux</button>
+                    <button class="overlay-toggle" data-overlay="emp">Pin Locks</button>
+                    <button class="overlay-toggle" data-overlay="atmos">High Coupling</button>
+                    <button class="overlay-toggle" data-overlay="doppler">Path Div.</button>
+                    <button class="overlay-toggle" data-overlay="multipath">Base Delta</button>
                 </div>
             </div>
 
@@ -405,7 +450,10 @@
             🧪 Test & Validate
         </button>
     </div>
-
+    <!-- Dynamic Diagnostic Drawer anchored above #gimbal-hud -->
+    <div id="gimbal-diagnostic-drawer"
+        style="display:none; position:fixed; right:20px; width:260px; max-height:240px; overflow-y:auto; z-index:950; flex-direction:column; gap:6px; pointer-events:auto;">
+    </div>
     <!-- 3D Gimbal Panel -->
     <div id="gimbal-hud"
         style="position: absolute; bottom: 20px; right: 20px; background: rgba(5, 5, 10, 0.95); border: 1px solid #00ffcc; padding: 12px; font-family: 'Courier New', monospace; color: #00ffcc; z-index: 100; font-size: 11px; width: 220px; box-shadow: 0 0 15px rgba(0,255,204,0.15);">
@@ -425,6 +473,41 @@
     <canvas id="hudCanvas"></canvas>
     <script type="module" src="/js/telemetryStream.js"></script>
     <script src="/js/snapshotEngine.js"></script>
+    <script type="module" src="/js/controlDeck.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="/js/testingSuiteWindow.js"></script>
+
+    <script>
+        window.openChannelWindow = function (channelId) {
+            let url = '/dashboard.html';
+            let windowName = 'TelemetryDashboard';
+
+            if (channelId === 'CH-01') {
+                url = '/oscilloscope.html';
+                windowName = 'OscilloscopeStream';
+            } else if (channelId === 'CH-02') {
+                url = '/topologylattice.html';
+                windowName = 'TopologyLatticeStream';
+            } else if (channelId === 'CH-03') {
+                url = '/rawmatrix.html';
+                windowName = 'RawMatrixStream';
+            } else if (channelId === 'CH-04') {
+                url = '/phasespace.html';
+                windowName = 'PhaseSpaceStream';
+            } else if (channelId === 'CH-05') {
+                url = '/topology.html';
+                windowName = 'TopologyEngineStream';
+            } else if (channelId === 'DASHBOARD') {
+                url = '/dashboard.html';
+                windowName = 'TelemetryDashboard';
+            }
+
+            const streamWindow = window.open(url, windowName, 'width=1000,height=700');
+            if (streamWindow) {
+                streamWindow.focus();
+            }
+        };
+    </script>
 
     <!-- Unified 1:1 Pipeline Script -->
     <script type="module">
@@ -482,17 +565,47 @@
         };
 
         const schemaPropertyMap = {
-            dynamic: { qe: true, ads: true, snr: false, thermal: false, em: false, doppler: false, tension: true, vacuum: false },
-            qe: { qe: true, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: false },
-            ads: { qe: false, ads: true, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: false },
-            snr: { qe: false, ads: false, snr: true, thermal: false, em: false, doppler: false, tension: false, vacuum: false },
-            thermal: { qe: false, ads: false, snr: false, thermal: true, em: false, doppler: false, tension: false, vacuum: false },
-            em: { qe: false, ads: false, snr: false, thermal: false, em: true, doppler: false, tension: false, vacuum: false },
-            doppler: { qe: false, ads: false, snr: false, thermal: false, em: false, doppler: true, tension: false, vacuum: false },
-            tension: { qe: false, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: true, vacuum: false },
-            vacuum: { qe: false, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: true },
-            composite: { qe: true, ads: true, snr: true, thermal: true, em: true, doppler: true, tension: true, vacuum: true }
-        };
+                dynamic: {
+                    qe: true, ads: true, snr: false, thermal: false, em: false, doppler: false, tension: true, vacuum: false,
+                    wave: false, emp: false, atmos: false, multipath: false
+                },
+                qe: {
+                    qe: true, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: false,
+                    wave: false, emp: false, atmos: false, multipath: false
+                },
+                ads: {
+                    qe: false, ads: true, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: false,
+                    wave: false, emp: false, atmos: false, multipath: false
+                },
+                snr: {
+                    qe: false, ads: false, snr: true, thermal: false, em: false, doppler: false, tension: false, vacuum: false,
+                    wave: false, emp: false, atmos: false, multipath: false
+                },
+                thermal: {
+                    qe: false, ads: false, snr: false, thermal: true, em: false, doppler: false, tension: false, vacuum: false,
+                    wave: false, emp: false, atmos: false, multipath: false
+                },
+                em: {
+                    qe: false, ads: false, snr: false, thermal: false, em: true, doppler: false, tension: false, vacuum: false,
+                    wave: false, emp: false, atmos: false, multipath: false
+                },
+                doppler: {
+                    qe: false, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: false,
+                    wave: false, emp: false, atmos: false, multipath: false
+                },
+                tension: {
+                    qe: false, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: true, vacuum: false,
+                    wave: false, emp: false, atmos: false, multipath: false
+                },
+                vacuum: {
+                    qe: false, ads: false, snr: false, thermal: false, em: false, doppler: false, tension: false, vacuum: true,
+                    wave: false, emp: false, atmos: false, multipath: false
+                },
+                composite: {
+                    qe: true, ads: true, snr: true, thermal: true, em: true, doppler: true, tension: true, vacuum: true,
+                    wave: true, emp: true, atmos: true, multipath: true
+                }
+            };
 
         function syncOverlayButtons() {
             document.querySelectorAll('.overlay-toggle').forEach(btn => {
@@ -503,53 +616,219 @@
             });
         }
 
-        const paletteSelect = document.getElementById('palette-select');
-            if (paletteSelect) {
-                paletteSelect.addEventListener('change', (e) => {
-                    const schema = e.target.value;
-                    const mappedProps = schemaPropertyMap[schema] || schemaPropertyMap.dynamic;
+        function updateHUDStats() {
+            const integrityEl = document.querySelector('.hud-integrity');
+            const eeEl = document.querySelector('.hud-ee');
+            const phiEl = document.querySelector('.hud-phi');
+            const telemEl = document.querySelector('.hud-telemetry');
 
-                    Object.assign(activeOverlays, mappedProps);
-                    syncOverlayButtons();
+            const nodes = Array.isArray(window.nodes) ? window.nodes : [];
+            const totalNodes = nodes.length;
+            let finiteNodes = 0;
+            let speedSum = 0;
 
-                    // Update global HUD config and viewport renderer
-                    if (window.hudConfig) {
-                        window.hudConfig.colorPalette = schema;
-                        window.hudConfig.overlays = { ...activeOverlays };
-                    }
+            for (let i = 0; i < totalNodes; i++) {
+                const n = nodes[i] || {};
+                const x = n.position ? n.position.x : n.x;
+                const y = n.position ? n.position.y : n.y;
+                const z = n.position ? n.position.z : n.z;
+                const vx = n.vx ?? 0;
+                const vy = n.vy ?? 0;
+                const vz = n.vz ?? 0;
 
-                    if (hudViewport && typeof hudViewport.setColorPalette === 'function') {
-                        hudViewport.setColorPalette(schema);
-                        hudViewport.setOverlays({ ...activeOverlays });
-                    }
-                });
+                if (
+                    Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z) &&
+                    Number.isFinite(vx) && Number.isFinite(vy) && Number.isFinite(vz)
+                ) {
+                    finiteNodes += 1;
+                    speedSum += Math.hypot(vx, vy, vz);
+                }
             }
 
-        // Interference Overlays Toggle Buttons
-            document.querySelectorAll('.overlay-toggle').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    const targetBtn = e.currentTarget;
-                    const key = targetBtn.getAttribute('data-overlay');
-                    const isActive = targetBtn.classList.toggle('active');
-                    activeOverlays[key] = isActive;
+            const worldScale = window.hudConfig?.worldScale ?? 1.0;
+            const pairs = typeof window.buildPairList === 'function'
+                ? window.buildPairList(nodes, window.edges || [], worldScale)
+                : [];
+            const pairCount = pairs.length;
 
-                    if (key === 'emp') activeOverlays.em = isActive;
-                    if (key === 'wave') activeOverlays.qe = isActive;
-                    if (key === 'atmos') activeOverlays.vacuum = isActive;
-                    if (key === 'multipath') activeOverlays.snr = isActive;
+            let couplingSum = 0;
+            for (let p = 0; p < pairCount; p++) {
+                const tension = Number.isFinite(pairs[p]?.tension) ? pairs[p].tension : 0;
+                couplingSum += Math.max(0, Math.min(1, 1 - tension));
+            }
+            const meanCoupling = pairCount > 0 ? couplingSum / pairCount : 0;
 
-                    // --- SPECIFIC PLACEMENT FOR THERMAL OVERLAY TOGGLE ---
-                    if (key === 'thermal') {
-                        if (typeof window.toggleThermalOverlay === 'function') {
-                            window.toggleThermalOverlay(isActive);
-                        }
-                    }
-                    // ----------------------------------------------------
+            const maxPairs = totalNodes > 1 ? (totalNodes * (totalNodes - 1)) / 2 : 1;
+            const density = Math.min(1, pairCount / maxPairs);
+            const phiProxy = meanCoupling * density;
 
+            const integrityPct = totalNodes > 0 ? (finiteNodes / totalNodes) * 100 : 100;
+            const meanSpeed = finiteNodes > 0 ? speedSum / finiteNodes : 0;
+            const simTime = window.hudConfig?.simulationTime ?? 0;
+
+            if (integrityEl) integrityEl.textContent = `${integrityPct.toFixed(1)}%`;
+            if (eeEl) eeEl.textContent = `${meanCoupling.toFixed(3)}p`;
+            if (phiEl) phiEl.textContent = `${phiProxy.toFixed(3)}p`;
+            if (telemEl) {
+                telemEl.textContent = `Nodes: ${totalNodes} | Pairs: ${pairCount} | v̄: ${meanSpeed.toFixed(2)} | t: ${simTime.toFixed(1)}s`;
+            }
+        }
+
+        function statsLoop() {
+            updateHUDStats();
+            requestAnimationFrame(statsLoop);
+        }
+        requestAnimationFrame(statsLoop);
+
+    const paletteSelect = document.getElementById('palette-select');
+        if (paletteSelect) {
+            paletteSelect.addEventListener('change', (e) => {
+                const schema = e.target.value;
+                const mappedProps = schemaPropertyMap[schema] || schemaPropertyMap.dynamic;
+
+                Object.assign(activeOverlays, mappedProps);
+                syncOverlayButtons();
+
+                // Update global HUD config and viewport renderer
+                if (window.hudConfig) {
+                    window.hudConfig.colorPalette = schema;
+                    window.hudConfig.overlays = { ...activeOverlays };
+                }
+
+                if (hudViewport && typeof hudViewport.setColorPalette === 'function') {
+                    hudViewport.setColorPalette(schema);
                     hudViewport.setOverlays({ ...activeOverlays });
-                });
+                }
             });
+        }
 
+        const DIAGNOSTIC_KEYS = new Set(['snr-gate', 'wave', 'emp', 'atmos', 'doppler', 'multipath']);
+        // Interference Overlays Toggle Buttons
+        document.querySelectorAll('.overlay-toggle').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const targetBtn = e.currentTarget;
+                const key = targetBtn.getAttribute('data-overlay');
+                if (!key) return;
+
+                if (targetBtn.classList.contains('diag-locked') || targetBtn.getAttribute('aria-disabled') === 'true') {
+                    e.preventDefault();
+                    e.stopImmediatePropagation();
+                    return;
+                }
+
+                e.preventDefault();
+                e.stopImmediatePropagation();
+
+                const isActive = targetBtn.classList.toggle('active');
+                activeOverlays[key] = isActive;
+
+                if (key === 'emp') activeOverlays.em = isActive;
+                if (key === 'atmos') activeOverlays.vacuum = isActive;
+                if (key === 'multipath') activeOverlays.snr = isActive;
+
+                window.hudConfig = window.hudConfig || {};
+                window.hudConfig.overlays = Object.assign({}, window.hudConfig.overlays || {}, activeOverlays);
+                window.hudConfig.diagnosticOverlays = window.hudConfig.diagnosticOverlays || {};
+
+                if (key === 'snr-gate') {
+                    window.hudConfig.diagnosticOverlays.snrGate = isActive;
+                    if (typeof window.diagnosticOverlayHandlers?.snrGate === 'function') {
+                        window.diagnosticOverlayHandlers.snrGate(isActive, window.hudConfig);
+                    } else if (typeof window.renderSnrGateCard === 'function') {
+                        const thresh = window.hudConfig.noiseThresh ?? window.hudConfig.noiseThreshold ?? 0.05;
+                        window.renderSnrGateCard(isActive, thresh, {
+                            total: 0, passCount: 0, gatedCount: 0, maxNoise: 0, topGated: []
+                        });
+                    }
+                } else if (key === 'wave') {
+                    window.hudConfig.diagnosticOverlays.phaseFlux = isActive;
+                    if (typeof window.diagnosticOverlayHandlers?.phaseFlux === 'function') {
+                        window.diagnosticOverlayHandlers.phaseFlux(isActive, window.hudConfig);
+                    } else if (typeof window.renderPhaseFluxCard === 'function') {
+                        const fluxThresh = window.hudConfig.phaseFluxThresh ?? 0.35;
+                        const stats = typeof window.computePhaseFluxStats === 'function'
+                            ? window.computePhaseFluxStats(fluxThresh)
+                            : { total: 0, coherentCount: 0, fluxCount: 0, maxFlux: 0, topFlux: [] };
+                        window.renderPhaseFluxCard(isActive, fluxThresh, stats);
+                    }
+                } else if (DIAGIC_KEY_MAP_FALLBACK(key, isActive, window.hudConfig)) {
+                    // handled below
+                }
+
+                if (DIAGNOSTIC_KEYS.has(key) && typeof window.syncDiagnosticLocksAndBudget === 'function') {
+                    window.syncDiagnosticLocksAndBudget(key, isActive);
+                } else if (typeof window.syncGimbalDrawerBounds === 'function') {
+                    window.syncGimbalDrawerBounds();
+                }
+
+                if (typeof hudViewport !== 'undefined' && typeof hudViewport.setOverlays === 'function') {
+                    hudViewport.setOverlays({ ...(window.hudConfig.overlays || {}) });
+                }
+
+                window.dispatchEvent(new CustomEvent('hud:diagnostic-overlay-toggle', {
+                    detail: {
+                        key,
+                        diagnostic: key === 'snr-gate' ? 'snrGate' : (key === 'wave' ? 'phaseFlux' : key),
+                        active: isActive,
+                        overlays: { ...(window.hudConfig.overlays || {}) }
+                    }
+                }));
+            });
+        });
+
+        function DIAGIC_KEY_MAP_FALLBACK(key, isActive, cfg) {
+            if (!DIAGNOSTIC_KEYS.has(key)) return false;
+            cfg.diagnosticOverlays[key] = isActive;
+            const handlerMap = {
+                emp: window.diagnosticOverlayHandlers?.emp,
+                atmos: window.diagnosticOverlayHandlers?.atmos,
+                doppler: window.diagnosticOverlayHandlers?.doppler,
+                multipath: window.diagnosticOverlayHandlers?.multipath,
+            };
+            if (typeof handlerMap[key] === 'function') {
+                handlerMap[key](isActive, cfg);
+            }
+            return true;
+        }
+
+        const OVERLAY_TO_DIAG_CONFIG_KEY = {
+            'snr-gate': 'snrGate',
+            'wave': 'phaseFlux',
+            'emp': 'pinLocks',
+            'atmos': 'highCoupling',
+            'doppler': 'pathDivergence',
+            'multipath': 'baseDelta'
+        };
+
+        window.addEventListener('hud:diagnostic-overlay-toggle', (event) => {
+            const detail = event?.detail;
+            if (!detail || !detail.key) return;
+
+            const key = detail.key;
+            const isActive = Boolean(detail.active);
+
+            if (key in activeOverlays) {
+                activeOverlays[key] = isActive;
+            }
+            if (key === 'emp') activeOverlays.em = isActive;
+            if (key === 'atmos') activeOverlays.vacuum = isActive;
+            if (key === 'multipath') activeOverlays.snr = isActive;
+
+            window.hudConfig = window.hudConfig || {};
+            window.hudConfig.overlays = Object.assign({}, window.hudConfig.overlays || {}, {
+                [key]: isActive
+            });
+            window.hudConfig.diagnosticOverlays = window.hudConfig.diagnosticOverlays || {};
+
+            const diagProp = OVERLAY_TO_DIAG_CONFIG_KEY[key];
+            if (diagProp) {
+                window.hudConfig.diagnosticOverlays[diagProp] = isActive;
+            }
+
+            if (hudViewport && typeof hudViewport.setOverlays === 'function') {
+                hudViewport.setOverlays({ ...window.hudConfig.overlays });
+            }
+        });
         // Stream Filter & Interpolation Mode Dropdowns
         const streamFilterSelect = document.getElementById('stream-filter-select');
         if (streamFilterSelect) {
@@ -606,7 +885,29 @@
                 window.nodes = synchronizedNodes;
                 window.edges = message.edges || message.connections || [];
 
+                function stampBaselineCoords(nodes) {
+                    if (!Array.isArray(nodes)) return;
+                    nodes.forEach((n) => {
+                        if (!n || typeof n !== 'object') return;
+                        const x = n.position ? n.position.x : (n.x ?? 0);
+                        const y = n.position ? n.position.y : (n.y ?? 0);
+                        const z = n.position ? n.position.z : (n.z ?? 0);
+                        if (!Number.isFinite(n._baseX)) n._baseX = x;
+                        if (!Number.isFinite(n._baseY)) n._baseY = y;
+                        if (!Number.isFinite(n._baseZ)) n._baseZ = z;
+                    });
+                }
+                stampBaselineCoords(window.nodes);
+                // Propagate the updated Main HUD model so channel views stay in sync
+                if (typeof window.broadcastHUDStateToBuilder === 'function') {
+                    window.broadcastHUDStateToBuilder(window.nodes);
+                }
+                window.publishModelToTelemetryStream('BUILDER_SYNC', true)
                 setTimeout(() => { isHUDExternalSync = false; }, 50);
+
+                if (typeof window.syncModelToTelemetryStream === 'function') {
+                    window.syncModelToTelemetryStream(window.nodes, window.edges);
+                }
             }
         };
 
@@ -638,6 +939,35 @@
 
             localStorage.setItem('holographic_latest_sync', JSON.stringify(payload));
             mainHUDChannel.postMessage(payload);
+        };
+
+        window.syncModelToTelemetryStream = function (nodes = window.nodes, edges = window.edges) {
+            const safeNodes = Array.isArray(nodes) ? nodes.map((n, idx) => ({
+                id: String(n.id || `N-00${idx + 1}`),
+                x: Number(n.x ?? n.position?.x ?? 0),
+                y: Number(n.y ?? n.position?.y ?? 0),
+                z: Number(n.z ?? n.position?.z ?? 0),
+                isCore: Boolean(n.isCore || n.tier === 'BULK_CORE'),
+                isSevered: Boolean(n.isSevered),
+                health: Number.isFinite(n.health) ? n.health : 100
+            })) : [];
+
+            const safeEdges = Array.isArray(edges) ? edges.map((e) => ({
+                source: typeof e.source === 'object' && e.source !== null ? (e.source.id || e.source.name) : e.source,
+                target: typeof e.target === 'object' && e.target !== null ? (e.target.id || e.target.name) : e.target
+            })) : [];
+
+            fetch('/api/telemetry/model', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    origin: 'MAIN_HUD',
+                    nodes: safeNodes,
+                    edges: safeEdges
+                })
+            }).catch((err) => {
+                console.warn('[TelemetryModelSync] Failed to push Main HUD model:', err);
+            });
         };
 
         // JSON Import Handler (1:1 ingest into Main HUD & broadcast to Builder Deck)
@@ -674,8 +1004,11 @@
                             const refSel = document.getElementById('ref-frame-select');
                             if (refSel) refSel.value = parsed.mode;
                         }
-
+                        window.publishModelToTelemetryStream('MAIN_HUD_IMPORT', true)
                         window.broadcastHUDStateToBuilder(window.nodes);
+                        if (typeof window.syncModelToTelemetryStream === 'function') {
+                            window.syncModelToTelemetryStream(window.nodes, window.edges);
+                        }
                     } catch (err) {
                         console.error('[JSON Import] Invalid topology JSON:', err);
                     }
@@ -684,6 +1017,22 @@
                 jsonInput.value = '';
             });
         }
+
+        const mainTelemetryChannel = new BroadcastChannel('holographic_telemetry_channel');
+
+            window.publishModelToTelemetryStream = function (source = 'MAIN_HUD', hasUserModel = true) {
+                const payload = {
+                    type: 'hud_model_state',
+                    source,
+                    hasUserModel,
+                    timestamp: Date.now(),
+                    nodes: Array.isArray(window.nodes) ? window.nodes : [],
+                    edges: Array.isArray(window.edges) ? window.edges : [],
+                    config: window.hudConfig || {}
+                };
+                localStorage.setItem('holographic_telemetry_model', JSON.stringify(payload));
+                mainTelemetryChannel.postMessage(payload);
+            };
 
         // Default 3-node baseline synchronized with deck_render.js
         window.nodes = [
@@ -696,6 +1045,17 @@
             { source: 'N-001', target: 'N-003' },
             { source: 'N-002', target: 'N-003' }
         ];
+
+        // Broadcast initial Main HUD baseline so any listening channel receives the active model
+        setTimeout(() => {
+            if (typeof window.broadcastHUDStateToBuilder === 'function') {
+                window.broadcastHUDStateToBuilder(window.nodes);
+            }
+        }, 0);
+
+        if (typeof window.syncModelToTelemetryStream === 'function') {
+                window.syncModelToTelemetryStream(window.nodes, window.edges);
+            }
 
         window.setTopologyMode = function (mode) {
             if (!mode) return;
@@ -855,9 +1215,59 @@
 
         syncOverlayButtons();
     </script>
-    <script src="/js/controlDeck.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="/js/testingSuiteWindow.js"></script>
-</body>
+    <script type="module">
+        import { ControlDeckController, attachControlDeckDOM } from '/js/controlDeck.js';
+
+        const deckController = window.controlDeck || new ControlDeckController({
+            streamClient: window.streamClient || null,
+            httpBase: '',
+        });
+        window.controlDeck = deckController;
+
+        const initDeckButtons = () => {
+            attachControlDeckDOM(deckController, {
+                getNodes: () => window.nodes || [],
+                getEdges: () => window.edges || [],
+            });
+
+            ['btn-pin-all', 'btn-release-all'].forEach((btnId) => {
+                const el = document.getElementById(btnId);
+                if (!el || el.dataset.diagRefreshBound) return;
+                el.dataset.diagRefreshBound = 'true';
+                el.addEventListener('click', () => {
+                    setTimeout(() => {
+                        const cfg = window.hudConfig || {};
+                        if (cfg.diagnosticOverlays?.pinLocks && typeof window.diagnosticOverlayHandlers?.emp === 'function') {
+                            window.diagnosticOverlayHandlers.emp(true, cfg);
+                        }
+                        if (cfg.diagnosticOverlays?.baseDelta && typeof window.diagnosticOverlayHandlers?.multipath === 'function') {
+                            window.diagnosticOverlayHandlers.multipath(true, cfg);
+                        }
+                    }, 0);
+                });
+            });
+
+            const resetBtn = document.getElementById('btn-reset-view');
+            if (resetBtn && !resetBtn.dataset.bound) {
+                resetBtn.dataset.bound = 'true';
+                resetBtn.removeAttribute('onclick');
+                resetBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    if (typeof window.resetCamera === 'function') {
+                        window.resetCamera();
+                    }
+                });
+            }
+        };
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initDeckButtons, { once: true });
+        } else {
+            initDeckButtons();
+        }
+        window.rebindControlDeck = initDeckButtons;
+
+    </script>
+    </body>
 
 </html>

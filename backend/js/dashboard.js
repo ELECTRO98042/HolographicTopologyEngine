@@ -6,8 +6,11 @@
  * 3. Mounting, initializing, and resizing individual channel viewers (`OscilloscopeViewer`, 
  *    `TopologyMeshViewer`, `RawMatrixViewer`) without breaking scoping or state.
  */
+import { OscilloscopeViewer } from './OscilloscopeViewer.js';
+import { TopologyMeshViewer } from './TopologyMeshViewer.js';
+import { RawMatrixViewer } from './RawMatrixViewer.js';
+import { PhaseSpaceViewer } from './PhaseSpaceViewer.js';
 import { TopologyEngineViewer } from './TopologyEngineViewer.js';
-
 export class TelemetryStreamApp {
     constructor(containerElement) {
         this.container = containerElement;
@@ -28,6 +31,7 @@ export class TelemetryStreamApp {
      */
     init() {
         this.renderLayout();
+        window.telemetryStreamApp = this;
         this.bindNavigationEvents();
         this.switchChannel('CH-01'); // Default initial view
     }
@@ -59,8 +63,8 @@ export class TelemetryStreamApp {
                         </div>
 
                         <!-- CH-02 View Container (Topology Lattice 3D) -->
-                        <div id="view-CH-02" class="channel-view" style="display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0;">
-                            <canvas id="canvas-CH-02" style="width: 100%; height: 100%; display: block;"></canvas>
+                        <div id="view-CH-02" class="channel-view" style="display: none; width: 100%; height: 100%; position: absolute; top: 0; left: 0; flex-direction: row;">
+                            <canvas id="canvas-CH-02" style="flex: 1; height: 100%; display: block;"></canvas>
                         </div>
 
                         <!-- CH-03 View Container (Raw Matrix / Tensor Inspector) -->
@@ -127,14 +131,22 @@ export class TelemetryStreamApp {
             el.style.display = 'none';
         });
 
-        // 2. Select the target view container
+        // 2. Sync active button visual feedback in bottom navigation bar
+        this.container.querySelectorAll('.channel-btn').forEach(btn => {
+            const isActive = btn.getAttribute('data-channel') === channelId;
+            btn.classList.toggle('active', isActive);
+            btn.style.background = isActive ? '#00ffcc22' : 'transparent';
+            btn.style.borderColor = '#00ffcc';
+        });
+
+        // 3. Select the target view container
         const activeView = this.container.querySelector(`#view-${channelId}`);
         const titleEl = this.container.querySelector('#channelTitle');
 
         if (activeView) {
             activeView.style.display = 'block';
 
-            // 3. Update top banner title and initialize respective channel module
+            // 4. Update top banner title and initialize respective channel module
             switch (channelId) {
                 case 'CH-01':
                     if (titleEl) titleEl.textContent = "CH-01: OSCILLOSCOPE (2D)";
@@ -170,12 +182,24 @@ export class TelemetryStreamApp {
         if (containerEl && typeof OscilloscopeViewer !== 'undefined') {
             if (!this.oscViewer) {
                 this.oscViewer = new OscilloscopeViewer(containerEl);
+                window.oscilloscopeViewer = this.oscViewer;
                 if (typeof this.oscViewer.connect === 'function') {
                     this.oscViewer.connect('/ws/oscilloscope');
                 }
             } else {
-                if (typeof this.oscViewer.resize === 'function') this.oscViewer.resize();
+                window.oscilloscopeViewer = this.oscViewer;
             }
+
+            const currentModel = this.currentModelId || this.state?.modelId || null;
+            if (currentModel && typeof this.oscViewer.setContextModel === 'function') {
+                this.oscViewer.setContextModel(currentModel);
+            }
+
+            requestAnimationFrame(() => {
+                if (this.oscViewer && typeof this.oscViewer.resize === 'function') {
+                    this.oscViewer.resize();
+                }
+            });
             this.activeViewer = this.oscViewer;
         }
     }
@@ -188,12 +212,21 @@ export class TelemetryStreamApp {
         if (canvasEl && typeof TopologyMeshViewer !== 'undefined') {
             if (!this.meshViewer) {
                 this.meshViewer = new TopologyMeshViewer(canvasEl);
-                if (typeof this.meshViewer.connect === 'function') {
-                    this.meshViewer.connect('/ws/telemetry');
-                }
-            } else {
-                if (typeof this.meshViewer.resize === 'function') this.meshViewer.resize();
             }
+
+            if (
+                typeof this.meshViewer.connect === 'function' &&
+                (!this.meshViewer.ws ||
+                    (this.meshViewer.ws.readyState !== WebSocket.OPEN &&
+                        this.meshViewer.ws.readyState !== WebSocket.CONNECTING))
+            ) {
+                this.meshViewer.connect('/ws/telemetry');
+            }
+
+            if (typeof this.meshViewer.resize === 'function') {
+                this.meshViewer.resize();
+            }
+
             this.activeViewer = this.meshViewer;
         }
     }
@@ -204,26 +237,36 @@ export class TelemetryStreamApp {
         if (container && typeof RawMatrixViewer !== 'undefined') {
             if (!this.matrixViewer) {
                 this.matrixViewer = new RawMatrixViewer(container);
-                this.matrixViewer.connect('/ws/matrix');
+                window.matrixViewer = this.matrixViewer;
+                if (typeof this.matrixViewer.connect === 'function') {
+                    this.matrixViewer.connect('/ws/matrix');
+                }
             }
-        } else if (typeof this.matrixViewer.renderGrid === 'function' && this.matrixViewer.currentData) {
-            this.matrixViewer.renderGrid(this.matrixViewer.currentData);
+            const currentModel = this.currentModelId || this.state?.modelId || null;
+            if (currentModel && typeof this.matrixViewer.setContextModel === 'function') {
+                this.matrixViewer.setContextModel(currentModel);
+            }
+            if (typeof this.matrixViewer.renderGrid === 'function' && this.matrixViewer.currentData) {
+                this.matrixViewer.renderGrid(this.matrixViewer.currentData);
+            }
+            this.activeViewer = this.matrixViewer;
         }
-        this.activeViewer = this.matrixViewer;
     }
 
     /*** CH-04 Initialization Logic (Phase Space Reconstructor View)***/
     initChannel04(activeView) {
         const container = activeView.querySelector('#phaseSpaceContainer');
         if (container && typeof PhaseSpaceViewer !== 'undefined') {
-            if (!this.phaseViewer) {
-                this.phaseViewer = new PhaseSpaceViewer(container);
-                this.phaseViewer.connect('/ws/phasespace');
-            } else if (typeof this.phaseViewer.resize === 'function') {
-                this.phaseViewer.resize();
+            if (!this.phaseSpaceViewer) {
+                this.phaseSpaceViewer = new PhaseSpaceViewer(container);
+                if (typeof this.phaseSpaceViewer.connect === 'function') {
+                    this.phaseSpaceViewer.connect('/ws/phasespace');
+                }
+            } else if (typeof this.phaseSpaceViewer.resize === 'function') {
+                this.phaseSpaceViewer.resize();
             }
+            this.activeViewer = this.phaseSpaceViewer;
         }
-        this.activeViewer = this.phaseViewer;
     }
     /*** CH-05 Initialization Logic (Holographic Topology Engine View) ***/
     initChannel05(activeView) {
@@ -231,7 +274,7 @@ export class TelemetryStreamApp {
         if (container && typeof TopologyEngineViewer !== 'undefined') {
             if (!this.topologyEngineViewer) {
                 this.topologyEngineViewer = new TopologyEngineViewer(container);
-                this.topologyEngineViewer.connect('/ws/topology');
+                this.topologyEngineViewer.connect('/ws/topology6d');
                 window.topologyEngineViewer = this.topologyEngineViewer;
             } else {
                 this.topologyEngineViewer.resize();

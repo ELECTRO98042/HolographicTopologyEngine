@@ -49,6 +49,67 @@ export class ReferenceFrameManager {
         };
     }
 
+    getBoundaryMetrics() {
+        const frameType = this.activeFrameType || this.activeMode || 'open';
+        const scale = Math.max(0.1, this.currentScale || 1.0);
+        const topo = this.topologies?.[frameType] || null;
+
+        let fallbackRadius = 260 * scale;
+        if (frameType === 'spheroid') fallbackRadius = (topo?.outerRadius || 275) * scale;
+        else if (frameType === 'cubed') fallbackRadius = (topo?.halfExtent || 180) * scale;
+        else if (frameType === 'toroidal') fallbackRadius = ((topo?.outerMajorR || 275) + (topo?.outerTubeR || 65)) * scale;
+        else if (frameType === 'hyperbolic') fallbackRadius = Math.max((topo?.outerThroat || 230) * 1.6, topo?.outerHeight || 295) * scale;
+
+        const box = new THREE.Box3();
+        const size = new THREE.Vector3();
+        const center = new THREE.Vector3();
+        const halfExtents = new THREE.Vector3();
+
+        let hasMeshBounds = false;
+        if (this.currentGeometryMesh) {
+            if (typeof this.currentGeometryMesh.updateMatrixWorld === 'function') {
+                this.currentGeometryMesh.updateMatrixWorld(true);
+            }
+            box.setFromObject(this.currentGeometryMesh);
+            if (!box.isEmpty()) {
+                hasMeshBounds = true;
+                box.getSize(size);
+                box.getCenter(center);
+                halfExtents.copy(size).multiplyScalar(0.5);
+            }
+        }
+
+        if (!hasMeshBounds) {
+            size.set(fallbackRadius * 2, fallbackRadius * 2, fallbackRadius * 2);
+            halfExtents.set(fallbackRadius, fallbackRadius, fallbackRadius);
+            box.set(center.clone().sub(halfExtents), center.clone().add(halfExtents));
+        }
+
+        const maxHalfExtent = Math.max(halfExtents.x, halfExtents.y, halfExtents.z, 1.0);
+        const boundingRadius = hasMeshBounds ? halfExtents.length() : fallbackRadius;
+        const avgAxis = (halfExtents.x + halfExtents.y + halfExtents.z) / 3;
+
+        // Axis ratios relative to average extent (clamped to prevent extreme distortion)
+        const aspect = {
+            x: THREE.MathUtils.clamp(halfExtents.x / Math.max(1.0, avgAxis), 0.5, 1.6),
+            y: THREE.MathUtils.clamp(halfExtents.y / Math.max(1.0, avgAxis), 0.45, 1.6),
+            z: THREE.MathUtils.clamp(halfExtents.z / Math.max(1.0, avgAxis), 0.5, 1.6)
+        };
+
+        return {
+            frameType,
+            scale,
+            hasMeshBounds,
+            box,
+            center,
+            size,
+            halfExtents,
+            maxHalfExtent,
+            boundingRadius,
+            aspect
+        };
+    }
+
     setMode(mode, nodes) {
         this.activeFrameType = mode;
         this.activeMode = mode;
@@ -269,13 +330,13 @@ export class ReferenceFrameManager {
                                         }
 
                                         if (uThermalActive > 0) {
-                                            for(int i = 0; i < 16; i++) {
+                                            for (int i = 0; i < 16; i++) {
                                                 float heat = uThermalHeats[i];
                                                 if (heat > 0.0) {
                                                     float dist = distance(vWorldPosition, uThermalCenters[i]);
-                                                    float dissipation = exp(-dist * 0.015) * heat;
-                                                    gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0, 0.45, 0.1), dissipation * 0.6);
-                                                    gl_FragColor.a = min(1.0, gl_FragColor.a + dissipation * 0.4);
+                                                    float dissipation = exp(-dist * 0.012) * heat;
+                                                    gl_FragColor.rgb = mix(gl_FragColor.rgb, vec3(1.0, 0.42, 0.08), clamp(dissipation * 0.85, 0.0, 0.85));
+                                                    gl_FragColor.a = min(1.0, gl_FragColor.a + dissipation * 0.45);
                                                 }
                                             }
                                         }

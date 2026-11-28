@@ -36,10 +36,24 @@
     <script>
         window.addEventListener('DOMContentLoaded', () => {
             const mount = document.getElementById('channel-mount');
-            if (mount && window.OscilloscopeViewer) {
-                const viewer = new OscilloscopeViewer(mount);
-                viewer.connect('/ws/oscilloscope');
+            if (!mount || !window.OscilloscopeViewer) {
+                console.error('[CH-01] Missing mount or OscilloscopeViewer global.');
+                return;
             }
+
+            const viewer = new OscilloscopeViewer(mount);
+            window.oscilloscopeViewer = viewer;
+            viewer.connect('/ws/oscilloscope');
+
+            window.addEventListener('message', (event) => {
+                const msg = event.data;
+                if (!msg || typeof msg !== 'object') return;
+                if (msg.type === 'hud_update' && Array.isArray(msg.nodes)) {
+                    viewer.updateWaveform(msg.nodes);
+                } else if (msg.projection || msg.latest || msg.history) {
+                    viewer.updateWaveform(msg.projection || msg);
+                }
+            });
         });
     </script>
 </body>

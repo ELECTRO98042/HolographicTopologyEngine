@@ -2014,4 +2014,16 @@ window.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+    if (typeof window.TestingSuiteWindow === 'function' && !window.testingSuite) {
+        window.testingSuite = new window.TestingSuiteWindow();
+    }
+
+    window.openTestingSuite = function (forceState = true) {
+        if (!window.testingSuite && typeof window.TestingSuiteWindow === 'function') {
+            window.testingSuite = new window.TestingSuiteWindow();
+        }
+        if (window.testingSuite && typeof window.testingSuite.toggleDrawer === 'function') {
+            window.testingSuite.toggleDrawer(forceState);
+        }
+    };
 });
